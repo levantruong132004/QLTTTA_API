@@ -1,0 +1,175 @@
+﻿@model List<QLTTTA_WEB.Models.CourseViewModel>
+@{
+    ViewData["Title"] = "Danh sách Khóa học";
+}
+
+<style>
+    /* Retro 80s-90s Styling */
+    body {
+        background: linear-gradient(45deg, #ff006e, #8338ec, #3a86ff, #06ffa5);
+        background-size: 400% 400%;
+        animation: gradientShift 8s ease infinite;
+        font-family: 'Courier New', monospace;
+        color: #00ff00;
+        min-height: 100vh;
+        margin: 0;
+        padding: 20px;
+    }
+
+    @@keyframes gradientShift {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+
+    .retro-container {
+        background: rgba(0, 0, 0, 0.8);
+        border: 3px solid #00ff00;
+        border-radius: 15px;
+        padding: 30px;
+        box-shadow:
+            0 0 20px #00ff00,
+            inset 0 0 20px rgba(0, 255, 0, 0.1);
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+
+    .retro-title {
+        text-align: center;
+        font-size: 2.5em;
+        color: #ff00ff;
+        text-shadow:
+            0 0 5px #ff00ff,
+            0 0 10px #ff00ff,
+            0 0 15px #ff00ff;
+        animation: neonFlicker 2s infinite alternate;
+        margin-bottom: 30px;
+        text-transform: uppercase;
+        letter-spacing: 3px;
+    }
+
+    @@keyframes neonFlicker {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.8; }
+    }
+
+    .retro-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        background: rgba(0, 0, 0, 0.6);
+        border: 2px solid #00ffff;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 0 15px #00ffff;
+    }
+
+    .retro-table thead {
+        background: linear-gradient(90deg, #ff006e, #8338ec);
+    }
+
+    .retro-table th {
+        padding: 15px 20px;
+        color: #ffffff;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        border-bottom: 2px solid #00ffff;
+        text-shadow: 0 0 5px #ffffff;
+        font-size: 1.1em;
+    }
+
+    .retro-table td {
+        padding: 15px 20px;
+        color: #00ff00;
+        border-bottom: 1px solid #333;
+        transition: all 0.3s ease;
+        background: rgba(0, 0, 0, 0.3);
+    }
+
+    .retro-table tbody tr:hover {
+        background: rgba(0, 255, 255, 0.1);
+        transform: scale(1.02);
+        box-shadow: 0 0 10px #00ffff;
+    }
+
+    .retro-table tbody tr:nth-child(even) {
+        background: rgba(255, 0, 255, 0.05);
+    }
+
+    .retro-table tbody tr:nth-child(odd) {
+        background: rgba(0, 255, 0, 0.05);
+    }
+
+    /* Scan lines effect */
+    .retro-container::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: repeating-linear-gradient(
+            0deg,
+            transparent,
+            transparent 2px,
+            rgba(0, 255, 0, 0.03) 2px,
+            rgba(0, 255, 0, 0.03) 4px
+        );
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    .retro-container > * {
+        position: relative;
+        z-index: 2;
+    }
+
+    /* Glitch effect on hover */
+    .retro-title:hover {
+        animation: glitch 0.3s infinite;
+    }
+
+    @@keyframes glitch {
+        0% { transform: translate(0); }
+        20% { transform: translate(-2px, 2px); }
+        40% { transform: translate(-2px, -2px); }
+        60% { transform: translate(2px, 2px); }
+        80% { transform: translate(2px, -2px); }
+        100% { transform: translate(0); }
+    }
+
+    /* Course name styling */
+    .course-name {
+        font-weight: bold;
+        color: #ffff00;
+        text-shadow: 0 0 3px #ffff00;
+    }
+
+    .course-description {
+        color: #00ffff;
+        font-style: italic;
+    }
+</style>
+
+<div class="retro-container">
+    <h1 class="retro-title">@ViewData["Title"]</h1>
+
+    <table class="retro-table">
+        <thead>
+            <tr>
+                <th>🎮 Tên khóa học</th>
+                <th>📝 Mô tả</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var course in Model)
+            {
+                <tr>
+                    <td class="course-name">@course.CourseName</td>
+                    <td class="course-description">@course.Description</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
