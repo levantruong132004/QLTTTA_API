@@ -1,0 +1,30 @@
+using Microsoft.AspNetCore.Mvc;
+
+namespace QLTTTA_API.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class TestController : ControllerBase
+    {
+        private readonly ILogger<TestController> _logger;
+
+        public TestController(ILogger<TestController> logger)
+        {
+            _logger = logger;
+        }
+
+        [HttpGet]
+        public IActionResult Get()
+        {
+            _logger.LogInformation("Test API called");
+            return Ok(new { message = "API is working", timestamp = DateTime.Now });
+        }
+
+        [HttpPost]
+        public IActionResult Post([FromBody] object data)
+        {
+            _logger.LogInformation("Test POST called with data: {Data}", data);
+            return Ok(new { message = "POST is working", receivedData = data });
+        }
+    }
+}

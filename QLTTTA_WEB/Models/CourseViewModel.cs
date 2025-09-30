@@ -1,9 +1,9 @@
 ﻿namespace QLTTTA_WEB.Models
 {
-    public class CourseViewModel
+    public class SimpleCourseViewModel
     {
         public int CourseId { get; set; }
-        public string CourseName { get; set; }
-        public string Description { get; set; }
+        public string CourseName { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
     }
 }

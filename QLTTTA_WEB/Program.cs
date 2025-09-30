@@ -2,6 +2,15 @@
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+
+// Add Session
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(30);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
+
 builder.Services.AddHttpClient("ApiClient", client =>
 {
     // Địa chỉ của API backend
@@ -22,11 +31,17 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();
+app.UseSession();
 
 app.UseAuthorization();
 
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
+    pattern: "{controller=Account}/{action=Login}/{id?}");
+
+app.MapControllerRoute(
+    name: "home",
+    pattern: "home/{action=Index}/{id?}",
+    defaults: new { controller = "Home" });
 
 app.Run();

@@ -1,6 +1,6 @@
-﻿@model List<QLTTTA_WEB.Models.CourseViewModel>
+﻿@model List<QLTTTA_WEB.Models.SimpleCourseViewModel>
 @{
-    ViewData["Title"] = "Danh sách Khóa học";
+    ViewData["Title"] = "Trang chủ";
 }
 
 <style>
@@ -153,23 +153,56 @@
 </style>
 
 <div class="retro-container">
-    <h1 class="retro-title">@ViewData["Title"]</h1>
+    <h1 class="retro-title">Chào mừng @ViewBag.Username - Trung tâm LDA</h1>
+    
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i> @TempData["SuccessMessage"]
+        </div>
+    }
 
-    <table class="retro-table">
-        <thead>
-            <tr>
-                <th>🎮 Tên khóa học</th>
-                <th>📝 Mô tả</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var course in Model)
-            {
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card" style="background: rgba(0, 0, 0, 0.6); border: 2px solid #00ffff; color: #00ff00;">
+                <div class="card-header">
+                    <h5><i class="fas fa-user-circle"></i> Thông tin tài khoản</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Tên đăng nhập:</strong> @ViewBag.Username</p>
+                    <p><strong>Vai trò:</strong> @ViewBag.Role</p>
+                    <p><strong>Thời gian đăng nhập:</strong> @DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss")</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h2 class="retro-title" style="font-size: 1.8em; margin-bottom: 20px;">Danh sách Khóa học</h2>
+
+    @if (Model != null && Model.Any())
+    {
+        <table class="retro-table">
+            <thead>
                 <tr>
-                    <td class="course-name">@course.CourseName</td>
-                    <td class="course-description">@course.Description</td>
+                    <th>🎮 Tên khóa học</th>
+                    <th>📝 Mô tả</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var course in Model)
+                {
+                    <tr>
+                        <td class="course-name">@course.CourseName</td>
+                        <td class="course-description">@course.Description</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <div class="alert alert-info" style="background: rgba(0, 255, 255, 0.1); border: 1px solid #00ffff; color: #00ffff;">
+            <i class="fas fa-info-circle"></i> Hiện tại chưa có khóa học nào.
+        </div>
+    }
 </div>

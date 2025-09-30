@@ -1,0 +1,280 @@
+@model StudentViewModel
+@{
+    ViewData["Title"] = "Chi tiết học viên";
+}
+
+<style>
+    body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .details-container {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 20px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        margin: 20px auto;
+        max-width: 800px;
+        backdrop-filter: blur(10px);
+        overflow: hidden;
+    }
+
+    .details-header {
+        background: linear-gradient(135deg, #5a67d8, #667eea);
+        color: white;
+        padding: 30px;
+        text-align: center;
+        position: relative;
+    }
+
+    .details-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 20"><defs><radialGradient id="a" cx="50%" cy="0%" r="100%"><stop offset="0%" stop-color="rgba(255,255,255,.1)"/><stop offset="100%" stop-color="rgba(255,255,255,0)"/></radialGradient></defs><rect width="100%" height="100%" fill="url(%23a)"/></svg>');
+    }
+
+    .details-header h1 {
+        margin: 0;
+        font-size: 1.8rem;
+        font-weight: 600;
+        position: relative;
+        z-index: 1;
+    }
+
+    .details-content {
+        padding: 40px;
+    }
+
+    .info-card {
+        background: white;
+        border-radius: 15px;
+        padding: 30px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        margin-bottom: 25px;
+    }
+
+    .info-row {
+        display: flex;
+        padding: 15px 0;
+        border-bottom: 1px solid #f1f5f9;
+        align-items: center;
+    }
+
+    .info-row:last-child {
+        border-bottom: none;
+    }
+
+    .info-label {
+        font-weight: 600;
+        color: #4a5568;
+        min-width: 150px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .info-value {
+        color: #2d3748;
+        flex: 1;
+        font-weight: 500;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #5a67d8, #667eea);
+        border: none;
+        border-radius: 12px;
+        color: white;
+        font-weight: 600;
+        font-size: 1rem;
+        padding: 14px 30px;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(90, 103, 216, 0.3);
+        background: linear-gradient(135deg, #4c51bf, #5a67d8);
+        color: white;
+        text-decoration: none;
+    }
+
+    .btn-secondary {
+        background: #718096;
+        border: none;
+        border-radius: 12px;
+        color: white;
+        font-weight: 600;
+        font-size: 1rem;
+        padding: 14px 30px;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-secondary:hover {
+        background: #4a5568;
+        transform: translateY(-1px);
+        color: white;
+        text-decoration: none;
+    }
+
+    .button-group {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        margin-top: 30px;
+    }
+
+    .avatar-section {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .avatar {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 20px;
+        color: white;
+        font-size: 3rem;
+    }
+
+    .student-name {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #2d3748;
+        margin-bottom: 5px;
+    }
+
+    .student-code {
+        font-size: 1.1rem;
+        color: #718096;
+        font-weight: 500;
+    }
+
+    @@media (max-width: 768px) {
+        .details-container {
+            margin: 10px;
+            border-radius: 15px;
+        }
+        
+        .details-content {
+            padding: 20px;
+        }
+        
+        .info-card {
+            padding: 20px;
+        }
+        
+        .info-row {
+            flex-direction: column;
+            align-items: flex-start;
+            text-align: left;
+        }
+        
+        .info-label {
+            min-width: auto;
+            margin-bottom: 5px;
+        }
+        
+        .button-group {
+            flex-direction: column;
+        }
+        
+        .btn-primary, .btn-secondary {
+            justify-content: center;
+        }
+    }
+</style>
+
+<div class="details-container">
+    <div class="details-header">
+        <h1><i class="fas fa-user-graduate me-2"></i>Chi tiết học viên</h1>
+    </div>
+
+    <div class="details-content">
+        <div class="avatar-section">
+            <div class="avatar">
+                <i class="fas fa-user"></i>
+            </div>
+            <div class="student-name">@Model.FullName</div>
+            <div class="student-code">Mã: @Model.StudentCode</div>
+        </div>
+
+        <div class="info-card">
+            <div class="info-row">
+                <div class="info-label">
+                    <i class="fas fa-id-card"></i>
+                    Mã học viên:
+                </div>
+                <div class="info-value">@Model.StudentCode</div>
+            </div>
+
+            <div class="info-row">
+                <div class="info-label">
+                    <i class="fas fa-user"></i>
+                    Họ tên:
+                </div>
+                <div class="info-value">@Model.FullName</div>
+            </div>
+
+            <div class="info-row">
+                <div class="info-label">
+                    <i class="fas fa-venus-mars"></i>
+                    Giới tính:
+                </div>
+                <div class="info-value">@(Model.Sex ?? "Chưa cập nhật")</div>
+            </div>
+
+            <div class="info-row">
+                <div class="info-label">
+                    <i class="fas fa-calendar"></i>
+                    Ngày sinh:
+                </div>
+                <div class="info-value">@(Model.DateOfBirth?.ToString("dd/MM/yyyy") ?? "Chưa cập nhật")</div>
+            </div>
+
+            <div class="info-row">
+                <div class="info-label">
+                    <i class="fas fa-phone"></i>
+                    Số điện thoại:
+                </div>
+                <div class="info-value">@Model.PhoneNumber</div>
+            </div>
+
+            <div class="info-row">
+                <div class="info-label">
+                    <i class="fas fa-map-marker-alt"></i>
+                    Địa chỉ:
+                </div>
+                <div class="info-value">@(Model.Address ?? "Chưa cập nhật")</div>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <a asp-action="Edit" asp-route-id="@Model.StudentId" class="btn-primary">
+                <i class="fas fa-edit"></i>
+                Chỉnh sửa
+            </a>
+            <a asp-action="Index" class="btn-secondary">
+                <i class="fas fa-arrow-left"></i>
+                Quay lại danh sách
+            </a>
+        </div>
+    </div>
+</div>
