@@ -4,6 +4,9 @@ try
 {
     var builder = WebApplication.CreateBuilder(args);
 
+    // Force the API to run on HTTP port 7158 to avoid HTTPS certificate prompts on localhost.
+    builder.WebHost.UseUrls("http://localhost:7158");
+
     // Add services to the container.
     builder.Services.AddControllers();
 
@@ -17,7 +20,11 @@ try
     {
         options.AddPolicy("AllowWebApp", policy =>
         {
-            policy.WithOrigins("https://localhost:7169", "http://localhost:5165") // Port của web app
+            policy.WithOrigins(
+                      "http://localhost:7169",
+                      "https://localhost:7169",
+                      "http://localhost:5165",
+                      "https://localhost:5165") // Port của web app
                   .AllowAnyHeader()
                   .AllowAnyMethod()
                   .AllowCredentials();
@@ -36,8 +43,6 @@ try
         app.UseSwagger();
         app.UseSwaggerUI();
     }
-
-    app.UseHttpsRedirection();
 
     // Use CORS
     app.UseCors("AllowWebApp");

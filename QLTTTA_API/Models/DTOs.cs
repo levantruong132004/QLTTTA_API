@@ -8,8 +8,8 @@ namespace QLTTTA_API.Models.DTOs
         [Required(ErrorMessage = "Họ tên là bắt buộc")]
         public string FullName { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "Mã học viên là bắt buộc")]
-        public string StudentCode { get; set; } = string.Empty;
+        // StudentCode được sinh tự động bởi trigger nếu không truyền
+        public string? StudentCode { get; set; }
 
         public string? Sex { get; set; }
 
