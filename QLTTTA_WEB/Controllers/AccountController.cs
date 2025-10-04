@@ -50,6 +50,7 @@ namespace QLTTTA_WEB.Controllers
 
                 var response = await _httpClient.PostAsync("api/auth/login", content);
                 var responseContent = await response.Content.ReadAsStringAsync();
+                _logger.LogInformation("Login API raw status: {StatusCode}, body: {Body}", response.StatusCode, responseContent);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -72,17 +73,25 @@ namespace QLTTTA_WEB.Controllers
                     }
                 }
 
-                var errorResponse = JsonSerializer.Deserialize<LoginApiResponse>(responseContent, new JsonSerializerOptions
+                try
                 {
-                    PropertyNameCaseInsensitive = true
-                });
+                    var errorResponse = JsonSerializer.Deserialize<LoginApiResponse>(responseContent, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
 
-                ModelState.AddModelError("", errorResponse?.Message ?? "Đăng nhập thất bại");
+                    ModelState.AddModelError("", errorResponse?.Message ?? $"Đăng nhập thất bại (HTTP {response.StatusCode})");
+                }
+                catch (Exception deserEx)
+                {
+                    _logger.LogError(deserEx, "Deserialize login error body failed. Raw body: {Body}", responseContent);
+                    ModelState.AddModelError("", $"Đăng nhập thất bại và không phân tích được phản hồi (HTTP {response.StatusCode})");
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Lỗi khi đăng nhập");
-                ModelState.AddModelError("", "Có lỗi xảy ra trong quá trình đăng nhập. Vui lòng thử lại.");
+                _logger.LogError(ex, "Lỗi khi đăng nhập - request Username={Username}", model?.Username);
+                ModelState.AddModelError("", $"Có lỗi xảy ra trong quá trình đăng nhập: {ex.Message}");
             }
 
             return View(model);
@@ -179,7 +188,7 @@ namespace QLTTTA_WEB.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Lỗi khi đăng ký - Username: {Username}, ErrorMessage: {Message}", 
+                _logger.LogError(ex, "Lỗi khi đăng ký - Username: {Username}, ErrorMessage: {Message}",
                     model.Username, ex.Message);
                 ModelState.AddModelError("", $"Có lỗi xảy ra trong quá trình đăng ký: {ex.Message}");
             }

@@ -20,6 +20,19 @@ namespace QLTTTA_API.Models.DTOs
         public string PhoneNumber { get; set; } = string.Empty;
 
         public string? Address { get; set; }
+
+        // --- Thông tin tài khoản đi kèm ---
+        [Required(ErrorMessage = "Tên đăng nhập là bắt buộc")]
+        [StringLength(50, MinimumLength = 3, ErrorMessage = "Tên đăng nhập 3-50 ký tự")]
+        public string Username { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Mật khẩu là bắt buộc")]
+        [StringLength(100, MinimumLength = 6, ErrorMessage = "Mật khẩu 6-100 ký tự")]
+        public string Password { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Email là bắt buộc")]
+        [EmailAddress(ErrorMessage = "Email không hợp lệ")]
+        public string Email { get; set; } = string.Empty;
     }
 
     public class StudentUpdateDto : StudentCreateDto

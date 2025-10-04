@@ -30,7 +30,7 @@
         font-weight: bold;
         text-transform: uppercase;
         letter-spacing: 2px;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
         color: var(--vintage-cream);
     }
 
@@ -177,8 +177,7 @@
         padding-right: 10px;
     }
 
-    @@medi
-a    (max-width: 768px) {
+    @@medi a (max-width: 768px) {
         .form-container {
             margin: 10px;
             border-radius: 15px;
@@ -238,8 +237,8 @@ a    (max-width: 768px) {
                         <label asp-for="StudentCode" class="form-label">
                             <i class="fas fa-id-card me-1"></i>@Html.DisplayNameFor(model => model.StudentCode)
                         </label>
-                        <input asp-for="StudentCode" class="form-control" placeholder="Sẽ tự sinh sau khi lưu" disabled readonly />
-                        <small class="form-text text-muted">Mã học viên sẽ được hệ thống tự động tạo. Bạn không cần nhập.</small>
+                        <input asp-for="StudentCode" class="form-control" placeholder="Sẽ tự sinh " disabled readonly />
+                        --<small class="form-text text-muted">Mã học viên sẽ được hệ thống tự động tạo. </small>
                     </div>
                 </div>
             </div>
@@ -291,6 +290,37 @@ a    (max-width: 768px) {
                     </div>
                 </div>
             </div>
+
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label asp-for="Username" class="form-label">
+                            <i class="fas fa-user-circle me-1"></i>@Html.DisplayNameFor(m => m.Username)
+                        </label>
+                        <input asp-for="Username" class="form-control" placeholder="Tên đăng nhập" />
+                        <span asp-validation-for="Username" class="text-validation-error"></span>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label asp-for="Password" class="form-label">
+                            <i class="fas fa-lock me-1"></i>@Html.DisplayNameFor(m => m.Password)
+                        </label>
+                        <input asp-for="Password" class="form-control" placeholder="Mật khẩu" />
+                        <span asp-validation-for="Password" class="text-validation-error"></span>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label asp-for="Email" class="form-label">
+                            <i class="fas fa-envelope me-1"></i>@Html.DisplayNameFor(m => m.Email)
+                        </label>
+                        <input asp-for="Email" class="form-control" placeholder="Email" />
+                        <span asp-validation-for="Email" class="text-validation-error"></span>
+                    </div>
+                </div>
+            </div>
+
 
             <div class="button-group">
                 <button type="submit" class="btn-primary">

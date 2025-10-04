@@ -28,59 +28,85 @@ namespace QLTTTA_API.Services
             {
                 using var connection = new OracleConnection(_connectionString);
                 await connection.OpenAsync();
+                _logger.LogInformation("Login attempt - Username: {Username}", request.Username);
 
-                // Truy vấn kiểm tra tài khoản từ bảng QLTT_ADMIN.ACCOUNTS
-                var sql = @"
-                    SELECT 
-                        a.USER_ID,
-                        a.USERNAME,
-                        a.EMAIL,
-                        a.ROLE_ID,
-                        r.ROLE_NAME
-                    FROM QLTT_ADMIN.ACCOUNTS a
-                    LEFT JOIN QLTT_ADMIN.ROLES r ON a.ROLE_ID = r.ROLE_ID
-                    WHERE a.USERNAME = :username AND a.PASSWORD = :password";
+                // Thêm FULL_NAME từ STUDENTS (nếu là học viên sẽ có bản ghi)
+                var sql = @"SELECT a.USER_ID,
+                                                                     a.USERNAME,
+                                                                     a.EMAIL,
+                                                                     a.ROLE_ID,
+                                                                     r.ROLE_NAME,
+                                                                     a.IS_ACTIVE,
+                                                                     s.FULL_NAME
+                                                            FROM QLTT_ADMIN.ACCOUNTS a
+                                                            LEFT JOIN QLTT_ADMIN.ROLES r ON a.ROLE_ID = r.ROLE_ID
+                                                            LEFT JOIN QLTT_ADMIN.STUDENTS s ON s.STUDENT_ID = a.USER_ID
+                                                         WHERE a.USERNAME = :username
+                                                             AND a.PASSWORD = :password"; // Có thể bổ sung AND a.IS_ACTIVE = 1 nếu muốn chặn hẳn
 
-                using var command = new OracleCommand(sql, connection);
-                command.Parameters.Add(":username", OracleDbType.Varchar2).Value = request.Username;
-                command.Parameters.Add(":password", OracleDbType.Varchar2).Value = request.Password; // Trong thực tế nên hash password
+                using var command = new OracleCommand(sql, connection)
+                {
+                    BindByName = true
+                };
+                command.Parameters.Add(":username", OracleDbType.Varchar2).Value = request.Username?.Trim();
+                command.Parameters.Add(":password", OracleDbType.Varchar2).Value = request.Password; // TODO: Hash password
 
-                using var reader = await command.ExecuteReaderAsync();
-
+                using var reader = await command.ExecuteReaderAsync(CommandBehavior.SingleRow);
                 if (await reader.ReadAsync())
                 {
+                    // Sử dụng ordinal để tránh lỗi truy cập theo tên cột (đảm bảo tương thích OracleDataReader)
+                    int ordUserId = reader.GetOrdinal("USER_ID");
+                    int ordUsername = reader.GetOrdinal("USERNAME");
+                    int ordEmail = reader.GetOrdinal("EMAIL");
+                    int ordRoleName = reader.GetOrdinal("ROLE_NAME");
+                    int ordIsActive = reader.GetOrdinal("IS_ACTIVE");
+                    int ordFullName = -1;
+                    try { ordFullName = reader.GetOrdinal("FULL_NAME"); } catch { }
+
+                    // Nếu cột IS_ACTIVE tồn tại và =0 thì báo lỗi
+                    bool inactive = !reader.IsDBNull(ordIsActive) && reader.GetInt32(ordIsActive) == 0;
+                    if (inactive)
+                    {
+                        return new LoginResponse
+                        {
+                            Success = false,
+                            Message = "Tài khoản đã bị khóa / vô hiệu hóa"
+                        };
+                    }
+
                     var userInfo = new UserInfo
                     {
-                        UserId = reader.IsDBNull("USER_ID") ? 0 : reader.GetInt32("USER_ID"),
-                        Username = reader.IsDBNull("USERNAME") ? "" : reader.GetString("USERNAME"),
-                        Email = reader.IsDBNull("EMAIL") ? "" : reader.GetString("EMAIL"),
-                        Role = reader.IsDBNull("ROLE_NAME") ? "" : reader.GetString("ROLE_NAME")
+                        UserId = reader.IsDBNull(ordUserId) ? 0 : reader.GetInt32(ordUserId),
+                        Username = reader.IsDBNull(ordUsername) ? string.Empty : reader.GetString(ordUsername),
+                        Email = reader.IsDBNull(ordEmail) ? string.Empty : reader.GetString(ordEmail),
+                        Role = reader.IsDBNull(ordRoleName) ? string.Empty : reader.GetString(ordRoleName),
+                        FullName = (ordFullName >= 0 && !reader.IsDBNull(ordFullName)) ? reader.GetString(ordFullName) : string.Empty
                     };
 
+                    _logger.LogInformation("Login success for {Username} with role {Role}", userInfo.Username, userInfo.Role);
                     return new LoginResponse
                     {
                         Success = true,
                         Message = "Đăng nhập thành công",
-                        Token = GenerateToken(userInfo), // Tạo JWT token nếu cần
+                        Token = GenerateToken(userInfo),
                         User = userInfo
                     };
                 }
-                else
-                {
-                    return new LoginResponse
-                    {
-                        Success = false,
-                        Message = "Tên tài khoản hoặc mật khẩu không đúng"
-                    };
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Lỗi khi xác thực người dùng");
+
+                _logger.LogWarning("Login failed - invalid credentials for {Username}", request.Username);
                 return new LoginResponse
                 {
                     Success = false,
-                    Message = "Có lỗi xảy ra trong quá trình đăng nhập"
+                    Message = "Tên tài khoản hoặc mật khẩu không đúng"
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi xác thực người dùng (username={Username})", request?.Username);
+                return new LoginResponse
+                {
+                    Success = false,
+                    Message = $"Có lỗi xảy ra trong quá trình đăng nhập: {ex.Message}"
                 };
             }
         }
@@ -106,10 +132,10 @@ namespace QLTTTA_API.Services
                 var checkUserSql = "SELECT COUNT(*) FROM QLTT_ADMIN.ACCOUNTS WHERE USERNAME = :username";
                 using var checkCommand = new OracleCommand(checkUserSql, connection);
                 checkCommand.Parameters.Add(":username", OracleDbType.Varchar2).Value = request.Username;
-                
+
                 var userExists = Convert.ToInt32(await checkCommand.ExecuteScalarAsync()) > 0;
                 _logger.LogInformation("Kiểm tra username tồn tại: {UserExists}", userExists);
-                
+
                 if (userExists)
                 {
                     return new RegisterResponse
@@ -123,10 +149,10 @@ namespace QLTTTA_API.Services
                 var checkEmailSql = "SELECT COUNT(*) FROM QLTT_ADMIN.ACCOUNTS WHERE EMAIL = :email";
                 using var checkEmailCommand = new OracleCommand(checkEmailSql, connection);
                 checkEmailCommand.Parameters.Add(":email", OracleDbType.Varchar2).Value = request.Email;
-                
+
                 var emailExists = Convert.ToInt32(await checkEmailCommand.ExecuteScalarAsync()) > 0;
                 _logger.LogInformation("Kiểm tra email tồn tại: {EmailExists}", emailExists);
-                
+
                 if (emailExists)
                 {
                     return new RegisterResponse
@@ -136,156 +162,116 @@ namespace QLTTTA_API.Services
                     };
                 }
 
-                // Lấy danh sách cột thực tế của bảng ACCOUNTS
-                var columns = new List<string>();
-                var columnsSql = @"SELECT COLUMN_NAME FROM USER_TAB_COLUMNS 
-                                    WHERE TABLE_NAME = 'ACCOUNTS'";
-                using (var colCmd = new OracleCommand(columnsSql, connection))
-                using (var colReader = await colCmd.ExecuteReaderAsync())
+                // BẮT ĐẦU TRANSACTION tạo Account + Student
+                using var transaction = connection.BeginTransaction();
+                try
                 {
-                    while (await colReader.ReadAsync())
-                    {
-                        columns.Add(colReader.GetString(0).ToUpperInvariant());
-                    }
-                }
-                _logger.LogInformation("ACCOUNTS columns: {Cols}", string.Join(",", columns));
-
-                // Các cột chuẩn mà ta mong muốn
-                var desired = new[] { "USERNAME", "PASSWORD", "EMAIL", "FULL_NAME", "PHONE_NUMBER", "ROLE_ID", "CREATED_DATE" };
-                // Giữ lại những cột thực sự tồn tại và cần thiết
-                var insertable = desired.Where(c => columns.Contains(c) && c != "ROLE_ID" && c != "CREATED_DATE").ToList();
-                // ROLE_ID xử lý riêng nếu tồn tại
-                var hasRoleId = columns.Contains("ROLE_ID");
-                var hasCreated = columns.Contains("CREATED_DATE");
-
-                // Build phần cột
-                var colList = new List<string>(insertable);
-                if (hasRoleId) colList.Add("ROLE_ID");
-                if (hasCreated) colList.Add("CREATED_DATE");
-
-                // Build phần values
-                var valueList = new List<string>();
-                foreach (var c in insertable)
-                {
-                    valueList.Add(":" + c.ToLowerInvariant());
-                }
-
-                // Lấy ROLE_ID cho STUDENT động thay vì hard-code (tránh gán nhầm quyền cao hơn)
-                int studentRoleId = 0;
-                if (hasRoleId)
-                {
+                    // 1. Role học viên
+                    int studentRoleId = 0;
                     try
                     {
-                        var roleSql = "SELECT ROLE_ID FROM QLTT_ADMIN.ROLES WHERE UPPER(ROLE_NAME) = 'STUDENT'";
-                        using var roleCmd = new OracleCommand(roleSql, connection);
+                        var roleSql = @"SELECT ROLE_ID FROM QLTT_ADMIN.ROLES WHERE UPPER(ROLE_NAME) IN ('STUDENT','HỌC VIÊN','HOC VIEN') FETCH FIRST 1 ROWS ONLY";
+                        using var roleCmd = new OracleCommand(roleSql, connection) { BindByName = true, Transaction = transaction };
                         var roleResult = await roleCmd.ExecuteScalarAsync();
-                        if (roleResult != null && int.TryParse(roleResult.ToString(), out var rid))
-                        {
+                        if (roleResult != null && int.TryParse(roleResult.ToString(), out var rid) && rid > 0)
                             studentRoleId = rid;
-                        }
                     }
                     catch (Exception exRole)
                     {
-                        _logger.LogWarning(exRole, "Không lấy được ROLE_ID STUDENT, sẽ dùng fallback");
+                        _logger.LogWarning(exRole, "Không lấy được ROLE_ID cho student, fallback=4");
+                    }
+                    if (studentRoleId == 0) studentRoleId = 4; // fallback theo sample_data.sql
+
+                    // 2. Insert ACCOUNTS RETURNING USER_ID
+                    int newUserId = 0;
+                    using (var accCmd = new OracleCommand(@"INSERT INTO QLTT_ADMIN.ACCOUNTS (USERNAME,PASSWORD,EMAIL,ROLE_ID,IS_ACTIVE)
+                                                             VALUES (:username,:password,:email,:roleId,1)
+                                                             RETURNING USER_ID INTO :p_user_id", connection))
+                    {
+                        accCmd.Transaction = transaction;
+                        accCmd.BindByName = true;
+                        accCmd.Parameters.Add(":username", OracleDbType.Varchar2).Value = request.Username.Trim();
+                        accCmd.Parameters.Add(":password", OracleDbType.Varchar2).Value = request.Password; // TODO: hash
+                        accCmd.Parameters.Add(":email", OracleDbType.Varchar2).Value = request.Email.Trim();
+                        accCmd.Parameters.Add(":roleId", OracleDbType.Int32).Value = studentRoleId;
+                        var outParam = new OracleParameter(":p_user_id", OracleDbType.Int32, System.Data.ParameterDirection.Output);
+                        accCmd.Parameters.Add(outParam);
+                        await accCmd.ExecuteNonQueryAsync();
+                        if (outParam.Value != null && int.TryParse(outParam.Value.ToString(), out var tmp)) newUserId = tmp;
+                    }
+                    if (newUserId <= 0)
+                    {
+                        transaction.Rollback();
+                        return new RegisterResponse { Success = false, Message = "Không lấy được USER_ID mới" };
                     }
 
-                    // Fallback nếu không tìm được (cập nhật giá trị này theo dữ liệu thực tế của bạn)
-                    if (studentRoleId == 0)
+                    // 3. Insert STUDENTS (profile) - để trigger sinh STUDENT_CODE nếu có
+                    using (var stuCmd = new OracleCommand(@"INSERT INTO QLTT_ADMIN.STUDENTS (STUDENT_ID,FULL_NAME,SEX,DATE_OF_BIRTH,PHONE_NUMBER,ADDRESS)
+                                                             VALUES (:id,:full,:sex,:dob,:phone,:addr)", connection))
                     {
-                        studentRoleId = 3; // giả định 3 là ROLE_ID của STUDENT
+                        stuCmd.Transaction = transaction;
+                        stuCmd.BindByName = true;
+                        stuCmd.Parameters.Add(":id", OracleDbType.Int32).Value = newUserId;
+                        stuCmd.Parameters.Add(":full", OracleDbType.NVarchar2).Value = request.FullName;
+                        stuCmd.Parameters.Add(":sex", OracleDbType.NVarchar2).Value = request.Sex;
+                        stuCmd.Parameters.Add(":dob", OracleDbType.Date).Value = (object?)request.DateOfBirth ?? DBNull.Value;
+                        stuCmd.Parameters.Add(":phone", OracleDbType.Varchar2).Value = request.PhoneNumber;
+                        stuCmd.Parameters.Add(":addr", OracleDbType.NVarchar2).Value = (object?)request.Address ?? DBNull.Value;
+                        await stuCmd.ExecuteNonQueryAsync();
                     }
 
-                    valueList.Add(":role_id");
-                }
-                if (hasCreated) valueList.Add("SYSDATE");
+                    // 4. Commit
+                    transaction.Commit();
 
-                var insertSql = $"INSERT INTO QLTT_ADMIN.ACCOUNTS (" + string.Join(", ", colList) + ") VALUES (" + string.Join(", ", valueList) + ")";
-                _logger.LogInformation("Dynamic INSERT SQL: {SQL}", insertSql);
-
-                int rowsAffected;
-                using (var insertCommand = new OracleCommand(insertSql, connection))
-                {
-                    // Thêm parameters tương ứng với các cột tồn tại
-                    if (insertable.Contains("USERNAME")) insertCommand.Parameters.Add(":username", OracleDbType.Varchar2).Value = request.Username;
-                    if (insertable.Contains("PASSWORD")) insertCommand.Parameters.Add(":password", OracleDbType.Varchar2).Value = request.Password;
-                    if (insertable.Contains("EMAIL")) insertCommand.Parameters.Add(":email", OracleDbType.Varchar2).Value = request.Email;
-                    if (insertable.Contains("FULL_NAME")) insertCommand.Parameters.Add(":full_name", OracleDbType.Varchar2).Value = request.FullName;
-                    if (insertable.Contains("PHONE_NUMBER")) insertCommand.Parameters.Add(":phone_number", OracleDbType.Varchar2).Value = request.PhoneNumber;
-
-                    if (hasRoleId)
+                    // 5. Lấy lại thông tin (join students để có FULL_NAME & STUDENT_CODE nếu cần sau này)
+                    using (var infoCmd = new OracleCommand(@"SELECT a.USER_ID, a.USERNAME, a.EMAIL, r.ROLE_NAME, s.FULL_NAME
+                                                             FROM QLTT_ADMIN.ACCOUNTS a
+                                                             LEFT JOIN QLTT_ADMIN.ROLES r ON a.ROLE_ID = r.ROLE_ID
+                                                             LEFT JOIN QLTT_ADMIN.STUDENTS s ON s.STUDENT_ID = a.USER_ID
+                                                             WHERE a.USER_ID = :id", connection))
                     {
-                        insertCommand.Parameters.Add(":role_id", OracleDbType.Int32).Value = studentRoleId;
-                    }
-
-                    rowsAffected = await insertCommand.ExecuteNonQueryAsync();
-                }
-                _logger.LogInformation("INSERT hoàn thành (dynamic), rows affected: {RowsAffected}", rowsAffected);
-                if (rowsAffected <= 0)
-                {
-                    return new RegisterResponse
-                    {
-                        Success = false,
-                        Message = "Không chèn được bản ghi mới"
-                    };
-                }
-
-                if (rowsAffected > 0)
-                {
-                    // Lấy thông tin user vừa tạo (dynamic columns)
-                    var selectCols = new List<string> { "a.USER_ID", "a.USERNAME" };
-                    if (columns.Contains("EMAIL")) selectCols.Add("a.EMAIL");
-                    if (columns.Contains("FULL_NAME")) selectCols.Add("a.FULL_NAME");
-                    selectCols.Add("a.ROLE_ID");
-                    selectCols.Add("r.ROLE_NAME");
-
-                    var getUserSql = $@"SELECT {string.Join(",", selectCols)}
-                                        FROM QLTT_ADMIN.ACCOUNTS a
-                                        LEFT JOIN QLTT_ADMIN.ROLES r ON a.ROLE_ID = r.ROLE_ID
-                                        WHERE a.USERNAME = :username";
-
-                    using (var getUserCommand = new OracleCommand(getUserSql, connection))
-                    {
-                        getUserCommand.Parameters.Add(":username", OracleDbType.Varchar2).Value = request.Username;
-                        using var reader2 = await getUserCommand.ExecuteReaderAsync();
-                        if (await reader2.ReadAsync())
+                        infoCmd.BindByName = true;
+                        infoCmd.Parameters.Add(":id", OracleDbType.Int32).Value = newUserId;
+                        using var rdr = await infoCmd.ExecuteReaderAsync();
+                        if (await rdr.ReadAsync())
                         {
-                            string emailVal = columns.Contains("EMAIL") && !reader2.IsDBNull(reader2.GetOrdinal("EMAIL")) ? reader2.GetString(reader2.GetOrdinal("EMAIL")) : "";
-                            string fullNameVal = columns.Contains("FULL_NAME") && !reader2.IsDBNull(reader2.GetOrdinal("FULL_NAME")) ? reader2.GetString(reader2.GetOrdinal("FULL_NAME")) : "";
                             var userInfo = new UserInfo
                             {
-                                UserId = reader2.IsDBNull(reader2.GetOrdinal("USER_ID")) ? 0 : reader2.GetInt32(reader2.GetOrdinal("USER_ID")),
-                                Username = reader2.IsDBNull(reader2.GetOrdinal("USERNAME")) ? "" : reader2.GetString(reader2.GetOrdinal("USERNAME")),
-                                FullName = fullNameVal,
-                                Email = emailVal,
-                                Role = reader2.IsDBNull(reader2.GetOrdinal("ROLE_NAME")) ? "" : reader2.GetString(reader2.GetOrdinal("ROLE_NAME"))
+                                UserId = rdr.IsDBNull(rdr.GetOrdinal("USER_ID")) ? 0 : rdr.GetInt32(rdr.GetOrdinal("USER_ID")),
+                                Username = rdr.IsDBNull(rdr.GetOrdinal("USERNAME")) ? string.Empty : rdr.GetString(rdr.GetOrdinal("USERNAME")),
+                                Email = rdr.IsDBNull(rdr.GetOrdinal("EMAIL")) ? string.Empty : rdr.GetString(rdr.GetOrdinal("EMAIL")),
+                                Role = rdr.IsDBNull(rdr.GetOrdinal("ROLE_NAME")) ? string.Empty : rdr.GetString(rdr.GetOrdinal("ROLE_NAME")),
+                                FullName = rdr.IsDBNull(rdr.GetOrdinal("FULL_NAME")) ? string.Empty : rdr.GetString(rdr.GetOrdinal("FULL_NAME"))
                             };
 
                             return new RegisterResponse
                             {
                                 Success = true,
-                                Message = "Đăng ký tài khoản thành công",
+                                Message = "Đăng ký học viên thành công",
                                 User = userInfo
                             };
                         }
                     }
-                }
 
-                return new RegisterResponse
+                    return new RegisterResponse { Success = true, Message = "Đăng ký thành công (không lấy được chi tiết sau commit)" };
+                }
+                catch (Exception txEx)
                 {
-                    Success = false,
-                    Message = "Có lỗi xảy ra khi tạo tài khoản"
-                };
+                    try { transaction.Rollback(); } catch { }
+                    _logger.LogError(txEx, "Rollback đăng ký user={Username}", request.Username);
+                    return new RegisterResponse { Success = false, Message = "Lỗi khi tạo học viên: " + txEx.Message };
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Lỗi khi đăng ký người dùng - Username: {Username}, Email: {Email}, ErrorMessage: {Message}", 
+                _logger.LogError(ex, "Lỗi khi đăng ký người dùng - Username: {Username}, Email: {Email}, ErrorMessage: {Message}",
                     request.Username, request.Email, ex.Message);
-                
+
                 // Trả về thông báo lỗi chi tiết hơn trong development
-                var errorMessage = ex.Message.Contains("ORA-") 
-                    ? $"Lỗi database: {ex.Message}" 
+                var errorMessage = ex.Message.Contains("ORA-")
+                    ? $"Lỗi database: {ex.Message}"
                     : "Có lỗi xảy ra trong quá trình đăng ký";
-                    
+
                 return new RegisterResponse
                 {
                     Success = false,
@@ -300,17 +286,17 @@ namespace QLTTTA_API.Services
             {
                 using var connection = new OracleConnection(_connectionString);
                 await connection.OpenAsync();
-                
+
                 // Test basic connection
                 var testSql = "SELECT 1 FROM DUAL";
                 using var testCommand = new OracleCommand(testSql, connection);
                 var result = await testCommand.ExecuteScalarAsync();
-                
+
                 // Check if ACCOUNTS table exists
                 var checkTableSql = "SELECT COUNT(*) FROM USER_TABLES WHERE TABLE_NAME = 'ACCOUNTS'";
                 using var checkTableCommand = new OracleCommand(checkTableSql, connection);
                 var tableExists = Convert.ToInt32(await checkTableCommand.ExecuteScalarAsync()) > 0;
-                
+
                 // Get table structure if exists
                 string tableInfo = "";
                 if (tableExists)
@@ -318,7 +304,7 @@ namespace QLTTTA_API.Services
                     var columnsSql = "SELECT COLUMN_NAME, DATA_TYPE FROM USER_TAB_COLUMNS WHERE TABLE_NAME = 'ACCOUNTS' ORDER BY COLUMN_ID";
                     using var columnsCommand = new OracleCommand(columnsSql, connection);
                     using var reader = await columnsCommand.ExecuteReaderAsync();
-                    
+
                     var columns = new List<string>();
                     while (await reader.ReadAsync())
                     {
@@ -326,7 +312,7 @@ namespace QLTTTA_API.Services
                     }
                     tableInfo = string.Join(", ", columns);
                 }
-                
+
                 return $"Database connected successfully. ACCOUNTS table exists: {tableExists}. Columns: {tableInfo}";
             }
             catch (Exception ex)

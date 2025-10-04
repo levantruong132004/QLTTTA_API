@@ -127,7 +127,10 @@ namespace QLTTTA_WEB.Controllers
                     Sex = model.Sex,
                     DateOfBirth = model.DateOfBirth,
                     PhoneNumber = model.PhoneNumber,
-                    Address = model.Address
+                    Address = model.Address,
+                    Username = model.Username,
+                    Password = model.Password,
+                    Email = model.Email
                 };
 
                 var json = JsonSerializer.Serialize(createDto);
