@@ -4,100 +4,83 @@
 }
 
 <style>
-    /* Retro 80s-90s Styling */
-    body {
-        background: linear-gradient(45deg, #ff006e, #8338ec, #3a86ff, #06ffa5);
-        background-size: 400% 400%;
-        animation: gradientShift 8s ease infinite;
-        font-family: 'Courier New', monospace;
-        color: #00ff00;
-        min-height: 100vh;
-        margin: 0;
-        padding: 20px;
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 2rem;
+        margin-bottom: 2rem;
     }
 
-    @@keyframes gradientShift {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
-    }
-
-    .retro-container {
-        background: rgba(0, 0, 0, 0.8);
-        border: 3px solid #00ff00;
-        border-radius: 15px;
-        padding: 30px;
-        box-shadow:
-            0 0 20px #00ff00,
-            inset 0 0 20px rgba(0, 255, 0, 0.1);
-        max-width: 1000px;
-        margin: 0 auto;
-    }
-
-    .retro-title {
+    .stat-card {
         text-align: center;
-        font-size: 2.5em;
-        color: #ff00ff;
-        text-shadow:
-            0 0 5px #ff00ff,
-            0 0 10px #ff00ff,
-            0 0 15px #ff00ff;
-        animation: neonFlicker 2s infinite alternate;
-        margin-bottom: 30px;
-        text-transform: uppercase;
-        letter-spacing: 3px;
     }
 
-    @@keyframes neonFlicker {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.8; }
+    .stat-icon {
+        font-size: 3rem;
+        color: var(--vintage-rust);
+        margin-bottom: 1rem;
     }
 
-    .retro-table {
-        width: 100%;
-        border-collapse: separate;
-        border-spacing: 0;
-        background: rgba(0, 0, 0, 0.6);
-        border: 2px solid #00ffff;
-        border-radius: 10px;
-        overflow: hidden;
-        box-shadow: 0 0 15px #00ffff;
-    }
-
-    .retro-table thead {
-        background: linear-gradient(90deg, #ff006e, #8338ec);
-    }
-
-    .retro-table th {
-        padding: 15px 20px;
-        color: #ffffff;
+    .stat-number {
+        font-size: 2.5rem;
         font-weight: bold;
+        color: var(--vintage-brown);
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+        font-size: 1rem;
+        color: var(--vintage-gray);
         text-transform: uppercase;
-        letter-spacing: 2px;
-        border-bottom: 2px solid #00ffff;
-        text-shadow: 0 0 5px #ffffff;
-        font-size: 1.1em;
+        letter-spacing: 1px;
     }
 
-    .retro-table td {
-        padding: 15px 20px;
-        color: #00ff00;
-        border-bottom: 1px solid #333;
+    .course-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1.5rem;
+        margin-top: 2rem;
+    }
+
+    .course-item {
+        border: 3px solid var(--vintage-brown);
+        padding: 1.5rem;
+        background: var(--vintage-off-white);
         transition: all 0.3s ease;
-        background: rgba(0, 0, 0, 0.3);
+        position: relative;
     }
 
-    .retro-table tbody tr:hover {
-        background: rgba(0, 255, 255, 0.1);
-        transform: scale(1.02);
-        box-shadow: 0 0 10px #00ffff;
+    .course-item::before {
+        content: '';
+        position: absolute;
+        top: 6px;
+        left: 6px;
+        right: 6px;
+        bottom: 6px;
+        border: 1px solid var(--vintage-tan);
+        pointer-events: none;
     }
 
-    .retro-table tbody tr:nth-child(even) {
-        background: rgba(255, 0, 255, 0.05);
+    .course-item:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-deep);
     }
 
-    .retro-table tbody tr:nth-child(odd) {
+    .course-title {
+        font-family: 'Courier New', monospace;
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: var(--vintage-brown);
+        margin-bottom: 1rem;
+        text-transform: uppercase;
+    }
+
+    .course-meta {
+        margin: 0.5rem 0;
+        color: var(--vintage-gray);
+    }
+
+    .tbody tr:nth-child(odd) {
         background: rgba(0, 255, 0, 0.05);
     }
 
@@ -150,59 +133,96 @@
         color: #00ffff;
         font-style: italic;
     }
+
+    /* Style cho tiêu đề chính */
+    .main-title {
+        color: var(--vintage-gold) !important;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        font-size: 2.2rem;
+        letter-spacing: 2px;
+    }
 </style>
 
-<div class="retro-container">
-    <h1 class="retro-title">Chào mừng @ViewBag.Username - Trung tâm LDA</h1>
-    
-    @if (TempData["SuccessMessage"] != null)
-    {
-        <div class="alert alert-success">
-            <i class="fas fa-check-circle"></i> @TempData["SuccessMessage"]
-        </div>
-    }
+<div class="retro-card corner-decorated">
+    <div class="retro-card-header text-center">
+        <h1 class="retro-card-title main-title">
+            <i class="fas fa-graduation-cap"></i> TRUNG TÂM TIẾNG ANH LDA
+        </h1>
+    </div>
 
-    <div class="row mb-4">
-        <div class="col-md-12">
-            <div class="card" style="background: rgba(0, 0, 0, 0.6); border: 2px solid #00ffff; color: #00ff00;">
-                <div class="card-header">
-                    <h5><i class="fas fa-user-circle"></i> Thông tin tài khoản</h5>
+    <div class="retro-card-body">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-success">
+                <div class="retro-alert-content">
+                    @TempData["SuccessMessage"]
                 </div>
-                <div class="card-body">
-                    <p><strong>Tên đăng nhập:</strong> @ViewBag.Username</p>
-                    <p><strong>Vai trò:</strong> @ViewBag.Role</p>
-                    <p><strong>Thời gian đăng nhập:</strong> @DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss")</p>
+            </div>
+        }
+
+        <div class="vintage-ornament"></div>
+        
+        <div class="dashboard-grid">
+            <div class="retro-card stat-card">
+                <div class="retro-card-body">
+                    <i class="fas fa-user-circle stat-icon"></i>
+                    <div class="stat-label">Tài khoản</div>
+                    <div style="margin-top: 1rem;">
+                        <p><strong>@ViewBag.Username</strong></p>
+                        <p><span class="retro-badge retro-badge-success">@ViewBag.Role</span></p>
+                        <p style="font-size: 0.875rem; color: var(--vintage-gray); margin-top: 0.5rem;">
+                            @DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss")
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="retro-card stat-card">
+                <div class="retro-card-body">
+                    <i class="fas fa-book stat-icon"></i>
+                    <div class="stat-number">@(Model?.Count ?? 0)</div>
+                    <div class="stat-label">Khóa học</div>
+                </div>
+            </div>
+
+            <div class="retro-card stat-card">
+                <div class="retro-card-body">
+                    <i class="fas fa-user-graduate stat-icon"></i>
+                    <div class="stat-number">-</div>
+                    <div class="stat-label">Học viên</div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <h2 class="retro-title" style="font-size: 1.8em; margin-bottom: 20px;">Danh sách Khóa học</h2>
+        <div class="vintage-divider"></div>
 
-    @if (Model != null && Model.Any())
-    {
-        <table class="retro-table">
-            <thead>
-                <tr>
-                    <th>🎮 Tên khóa học</th>
-                    <th>📝 Mô tả</th>
-                </tr>
-            </thead>
-            <tbody>
+        <h2 style="text-align: center; margin-bottom: 1.5rem;">
+            <i class="fas fa-book"></i> DANH SÁCH KHÓA HỌC
+        </h2>
+
+        @if (Model != null && Model.Any())
+        {
+            <div class="course-grid">
                 @foreach (var course in Model)
                 {
-                    <tr>
-                        <td class="course-name">@course.CourseName</td>
-                        <td class="course-description">@course.Description</td>
-                    </tr>
+                    <div class="course-item">
+                        <div class="course-title">
+                            <i class="fas fa-bookmark"></i> @course.CourseName
+                        </div>
+                        <div class="course-meta">
+                            <i class="fas fa-align-left"></i> @course.Description
+                        </div>
+                    </div>
                 }
-            </tbody>
-        </table>
-    }
-    else
-    {
-        <div class="alert alert-info" style="background: rgba(0, 255, 255, 0.1); border: 1px solid #00ffff; color: #00ffff;">
-            <i class="fas fa-info-circle"></i> Hiện tại chưa có khóa học nào.
-        </div>
-    }
+            </div>
+        }
+        else
+        {
+            <div class="retro-alert retro-alert-info text-center">
+                <div class="retro-alert-content">
+                    <i class="fas fa-info-circle"></i> Hiện tại chưa có khóa học nào trong hệ thống.
+                </div>
+            </div>
+        }
+    </div>
 </div>

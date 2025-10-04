@@ -1,0 +1,913 @@
+/* ==========================================
+   RETRO VINTAGE THEME - Inspired by Classic Era
+   Created: 2025
+   ========================================== */
+
+/* ==========================================
+   ROOT VARIABLES - Vintage Color Palette
+   ========================================== */
+:root {
+    /* Primary vintage browns and earth tones */
+    --vintage-brown: #7d5a3b;
+    --vintage-dark-brown: #4a3526;
+    --vintage-light-brown: #a67c52;
+    --vintage-cream: #f4ead5;
+    --vintage-beige: #e8dcc4;
+    --vintage-tan: #d4c4a8;
+    
+    /* Accent colors */
+    --vintage-gold: #b8860b;
+    --vintage-rust: #a85832;
+    --vintage-olive: #6b8e23;
+    --vintage-burgundy: #7c2d37;
+    
+    /* Neutral tones */
+    --vintage-white: #faf8f3;
+    --vintage-off-white: #f5f1e8;
+    --vintage-gray: #8b7d6b;
+    --vintage-dark-gray: #5a4a3a;
+    
+    /* Shadow and effects */
+    --shadow-vintage: 0 4px 6px rgba(74, 53, 38, 0.15);
+    --shadow-deep: 0 8px 16px rgba(74, 53, 38, 0.25);
+    --text-shadow-vintage: 2px 2px 4px rgba(74, 53, 38, 0.3);
+}
+
+/* ==========================================
+   GLOBAL STYLES & TYPOGRAPHY
+   ========================================== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Set Times New Roman for all input text content */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
+input[type="url"],
+input[type="search"],
+input[type="number"],
+textarea,
+select,
+.form-control,
+.form-select {
+    font-family: 'Times New Roman', Times, serif !important;
+}
+
+body {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    background-color: var(--vintage-cream);
+    background-image: 
+        linear-gradient(45deg, var(--vintage-beige) 25%, transparent 25%),
+        linear-gradient(-45deg, var(--vintage-beige) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, var(--vintage-beige) 75%),
+        linear-gradient(-45deg, transparent 75%, var(--vintage-beige) 75%);
+    background-size: 40px 40px;
+    background-position: 0 0, 0 20px, 20px -20px, -20px 0px;
+    color: var(--vintage-dark-brown);
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+/* Retro Typography */
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Courier New', 'Courier', monospace;
+    font-weight: bold;
+    color: var(--vintage-brown);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 1rem;
+    text-shadow: 1px 1px 2px rgba(125, 90, 59, 0.2);
+}
+
+h1 {
+    font-size: 2.5rem;
+    border-bottom: 4px solid var(--vintage-brown);
+    padding-bottom: 0.5rem;
+    display: inline-block;
+}
+
+h2 {
+    font-size: 2rem;
+    color: var(--vintage-rust);
+}
+
+h3 {
+    font-size: 1.5rem;
+}
+
+p {
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    font-family: 'Arial', 'Helvetica', sans-serif;
+}
+
+a {
+    color: var(--vintage-brown);
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+a:hover {
+    color: var(--vintage-rust);
+    text-decoration: underline;
+}
+
+/* ==========================================
+   LAYOUT CONTAINER
+   ========================================== */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+    background: var(--vintage-white);
+    box-shadow: var(--shadow-deep);
+    border: 3px solid var(--vintage-brown);
+    border-radius: 0;
+    position: relative;
+}
+
+.container::before {
+    content: '';
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    border: 1px solid var(--vintage-tan);
+    pointer-events: none;
+}
+
+/* ==========================================
+   HEADER & NAVIGATION - Retro Style
+   ========================================== */
+.retro-header {
+    background: linear-gradient(180deg, var(--vintage-dark-brown) 0%, var(--vintage-brown) 100%);
+    padding: 1.5rem 2rem;
+    border-bottom: 5px solid var(--vintage-gold);
+    box-shadow: var(--shadow-vintage);
+    position: relative;
+}
+
+.retro-header::after {
+    content: '';
+    position: absolute;
+    bottom: -5px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: repeating-linear-gradient(
+        90deg,
+        var(--vintage-gold) 0px,
+        var(--vintage-gold) 10px,
+        var(--vintage-brown) 10px,
+        var(--vintage-brown) 20px
+    );
+}
+
+.retro-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.retro-brand {
+    font-family: 'Courier New', monospace;
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--vintage-cream);
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    text-shadow: var(--text-shadow-vintage);
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border: 2px solid var(--vintage-gold);
+    background: rgba(184, 134, 11, 0.1);
+}
+
+.retro-brand:hover {
+    background: rgba(184, 134, 11, 0.2);
+    color: var(--vintage-gold);
+}
+
+.retro-nav-links {
+    display: flex;
+    list-style: none;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+}
+
+.retro-nav-item {
+    position: relative;
+}
+
+.retro-nav-link {
+    display: block;
+    padding: 0.75rem 1.5rem;
+    color: var(--vintage-cream);
+    font-family: 'Times New Roman', 'Georgia', serif;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    background: var(--vintage-brown);
+    border: 2px solid var(--vintage-tan);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.retro-nav-link::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: var(--vintage-gold);
+    transition: left 0.3s ease;
+    z-index: -1;
+}
+
+.retro-nav-link:hover {
+    color: var(--vintage-dark-brown);
+    border-color: var(--vintage-gold);
+    text-decoration: none;
+}
+
+.retro-nav-link:hover::before {
+    left: 0;
+}
+
+.retro-nav-link.active {
+    background: var(--vintage-rust);
+    border-color: var(--vintage-cream);
+    color: var(--vintage-white);
+}
+
+/* ==========================================
+   BUTTONS - Vintage Style
+   ========================================== */
+.btn-retro {
+    display: inline-block;
+    padding: 0.75rem 2rem;
+    font-family: 'Courier New', monospace;
+    font-size: 1rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--vintage-cream);
+    background: var(--vintage-brown);
+    border: 3px solid var(--vintage-dark-brown);
+    box-shadow: 4px 4px 0 var(--vintage-dark-brown);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    position: relative;
+}
+
+.btn-retro:hover {
+    background: var(--vintage-rust);
+    color: var(--vintage-white);
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0 var(--vintage-dark-brown);
+}
+
+.btn-retro:active {
+    transform: translate(4px, 4px);
+    box-shadow: 0 0 0 var(--vintage-dark-brown);
+}
+
+.btn-retro-primary {
+    background: var(--vintage-brown);
+    border-color: var(--vintage-dark-brown);
+}
+
+.btn-retro-success {
+    background: var(--vintage-olive);
+    border-color: #4a5f15;
+    box-shadow: 4px 4px 0 #4a5f15;
+}
+
+.btn-retro-danger {
+    background: var(--vintage-burgundy);
+    border-color: #4a1820;
+    box-shadow: 4px 4px 0 #4a1820;
+}
+
+.btn-retro-warning {
+    background: var(--vintage-gold);
+    border-color: #8b6914;
+    box-shadow: 4px 4px 0 #8b6914;
+    color: var(--vintage-dark-brown);
+}
+
+.btn-retro-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+}
+
+.btn-retro-lg {
+    padding: 1rem 2.5rem;
+    font-size: 1.25rem;
+}
+
+/* ==========================================
+   FORMS - Classic Paper Style
+   ========================================== */
+.retro-form {
+    background: var(--vintage-off-white);
+    padding: 2rem;
+    border: 3px double var(--vintage-brown);
+    box-shadow: var(--shadow-vintage);
+    position: relative;
+}
+
+.retro-form::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 29px,
+        var(--vintage-tan) 29px,
+        var(--vintage-tan) 30px
+    );
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+.form-group-retro {
+    margin-bottom: 1.5rem;
+    position: relative;
+}
+
+.form-label-retro {
+    display: block;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    font-size: 0.95rem;
+    color: var(--vintage-dark-brown);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 0.5rem;
+}
+
+.form-control-retro {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 1rem;
+    color: var(--vintage-dark-brown);
+    background: var(--vintage-white);
+    border: 2px solid var(--vintage-brown);
+    outline: none;
+    transition: all 0.3s ease;
+    box-shadow: inset 2px 2px 4px rgba(74, 53, 38, 0.1);
+}
+
+.form-control-retro:focus {
+    border-color: var(--vintage-rust);
+    box-shadow: inset 2px 2px 4px rgba(168, 88, 50, 0.2), 0 0 0 3px rgba(168, 88, 50, 0.1);
+}
+
+.form-control-retro::placeholder {
+    color: var(--vintage-gray);
+    font-style: italic;
+}
+
+textarea.form-control-retro {
+    resize: vertical;
+    min-height: 120px;
+    font-family: 'Times New Roman', Times, serif;
+}
+
+select.form-control-retro {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%237d5a3b' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    padding-right: 2.5rem;
+    appearance: none;
+}
+
+.form-check-retro {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.form-check-retro input[type="checkbox"],
+.form-check-retro input[type="radio"] {
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 2px solid var(--vintage-brown);
+    appearance: none;
+    cursor: pointer;
+    position: relative;
+}
+
+.form-check-retro input[type="checkbox"]:checked::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--vintage-brown);
+    font-size: 1rem;
+    font-weight: bold;
+}
+
+.form-check-retro input[type="radio"] {
+    border-radius: 50%;
+}
+
+.form-check-retro input[type="radio"]:checked::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px;
+    height: 8px;
+    background: var(--vintage-brown);
+    border-radius: 50%;
+}
+
+/* ==========================================
+   TABLES - Vintage Ledger Style
+   ========================================== */
+.retro-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: var(--vintage-white);
+    border: 3px solid var(--vintage-brown);
+    box-shadow: var(--shadow-vintage);
+    overflow: hidden;
+}
+
+.retro-table thead {
+    background: linear-gradient(180deg, var(--vintage-brown) 0%, var(--vintage-dark-brown) 100%);
+    color: var(--vintage-cream);
+}
+
+.retro-table thead th {
+    padding: 1rem;
+    font-family: 'Times New Roman', 'Courier New', serif !important;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0px !important;
+    text-align: left;
+    border-right: 1px solid var(--vintage-tan);
+    border-bottom: 3px solid var(--vintage-gold);
+}
+
+.retro-table thead th:last-child {
+    border-right: none;
+}
+
+.retro-table tbody tr {
+    background: var(--vintage-off-white);
+    transition: background 0.2s ease;
+}
+
+.retro-table tbody tr:nth-child(even) {
+    background: var(--vintage-cream);
+}
+
+.retro-table tbody tr:hover {
+    background: var(--vintage-beige);
+}
+
+.retro-table tbody td {
+    padding: 0.875rem 1rem;
+    border-right: 1px solid var(--vintage-tan);
+    border-bottom: 1px solid var(--vintage-tan);
+    font-family: 'Times New Roman', 'Georgia', serif !important;
+    letter-spacing: 0px !important;
+}
+
+.retro-table tbody td:last-child {
+    border-right: none;
+}
+
+.retro-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Table actions */
+.table-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* ==========================================
+   CARDS - Vintage Photo Frame Style
+   ========================================== */
+.retro-card {
+    background: var(--vintage-white);
+    border: 4px solid var(--vintage-brown);
+    box-shadow: var(--shadow-deep);
+    padding: 0;
+    margin-bottom: 2rem;
+    position: relative;
+}
+
+.retro-card::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    border: 1px solid var(--vintage-tan);
+    pointer-events: none;
+}
+
+.retro-card-header {
+    background: linear-gradient(180deg, var(--vintage-brown) 0%, var(--vintage-dark-brown) 100%);
+    color: var(--vintage-cream);
+    padding: 1rem 1.5rem;
+    border-bottom: 3px solid var(--vintage-gold);
+}
+
+.retro-card-title {
+    font-family: 'Courier New', monospace;
+    font-size: 1.5rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin: 0;
+}
+
+.retro-card-body {
+    padding: 1.5rem;
+    background: var(--vintage-off-white);
+    font-family: 'Arial', 'Helvetica', sans-serif;
+}
+
+.retro-card-footer {
+    padding: 1rem 1.5rem;
+    background: var(--vintage-beige);
+    border-top: 2px solid var(--vintage-tan);
+}
+
+/* ==========================================
+   ALERTS & MESSAGES - Vintage Notice Style
+   ========================================== */
+.retro-alert {
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+    border: 3px double var(--vintage-brown);
+    background: var(--vintage-cream);
+    font-family: 'Georgia', serif;
+    position: relative;
+}
+
+.retro-alert::before {
+    content: '⚠';
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.5rem;
+}
+
+.retro-alert-content {
+    margin-left: 2rem;
+}
+
+.retro-alert-success {
+    background: #e8f4d8;
+    border-color: var(--vintage-olive);
+}
+
+.retro-alert-success::before {
+    content: '✓';
+    color: var(--vintage-olive);
+}
+
+.retro-alert-danger {
+    background: #f4d8d8;
+    border-color: var(--vintage-burgundy);
+}
+
+.retro-alert-danger::before {
+    content: '✗';
+    color: var(--vintage-burgundy);
+}
+
+.retro-alert-warning {
+    background: #f4ead8;
+    border-color: var(--vintage-gold);
+}
+
+.retro-alert-warning::before {
+    content: '!';
+    color: var(--vintage-gold);
+}
+
+.retro-alert-info {
+    background: #d8e8f4;
+    border-color: #5a7a8b;
+}
+
+.retro-alert-info::before {
+    content: 'ℹ';
+    color: #5a7a8b;
+}
+
+/* ==========================================
+   BADGES & LABELS - Vintage Tags
+   ========================================== */
+.retro-badge {
+    display: inline-block;
+    padding: 0.35rem 0.75rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--vintage-cream);
+    background: var(--vintage-brown);
+    border: 2px solid var(--vintage-dark-brown);
+}
+
+.retro-badge-success {
+    background: var(--vintage-olive);
+    border-color: #4a5f15;
+}
+
+.retro-badge-danger {
+    background: var(--vintage-burgundy);
+    border-color: #4a1820;
+}
+
+.retro-badge-warning {
+    background: var(--vintage-gold);
+    border-color: #8b6914;
+    color: var(--vintage-dark-brown);
+}
+
+/* ==========================================
+   PAGINATION - Vintage Book Style
+   ========================================== */
+.retro-pagination {
+    display: flex;
+    list-style: none;
+    gap: 0.5rem;
+    justify-content: center;
+    margin: 2rem 0;
+    padding: 0;
+}
+
+.retro-pagination-item {
+    display: block;
+}
+
+.retro-pagination-link {
+    display: block;
+    padding: 0.5rem 1rem;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    color: var(--vintage-brown);
+    background: var(--vintage-cream);
+    border: 2px solid var(--vintage-brown);
+    transition: all 0.2s ease;
+}
+
+.retro-pagination-link:hover {
+    background: var(--vintage-brown);
+    color: var(--vintage-cream);
+    text-decoration: none;
+}
+
+.retro-pagination-link.active {
+    background: var(--vintage-rust);
+    color: var(--vintage-white);
+    border-color: var(--vintage-rust);
+}
+
+/* ==========================================
+   FOOTER - Vintage Newspaper Style
+   ========================================== */
+.retro-footer {
+    background: var(--vintage-dark-brown);
+    color: var(--vintage-cream);
+    padding: 2rem;
+    border-top: 5px solid var(--vintage-gold);
+    margin-top: 3rem;
+    text-align: center;
+    font-family: 'Georgia', serif;
+}
+
+.retro-footer p {
+    margin: 0.5rem 0;
+}
+
+.retro-footer a {
+    color: var(--vintage-gold);
+}
+
+.retro-footer a:hover {
+    color: var(--vintage-cream);
+}
+
+/* ==========================================
+   DECORATIVE ELEMENTS
+   ========================================== */
+.vintage-ornament {
+    text-align: center;
+    margin: 2rem 0;
+}
+
+.vintage-ornament::before,
+.vintage-ornament::after {
+    content: '❦';
+    color: var(--vintage-brown);
+    font-size: 1.5rem;
+    margin: 0 1rem;
+}
+
+.vintage-divider {
+    height: 3px;
+    background: repeating-linear-gradient(
+        90deg,
+        var(--vintage-brown) 0px,
+        var(--vintage-brown) 10px,
+        transparent 10px,
+        transparent 20px
+    );
+    margin: 2rem 0;
+}
+
+/* Corner decorations for boxes */
+.corner-decorated {
+    position: relative;
+}
+
+.corner-decorated::before,
+.corner-decorated::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border: 3px solid var(--vintage-gold);
+}
+
+.corner-decorated::before {
+    top: -3px;
+    left: -3px;
+    border-right: none;
+    border-bottom: none;
+}
+
+.corner-decorated::after {
+    bottom: -3px;
+    right: -3px;
+    border-left: none;
+    border-top: none;
+}
+
+/* ==========================================
+   UTILITY CLASSES
+   ========================================== */
+.text-center {
+    text-align: center;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.text-left {
+    text-align: left;
+}
+
+.mt-1 { margin-top: 0.5rem; }
+.mt-2 { margin-top: 1rem; }
+.mt-3 { margin-top: 1.5rem; }
+.mt-4 { margin-top: 2rem; }
+
+.mb-1 { margin-bottom: 0.5rem; }
+.mb-2 { margin-bottom: 1rem; }
+.mb-3 { margin-bottom: 1.5rem; }
+.mb-4 { margin-bottom: 2rem; }
+
+.p-1 { padding: 0.5rem; }
+.p-2 { padding: 1rem; }
+.p-3 { padding: 1.5rem; }
+.p-4 { padding: 2rem; }
+
+.d-flex {
+    display: flex;
+}
+
+.justify-content-between {
+    justify-content: space-between;
+}
+
+.align-items-center {
+    align-items: center;
+}
+
+.gap-1 { gap: 0.5rem; }
+.gap-2 { gap: 1rem; }
+.gap-3 { gap: 1.5rem; }
+
+/* ==========================================
+   OVERRIDE SPECIFIC ELEMENTS WITH TIMES NEW ROMAN
+   ========================================== */
+/* For "~ Hệ thống quản lý tiếng Anh ~" */
+.retro-brand {
+    font-family: 'Times New Roman', 'Georgia', serif !important;
+}
+
+/* For "ĐĂNG XUẤT(<tên người dùng>)" */
+.retro-nav-link {
+    font-family: 'Times New Roman', 'Georgia', serif !important;
+}
+
+/* For "Bạn đã đăng xuất thành công!" */
+.retro-alert {
+    font-family: 'Times New Roman', 'Georgia', serif !important;
+}
+
+/* ==========================================
+   RESPONSIVE DESIGN
+   ========================================== */
+@media (max-width: 768px) {
+    .retro-nav {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .retro-nav-links {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .retro-nav-link {
+        text-align: center;
+    }
+    
+    .container {
+        padding: 1rem;
+    }
+    
+    h1 {
+        font-size: 1.75rem;
+    }
+    
+    .retro-table {
+        font-size: 0.875rem;
+    }
+    
+    .retro-table thead th,
+    .retro-table tbody td {
+        padding: 0.5rem;
+    }
+    
+    .table-actions {
+        flex-direction: column;
+    }
+    
+    .btn-retro {
+        width: 100%;
+        text-align: center;
+    }
+}
+
+/* ==========================================
+   PRINT STYLES - Vintage Document
+   ========================================== */
+@media print {
+    body {
+        background: white;
+        color: black;
+    }
+    
+    .retro-nav,
+    .retro-footer,
+    .btn-retro,
+    .table-actions {
+        display: none;
+    }
+    
+    .retro-table {
+        border: 2px solid black;
+    }
+    
+    .retro-card {
+        border: 2px solid black;
+        box-shadow: none;
+    }
+}

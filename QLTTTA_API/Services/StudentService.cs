@@ -76,40 +76,70 @@ namespace QLTTTA_API.Services
         {
             try
             {
-                // Kiểm tra mã học viên đã tồn tại
-                var existingSql = "SELECT COUNT(*) FROM QLTT_ADMIN.STUDENTS WHERE STUDENT_CODE = :studentcode";
-                var exists = Convert.ToInt32(await ExecuteScalarAsync(existingSql, new { studentcode = dto.StudentCode }));
-
-                if (exists > 0)
+                bool hasStudentCode = !string.IsNullOrWhiteSpace(dto.StudentCode);
+                if (hasStudentCode)
                 {
-                    return new ApiResponse<Student>
+                    var existingSql = "SELECT COUNT(*) FROM QLTT_ADMIN.STUDENTS WHERE STUDENT_CODE = :studentcode";
+                    var exists = Convert.ToInt32(await ExecuteScalarAsync(existingSql, new { studentcode = dto.StudentCode }));
+                    if (exists > 0)
                     {
-                        Success = false,
-                        Message = "Mã học viên đã tồn tại"
+                        return new ApiResponse<Student>
+                        {
+                            Success = false,
+                            Message = "Mã học viên đã tồn tại"
+                        };
+                    }
+                }
+
+                string insertSql;
+                object parameters;
+                if (hasStudentCode)
+                {
+                    insertSql = @"INSERT INTO QLTT_ADMIN.STUDENTS 
+                                    (FULL_NAME, STUDENT_CODE, SEX, DATE_OF_BIRTH, PHONE_NUMBER, ADDRESS)
+                                    VALUES (:fullname, :studentcode, :sex, :dateofbirth, :phonenumber, :address)";
+                    parameters = new
+                    {
+                        fullname = dto.FullName,
+                        studentcode = dto.StudentCode,
+                        sex = dto.Sex,
+                        dateofbirth = dto.DateOfBirth,
+                        phonenumber = dto.PhoneNumber,
+                        address = dto.Address
+                    };
+                }
+                else
+                {
+                    // Để trigger tự sinh STUDENT_CODE => không truyền cột vào câu lệnh
+                    insertSql = @"INSERT INTO QLTT_ADMIN.STUDENTS 
+                                    (FULL_NAME, SEX, DATE_OF_BIRTH, PHONE_NUMBER, ADDRESS)
+                                    VALUES (:fullname, :sex, :dateofbirth, :phonenumber, :address)";
+                    parameters = new
+                    {
+                        fullname = dto.FullName,
+                        sex = dto.Sex,
+                        dateofbirth = dto.DateOfBirth,
+                        phonenumber = dto.PhoneNumber,
+                        address = dto.Address
                     };
                 }
 
-                var sql = @"
-                    INSERT INTO QLTT_ADMIN.STUDENTS 
-                    (FULL_NAME, STUDENT_CODE, SEX, DATE_OF_BIRTH, PHONE_NUMBER, ADDRESS)
-                    VALUES (:fullname, :studentcode, :sex, :dateofbirth, :phonenumber, :address)";
+                await ExecuteNonQueryAsync(insertSql, parameters);
 
-                var parameters = new
+                Student? newStudent;
+                if (hasStudentCode)
                 {
-                    fullname = dto.FullName,
-                    studentcode = dto.StudentCode,
-                    sex = dto.Sex,
-                    dateofbirth = dto.DateOfBirth,
-                    phonenumber = dto.PhoneNumber,
-                    address = dto.Address
-                };
-
-                await ExecuteNonQueryAsync(sql, parameters);
-
-                // Lấy thông tin học viên vừa tạo
-                var newStudent = await ExecuteQuerySingleAsync<Student>(
-                    "SELECT * FROM QLTT_ADMIN.STUDENTS WHERE STUDENT_CODE = :studentcode",
-                    new { studentcode = dto.StudentCode });
+                    newStudent = await ExecuteQuerySingleAsync<Student>(
+                        "SELECT * FROM QLTT_ADMIN.STUDENTS WHERE STUDENT_CODE = :studentcode",
+                        new { studentcode = dto.StudentCode });
+                }
+                else
+                {
+                    // Lấy bản ghi mới nhất dựa vào STUDENT_ID lớn nhất (giả định sequence tăng dần)
+                    newStudent = await ExecuteQuerySingleAsync<Student>(
+                        "SELECT * FROM (SELECT * FROM QLTT_ADMIN.STUDENTS ORDER BY STUDENT_ID DESC) WHERE ROWNUM = 1",
+                        null);
+                }
 
                 return new ApiResponse<Student>
                 {
@@ -124,7 +154,8 @@ namespace QLTTTA_API.Services
                 return new ApiResponse<Student>
                 {
                     Success = false,
-                    Message = "Có lỗi xảy ra khi tạo học viên"
+                    //Message = "Có lỗi xảy ra khi tạo học viên"
+                    Message = "Lỗi: " + ex.Message
                 };
             }
         }

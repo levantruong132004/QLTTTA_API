@@ -124,7 +124,6 @@ namespace QLTTTA_WEB.Controllers
                 var createDto = new
                 {
                     FullName = model.FullName,
-                    StudentCode = model.StudentCode,
                     Sex = model.Sex,
                     DateOfBirth = model.DateOfBirth,
                     PhoneNumber = model.PhoneNumber,

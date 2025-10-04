@@ -1,5 +1,8 @@
 ﻿var builder = WebApplication.CreateBuilder(args);
 
+// Run the MVC app on HTTP port 5165 to avoid localhost certificate warnings.
+builder.WebHost.UseUrls("http://localhost:5165");
+
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
@@ -14,7 +17,7 @@ builder.Services.AddSession(options =>
 builder.Services.AddHttpClient("ApiClient", client =>
 {
     // Địa chỉ của API backend
-    client.BaseAddress = new Uri("http://localhost:5069/"); // port API
+    client.BaseAddress = new Uri("http://localhost:7158/"); // port API
 });
 
 var app = builder.Build();
@@ -26,8 +29,6 @@ if (!app.Environment.IsDevelopment())
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
-
-app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();

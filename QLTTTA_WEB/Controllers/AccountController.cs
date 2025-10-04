@@ -107,5 +107,84 @@ namespace QLTTTA_WEB.Controllers
             TempData["InfoMessage"] = "Bạn đã đăng xuất thành công!";
             return RedirectToAction("Login");
         }
+
+        [HttpGet]
+        public IActionResult Register()
+        {
+            // Kiểm tra nếu đã đăng nhập rồi thì redirect về trang chính
+            if (HttpContext.Session.GetString("UserId") != null)
+            {
+                return RedirectToAction("Index", "Home");
+            }
+
+            return View();
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Register(RegisterViewModel model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            try
+            {
+                _logger.LogInformation("Bắt đầu đăng ký user: {Username}, Email: {Email}", model.Username, model.Email);
+
+                var registerRequest = new RegisterApiRequest
+                {
+                    FullName = model.FullName,
+                    Sex = model.Sex,
+                    DateOfBirth = model.DateOfBirth ?? DateTime.Now.AddYears(-18), // Default nếu null
+                    PhoneNumber = model.PhoneNumber,
+                    Email = model.Email,
+                    Address = model.Address,
+                    Username = model.Username,
+                    Password = model.Password,
+                    ConfirmPassword = model.ConfirmPassword
+                };
+
+                var json = JsonSerializer.Serialize(registerRequest);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                _logger.LogInformation("Gọi API register với data: {Json}", json);
+
+                var response = await _httpClient.PostAsync("api/auth/register", content);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                _logger.LogInformation("API response status: {StatusCode}, content: {Content}", response.StatusCode, responseContent);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var registerResponse = JsonSerializer.Deserialize<RegisterApiResponse>(responseContent, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+
+                    if (registerResponse?.Success == true)
+                    {
+                        TempData["SuccessMessage"] = "Đăng ký tài khoản thành công! Vui lòng đăng nhập.";
+                        return RedirectToAction("Login");
+                    }
+                }
+
+                var errorResponse = JsonSerializer.Deserialize<RegisterApiResponse>(responseContent, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                ModelState.AddModelError("", errorResponse?.Message ?? "Đăng ký thất bại");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi đăng ký - Username: {Username}, ErrorMessage: {Message}", 
+                    model.Username, ex.Message);
+                ModelState.AddModelError("", $"Có lỗi xảy ra trong quá trình đăng ký: {ex.Message}");
+            }
+
+            return View(model);
+        }
     }
 }

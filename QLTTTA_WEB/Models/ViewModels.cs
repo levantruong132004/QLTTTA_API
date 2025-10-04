@@ -33,9 +33,9 @@ namespace QLTTTA_WEB.Models
         [Display(Name = "Họ tên")]
         public string FullName { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "Mã học viên là bắt buộc")]
+        // Mã học viên được sinh tự động ở DB (trigger) => không cho nhập
         [Display(Name = "Mã học viên")]
-        public string StudentCode { get; set; } = string.Empty;
+        public string? StudentCode { get; set; }
 
         [Display(Name = "Giới tính")]
         public string? Sex { get; set; }
