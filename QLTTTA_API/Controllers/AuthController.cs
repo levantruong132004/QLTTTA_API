@@ -85,5 +85,16 @@ namespace QLTTTA_API.Controllers
                 return BadRequest(new { Success = false, Message = ex.Message });
             }
         }
+
+        [HttpGet("check-session")]
+        public async Task<IActionResult> CheckSession([FromQuery] string username, [FromQuery] string sessionId)
+        {
+            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(sessionId))
+            {
+                return BadRequest(new { status = "invalid", reason = "missing" });
+            }
+            var valid = await _authService.CheckSessionAsync(username, sessionId);
+            return Ok(new { status = valid ? "valid" : "invalid" });
+        }
     }
 }

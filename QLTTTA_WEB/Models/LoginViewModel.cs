@@ -76,7 +76,13 @@ namespace QLTTTA_WEB.Models
         public bool Success { get; set; }
         public string Message { get; set; } = string.Empty;
         public string Token { get; set; } = string.Empty;
+        public string? SessionId { get; set; }
         public UserInfo? User { get; set; }
+    }
+
+    public class CheckSessionResponse
+    {
+        public string Status { get; set; } = string.Empty; // "valid" | "invalid"
     }
 
     public class RegisterApiRequest

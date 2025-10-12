@@ -68,6 +68,18 @@ namespace QLTTTA_WEB.Controllers
                         HttpContext.Session.SetString("Role", loginResponse.User.Role);
                         HttpContext.Session.SetString("Token", loginResponse.Token);
 
+                        // Lưu SessionId vào cookie cho short polling kiểm tra đăng nhập đồng thời
+                        if (!string.IsNullOrEmpty(loginResponse.SessionId))
+                        {
+                            Response.Cookies.Append("SessionId", loginResponse.SessionId, new CookieOptions
+                            {
+                                HttpOnly = false,
+                                SameSite = SameSiteMode.Lax,
+                                Secure = false,
+                                Expires = DateTimeOffset.UtcNow.AddHours(1)
+                            });
+                        }
+
                         TempData["SuccessMessage"] = "Đăng nhập thành công!";
                         return RedirectToAction("Index", "Home");
                     }
