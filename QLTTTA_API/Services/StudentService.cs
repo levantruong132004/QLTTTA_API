@@ -29,22 +29,34 @@ namespace QLTTTA_API.Services
 
                 if (string.IsNullOrEmpty(search))
                 {
-                    sql = @"SELECT s.* FROM QLTT_ADMIN.STUDENTS s 
-                            INNER JOIN QLTT_ADMIN.ACCOUNTS a ON a.USER_ID = s.STUDENT_ID
-                            WHERE a.IS_ACTIVE = 1
-                            ORDER BY s.STUDENT_ID";
+                    sql = @"SELECT 
+                                s.ID_HOC_VIEN AS StudentId, 
+                                s.HO_TEN AS FullName, 
+                                s.MA_HOC_VIEN AS StudentCode, 
+                                s.GIOI_TINH AS Sex, 
+                                s.NGAY_SINH AS DateOfBirth, 
+                                s.SO_DIEN_THOAI AS PhoneNumber, 
+                                s.DIA_CHI AS Address
+                            FROM QLTT_ADMIN.HOC_VIEN s 
+                            ORDER BY s.ID_HOC_VIEN";
                 }
                 else
                 {
-                    sql = @"SELECT s.* FROM QLTT_ADMIN.STUDENTS s 
-                            INNER JOIN QLTT_ADMIN.ACCOUNTS a ON a.USER_ID = s.STUDENT_ID
-                            WHERE a.IS_ACTIVE = 1
-                              AND (UPPER(s.FULL_NAME) LIKE UPPER(:search) OR UPPER(s.STUDENT_CODE) LIKE UPPER(:search))
-                            ORDER BY s.STUDENT_ID";
+                    sql = @"SELECT 
+                                s.ID_HOC_VIEN AS StudentId, 
+                                s.HO_TEN AS FullName, 
+                                s.MA_HOC_VIEN AS StudentCode, 
+                                s.GIOI_TINH AS Sex, 
+                                s.NGAY_SINH AS DateOfBirth, 
+                                s.SO_DIEN_THOAI AS PhoneNumber, 
+                                s.DIA_CHI AS Address
+                            FROM QLTT_ADMIN.HOC_VIEN s 
+                            WHERE (UPPER(s.HO_TEN) LIKE UPPER(:search) OR UPPER(s.MA_HOC_VIEN) LIKE UPPER(:search))
+                            ORDER BY s.ID_HOC_VIEN";
                     parameters = new { search = $"%{search}%" };
                 }
 
-                var allStudents = await ExecuteQueryAsync<Student>(sql, parameters);
+                var allStudents = await ExecuteQueryAdminAsync<Student>(sql, parameters);
                 var totalRecords = allStudents.Count;
 
                 var skip = (pageNumber - 1) * pageSize;
@@ -73,10 +85,17 @@ namespace QLTTTA_API.Services
 
         public async Task<Student?> GetStudentByIdAsync(int id)
         {
-            var sql = @"SELECT s.* FROM QLTT_ADMIN.STUDENTS s
-                        INNER JOIN QLTT_ADMIN.ACCOUNTS a ON a.USER_ID = s.STUDENT_ID
-                        WHERE s.STUDENT_ID = :id AND a.IS_ACTIVE = 1";
-            return await ExecuteQuerySingleAsync<Student>(sql, new { id });
+            var sql = @"SELECT 
+                            s.ID_HOC_VIEN AS StudentId, 
+                            s.HO_TEN AS FullName, 
+                            s.MA_HOC_VIEN AS StudentCode, 
+                            s.GIOI_TINH AS Sex, 
+                            s.NGAY_SINH AS DateOfBirth, 
+                            s.SO_DIEN_THOAI AS PhoneNumber, 
+                            s.DIA_CHI AS Address
+                        FROM QLTT_ADMIN.HOC_VIEN s
+                        WHERE s.ID_HOC_VIEN = :id";
+            return await ExecuteQuerySingleAdminAsync<Student>(sql, new { id });
         }
 
         public async Task<ApiResponse<Student>> CreateStudentAsync(StudentCreateDto dto)
@@ -93,12 +112,12 @@ namespace QLTTTA_API.Services
                     };
                 }
 
-                using var connection = await GetConnectionAsync();
+                using var connection = await GetAdminConnectionAsync();
                 using var transaction = connection.BeginTransaction();
                 try
                 {
-                    // 1. Kiểm tra trùng USERNAME / EMAIL
-                    using (var checkUserCmd = new OracleCommand("SELECT COUNT(*) FROM QLTT_ADMIN.ACCOUNTS WHERE USERNAME = :u", connection))
+                    // 1. Kiểm tra trùng TEN_DANG_NHAP / EMAIL
+                    using (var checkUserCmd = new OracleCommand("SELECT COUNT(*) FROM QLTT_ADMIN.TAI_KHOAN WHERE TEN_DANG_NHAP = :u", connection))
                     {
                         checkUserCmd.Transaction = transaction;
                         checkUserCmd.Parameters.Add(":u", OracleDbType.Varchar2).Value = dto.Username.Trim();
@@ -108,7 +127,7 @@ namespace QLTTTA_API.Services
                             return new ApiResponse<Student> { Success = false, Message = "Tên đăng nhập đã tồn tại" };
                         }
                     }
-                    using (var checkEmailCmd = new OracleCommand("SELECT COUNT(*) FROM QLTT_ADMIN.ACCOUNTS WHERE EMAIL = :e", connection))
+                    using (var checkEmailCmd = new OracleCommand("SELECT COUNT(*) FROM QLTT_ADMIN.TAI_KHOAN WHERE EMAIL = :e", connection))
                     {
                         checkEmailCmd.Transaction = transaction;
                         checkEmailCmd.Parameters.Add(":e", OracleDbType.Varchar2).Value = dto.Email.Trim();
@@ -119,11 +138,11 @@ namespace QLTTTA_API.Services
                         }
                     }
 
-                    // 2. Lấy ROLE_ID của STUDENT (fallback 1)
+                    // 2. Lấy ID_VAI_TRO của HOCVIEN (fallback 1)
                     int roleId = 1;
                     try
                     {
-                        using var roleCmd = new OracleCommand("SELECT ROLE_ID FROM QLTT_ADMIN.ROLES WHERE UPPER(ROLE_NAME) IN ('STUDENT','HỌC VIÊN','HOC VIEN') FETCH FIRST 1 ROWS ONLY", connection);
+                        using var roleCmd = new OracleCommand("SELECT ID_VAI_TRO FROM QLTT_ADMIN.VAI_TRO WHERE UPPER(TEN_VAI_TRO) = 'HOCVIEN' FETCH FIRST 1 ROWS ONLY", connection);
                         roleCmd.Transaction = transaction;
                         var roleObj = await roleCmd.ExecuteScalarAsync();
                         if (roleObj != null && int.TryParse(roleObj.ToString(), out var rid) && rid > 0)
@@ -131,11 +150,11 @@ namespace QLTTTA_API.Services
                     }
                     catch { /* ignore, fallback 1 */ }
 
-                    // 3. Insert ACCOUNT (identity) + lấy USER_ID
+                    // 3. Insert TAI_KHOAN + lấy ID_NGUOI_DUNG
                     int newUserId = 0;
-                    using (var accCmd = new OracleCommand(@"INSERT INTO QLTT_ADMIN.ACCOUNTS (USERNAME,PASSWORD,EMAIL,ROLE_ID,IS_ACTIVE)
-                                                             VALUES (:username,:password,:email,:roleId,1)
-                                                             RETURNING USER_ID INTO :p_user_id", connection))
+                    using (var accCmd = new OracleCommand(@"INSERT INTO QLTT_ADMIN.TAI_KHOAN (TEN_DANG_NHAP, MAT_KHAU, EMAIL, ID_VAI_TRO, TRANG_THAI_KICH_HOAT)
+                                                             VALUES (:username, :password, :email, :roleId, 1)
+                                                             RETURNING ID_NGUOI_DUNG INTO :p_user_id", connection))
                     {
                         accCmd.Transaction = transaction;
                         accCmd.Parameters.Add(":username", OracleDbType.Varchar2).Value = dto.Username.Trim();
@@ -151,12 +170,12 @@ namespace QLTTTA_API.Services
                     if (newUserId <= 0)
                     {
                         transaction.Rollback();
-                        return new ApiResponse<Student> { Success = false, Message = "Không lấy được USER_ID sau khi tạo tài khoản" };
+                        return new ApiResponse<Student> { Success = false, Message = "Không lấy được ID người dùng sau khi tạo tài khoản" };
                     }
 
-                    // 4. Insert STUDENT (STUDENT_ID = USER_ID) - bỏ STUDENT_CODE để trigger tự sinh
-                    using (var stuCmd = new OracleCommand(@"INSERT INTO QLTT_ADMIN.STUDENTS (STUDENT_ID,FULL_NAME,SEX,DATE_OF_BIRTH,PHONE_NUMBER,ADDRESS)
-                                                            VALUES (:id,:fullName,:sex,:dob,:phone,:addr)", connection))
+                    // 4. Insert HOC_VIEN (ID_HOC_VIEN = ID_NGUOI_DUNG) - bỏ MA_HOC_VIEN để trigger tự sinh
+                    using (var stuCmd = new OracleCommand(@"INSERT INTO QLTT_ADMIN.HOC_VIEN (ID_HOC_VIEN, HO_TEN, GIOI_TINH, NGAY_SINH, SO_DIEN_THOAI, DIA_CHI)
+                                                            VALUES (:id, :fullName, :sex, :dob, :phone, :addr)", connection))
                     {
                         stuCmd.Transaction = transaction;
                         stuCmd.Parameters.Add(":id", OracleDbType.Int32).Value = newUserId;
@@ -171,30 +190,8 @@ namespace QLTTTA_API.Services
                     // 5. Commit transaction
                     transaction.Commit();
 
-                    // 6. Lấy lại student vừa tạo (bao gồm STUDENT_CODE do trigger sinh)
-                    Student? newStudent;
-                    using (var fetchCmd = new OracleCommand("SELECT * FROM QLTT_ADMIN.STUDENTS WHERE STUDENT_ID = :sid", connection))
-                    {
-                        fetchCmd.Parameters.Add(":sid", OracleDbType.Int32).Value = newUserId;
-                        using var reader = await fetchCmd.ExecuteReaderAsync();
-                        if (await reader.ReadAsync())
-                        {
-                            newStudent = new Student
-                            {
-                                StudentId = newUserId,
-                                FullName = reader.IsDBNull(reader.GetOrdinal("FULL_NAME")) ? null : reader.GetString(reader.GetOrdinal("FULL_NAME")),
-                                StudentCode = reader.IsDBNull(reader.GetOrdinal("STUDENT_CODE")) ? null : reader.GetString(reader.GetOrdinal("STUDENT_CODE")),
-                                Sex = reader.IsDBNull(reader.GetOrdinal("SEX")) ? null : reader.GetString(reader.GetOrdinal("SEX")),
-                                DateOfBirth = reader.IsDBNull(reader.GetOrdinal("DATE_OF_BIRTH")) ? null : reader.GetDateTime(reader.GetOrdinal("DATE_OF_BIRTH")),
-                                PhoneNumber = reader.IsDBNull(reader.GetOrdinal("PHONE_NUMBER")) ? null : reader.GetString(reader.GetOrdinal("PHONE_NUMBER")),
-                                Address = reader.IsDBNull(reader.GetOrdinal("ADDRESS")) ? null : reader.GetString(reader.GetOrdinal("ADDRESS"))
-                            };
-                        }
-                        else
-                        {
-                            newStudent = null;
-                        }
-                    }
+                    // 6. Lấy lại student vừa tạo (bao gồm MA_HOC_VIEN do trigger sinh)
+                    var newStudent = await GetStudentByIdAsync(newUserId);
 
                     return new ApiResponse<Student>
                     {
@@ -243,8 +240,8 @@ namespace QLTTTA_API.Services
 
                 // Kiểm tra mã học viên trùng (ngoại trừ chính nó)
                 var existingSql = @"
-                    SELECT COUNT(*) FROM QLTT_ADMIN.STUDENTS 
-                    WHERE STUDENT_CODE = :studentcode AND STUDENT_ID != :studentid";
+                    SELECT COUNT(*) FROM QLTT_ADMIN.HOC_VIEN 
+                    WHERE MA_HOC_VIEN = :studentcode AND ID_HOC_VIEN != :studentid";
                 var exists = Convert.ToInt32(await ExecuteScalarAsync(existingSql,
                     new { studentcode = dto.StudentCode, studentid = dto.StudentId }));
 
@@ -258,14 +255,14 @@ namespace QLTTTA_API.Services
                 }
 
                 var sql = @"
-                    UPDATE QLTT_ADMIN.STUDENTS SET
-                        FULL_NAME = :fullname,
-                        STUDENT_CODE = :studentcode,
-                        SEX = :sex,
-                        DATE_OF_BIRTH = :dateofbirth,
-                        PHONE_NUMBER = :phonenumber,
-                        ADDRESS = :address
-                    WHERE STUDENT_ID = :studentid";
+                    UPDATE QLTT_ADMIN.HOC_VIEN SET
+                        HO_TEN = :fullname,
+                        MA_HOC_VIEN = :studentcode,
+                        GIOI_TINH = :sex,
+                        NGAY_SINH = :dateofbirth,
+                        SO_DIEN_THOAI = :phonenumber,
+                        DIA_CHI = :address
+                    WHERE ID_HOC_VIEN = :studentid";
 
                 var parameters = new
                 {
@@ -305,9 +302,9 @@ namespace QLTTTA_API.Services
             try
             {
                 // Kiểm tra học viên có đăng ký học không
-                // Soft delete: đặt IS_ACTIVE = 0 cho ACCOUNT tương ứng (không xóa dữ liệu STUDENTS)
-                using var connection = await GetConnectionAsync();
-                using var command = new OracleCommand("BEGIN UPDATE QLTT_ADMIN.ACCOUNTS SET IS_ACTIVE = 0 WHERE USER_ID = :id; :rowcount := SQL%ROWCOUNT; END;", connection);
+                // Soft delete: đặt TRANG_THAI_KICH_HOAT = 0 cho TAI_KHOAN tương ứng
+                using var connection = await GetAdminConnectionAsync();
+                using var command = new OracleCommand("BEGIN UPDATE QLTT_ADMIN.TAI_KHOAN SET TRANG_THAI_KICH_HOAT = 0 WHERE ID_NGUOI_DUNG = :id; :rowcount := SQL%ROWCOUNT; END;", connection);
                 var idParam = new OracleParameter(":id", OracleDbType.Int32) { Value = id };
                 var outParam = new OracleParameter(":rowcount", OracleDbType.Int32, System.Data.ParameterDirection.Output);
                 command.Parameters.Add(idParam);
@@ -335,12 +332,18 @@ namespace QLTTTA_API.Services
 
         public async Task<List<Student>> SearchStudentsAsync(string keyword)
         {
-            var sql = @"SELECT s.* FROM QLTT_ADMIN.STUDENTS s
-                        INNER JOIN QLTT_ADMIN.ACCOUNTS a ON a.USER_ID = s.STUDENT_ID
-                        WHERE a.IS_ACTIVE = 1
-                          AND (UPPER(s.FULL_NAME) LIKE UPPER(:keyword) OR UPPER(s.STUDENT_CODE) LIKE UPPER(:keyword))
-                        ORDER BY s.FULL_NAME";
-            return await ExecuteQueryAsync<Student>(sql, new { keyword = $"%{keyword}%" });
+                        var sql = @"SELECT 
+                            s.ID_HOC_VIEN AS StudentId, 
+                            s.HO_TEN AS FullName, 
+                            s.MA_HOC_VIEN AS StudentCode, 
+                            s.GIOI_TINH AS Sex, 
+                            s.NGAY_SINH AS DateOfBirth, 
+                            s.SO_DIEN_THOAI AS PhoneNumber, 
+                            s.DIA_CHI AS Address
+                                                FROM QLTT_ADMIN.HOC_VIEN s
+                                                WHERE (UPPER(s.HO_TEN) LIKE UPPER(:keyword) OR UPPER(s.MA_HOC_VIEN) LIKE UPPER(:keyword))
+                                                ORDER BY s.HO_TEN";
+                        return await ExecuteQueryAdminAsync<Student>(sql, new { keyword = $"%{keyword}%" });
         }
     }
 }
