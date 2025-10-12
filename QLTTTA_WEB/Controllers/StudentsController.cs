@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using QLTTTA_WEB.Models;
 using System.Text;
 using System.Text.Json;
+using QRCoder;
 
 namespace QLTTTA_WEB.Controllers
 {
@@ -19,6 +21,15 @@ namespace QLTTTA_WEB.Controllers
         private bool CheckAuthentication()
         {
             return !string.IsNullOrEmpty(HttpContext.Session.GetString("UserId"));
+        }
+
+        private string BuildPublicProfileUrl(int id)
+        {
+            // Build absolute URL for public profile (no auth)
+            var scheme = Request.Scheme;
+            var host = Request.Host.ToString();
+            var path = Url.Action("PublicProfile", "Students", new { id }) ?? $"/Students/PublicProfile/{id}";
+            return $"{scheme}://{host}{path}";
         }
 
         public async Task<IActionResult> Index(int pageNumber = 1, int pageSize = 10, string? search = null)
@@ -84,7 +95,10 @@ namespace QLTTTA_WEB.Controllers
 
                     if (apiResponse?.Success == true && apiResponse.Data != null)
                     {
-                        return View(MapToStudentViewModel(apiResponse.Data));
+                        // Attach a public link for QR usage via ViewData
+                        var vm = MapToStudentViewModel(apiResponse.Data);
+                        ViewData["PublicProfileUrl"] = BuildPublicProfileUrl(id);
+                        return View(vm);
                     }
                 }
 
@@ -97,6 +111,61 @@ namespace QLTTTA_WEB.Controllers
             }
 
             return RedirectToAction(nameof(Index));
+        }
+
+        [HttpGet]
+        [AllowAnonymous]
+        public async Task<IActionResult> PublicProfile(int id)
+        {
+            // Public: show minimal, non-sensitive info. No session check.
+            try
+            {
+                var response = await _httpClient.GetAsync($"api/students/{id}");
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    var apiResponse = JsonSerializer.Deserialize<StudentApiResponse>(content, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+
+                    if (apiResponse?.Success == true && apiResponse.Data != null)
+                    {
+                        var data = apiResponse.Data;
+                        var vm = new PublicStudentViewModel
+                        {
+                            StudentId = data.StudentId,
+                            FullName = data.FullName ?? "",
+                            StudentCode = data.StudentCode ?? "",
+                            Sex = data.Sex,
+                            DateOfBirth = data.DateOfBirth,
+                            PhoneNumber = data.PhoneNumber ?? "",
+                            Address = data.Address
+                        };
+                        return View(vm);
+                    }
+                }
+
+                return View("PublicNotFound");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error loading public student profile");
+                return View("PublicNotFound");
+            }
+        }
+
+        [HttpGet]
+        public IActionResult GenerateQr(int id)
+        {
+            // Generate QR that encodes the public profile URL
+            var url = BuildPublicProfileUrl(id);
+
+            using var generator = new QRCodeGenerator();
+            using var data = generator.CreateQrCode(url, QRCodeGenerator.ECCLevel.Q);
+            var pngQr = new PngByteQRCode(data);
+            var bytes = pngQr.GetGraphic(6);
+            return File(bytes, "image/png");
         }
 
         public IActionResult Create()
@@ -349,6 +418,17 @@ namespace QLTTTA_WEB.Controllers
         public string? Sex { get; set; }
         public DateTime? DateOfBirth { get; set; }
         public string? PhoneNumber { get; set; }
+        public string? Address { get; set; }
+    }
+
+    public class PublicStudentViewModel
+    {
+        public int StudentId { get; set; }
+        public string FullName { get; set; } = "";
+        public string StudentCode { get; set; } = "";
+        public string? Sex { get; set; }
+        public DateTime? DateOfBirth { get; set; }
+        public string PhoneNumber { get; set; } = "";
         public string? Address { get; set; }
     }
 }

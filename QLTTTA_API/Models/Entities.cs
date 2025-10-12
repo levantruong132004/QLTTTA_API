@@ -1,16 +1,32 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace QLTTTA_API.Models
 {
+    [Table("HOC_VIEN", Schema = "QLTT_ADMIN")]
     // Học viên
     public class Student
     {
+        [Key]
+        [Column("ID_HOC_VIEN")]
         public int StudentId { get; set; }
+
+        [Column("HO_TEN")]
         public string? FullName { get; set; }
+
+        [Column("MA_HOC_VIEN")]
         public string? StudentCode { get; set; }
+
+        [Column("GIOI_TINH")]
         public string? Sex { get; set; }
+
+        [Column("NGAY_SINH")]
         public DateTime? DateOfBirth { get; set; }
+
+        [Column("SO_DIEN_THOAI")]
         public string? PhoneNumber { get; set; }
+
+        [Column("DIA_CHI")]
         public string? Address { get; set; }
     }
 

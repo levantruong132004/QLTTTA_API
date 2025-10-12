@@ -28,10 +28,10 @@ namespace QLTTTA_API.Controllers
             {
                 var baseService = new BaseService(_configuration, _logger);
                 using var connection = await baseService.GetConnectionAsync();
-                using var command = new OracleCommand("SELECT COUNT(*) FROM QLTT_ADMIN.STUDENTS", connection);
+                using var command = new OracleCommand("SELECT COUNT(*) FROM QLTT_ADMIN.HOC_VIEN", connection);
                 var count = Convert.ToInt32(await command.ExecuteScalarAsync());
 
-                return Ok(new { Success = true, Count = count, Message = "Students table accessible" });
+                return Ok(new { Success = true, Count = count, Message = "HOC_VIEN table accessible" });
             }
             catch (Exception ex)
             {

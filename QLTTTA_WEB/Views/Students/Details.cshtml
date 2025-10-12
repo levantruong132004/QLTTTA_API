@@ -270,6 +270,27 @@
             </div>
         </div>
 
+        <div class="info-card">
+            <div class="info-row" style="justify-content:center;">
+                <div style="text-align:center;">
+                    <div style="font-family:'Times New Roman', serif;font-weight:bold;color:var(--vintage-brown);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">
+                        QR tra cứu hồ sơ công khai
+                    </div>
+                    <img src="@Url.Action("GenerateQr", "Students", new { id = Model.StudentId })"
+                         alt="Student QR"
+                         style="width:200px;height:200px;border:1px solid var(--vintage-tan);padding:8px;background:#fff;box-shadow:4px 4px 0 var(--vintage-brown);" />
+                    <div style="margin-top:10px">
+                        <a class="btn-primary" href="@Url.Action("GenerateQr", "Students", new { id = Model.StudentId })" download="student-@Model.StudentCode-qr.png">
+                            <i class="fas fa-download"></i> Tải QR
+                        </a>
+                        <a class="btn-secondary" href="@((ViewData["PublicProfileUrl"] as string) ?? Url.Action("PublicProfile", "Students", new { id = Model.StudentId }))">
+                            <i class="fas fa-external-link-alt"></i> Mở trang công khai
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="button-group">
             <a asp-action="Edit" asp-route-id="@Model.StudentId" class="btn-primary">
                 <i class="fas fa-edit"></i>
