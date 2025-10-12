@@ -105,7 +105,8 @@ namespace QLTTTA_API.Controllers
                 if (!ModelState.IsValid)
                 {
                     var errors = ModelState
-                        .SelectMany(x => x.Value.Errors)
+                        .Where(x => x.Value != null)
+                        .SelectMany(x => x.Value!.Errors)
                         .Select(x => x.ErrorMessage)
                         .ToArray();
 

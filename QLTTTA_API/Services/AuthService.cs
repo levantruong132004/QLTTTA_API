@@ -10,17 +10,20 @@ namespace QLTTTA_API.Services
         Task<RegisterResponse> RegisterAsync(RegisterRequest request);
         Task<string> TestDatabaseAsync();
         Task<bool> CheckSessionAsync(string username, string sessionId);
+        Task LogoutAsync(string sessionId);
     }
 
     public class AuthService : IAuthService
     {
         private readonly string _connectionString;
         private readonly ILogger<AuthService> _logger;
+        private readonly IUserCredentialCache _credCache;
 
-        public AuthService(IConfiguration configuration, ILogger<AuthService> logger)
+        public AuthService(IConfiguration configuration, ILogger<AuthService> logger, IUserCredentialCache credCache)
         {
             _connectionString = configuration.GetConnectionString("OracleDbConnection") ?? throw new ArgumentNullException(nameof(configuration));
             _logger = logger;
+            _credCache = credCache;
         }
 
         public async Task<LoginResponse> AuthenticateAsync(LoginRequest request)
@@ -100,6 +103,9 @@ namespace QLTTTA_API.Services
                     upCmd.Parameters.Add(":u", OracleDbType.Varchar2).Value = userInfo.Username;
                     await upCmd.ExecuteNonQueryAsync();
                 }
+
+                // Lưu thông tin chứng thực tạm thời để các request tiếp theo mở kết nối theo user
+                _credCache.Set(sessionId, request.Username!.Trim(), request.Password!, TimeSpan.FromHours(1));
 
                 _logger.LogInformation("Login success for {Username} with role {Role}", userInfo.Username, userInfo.Role);
                 return new LoginResponse
@@ -265,6 +271,25 @@ namespace QLTTTA_API.Services
             {
                 _logger.LogError(ex, "CheckSessionAsync error for user {Username}", username);
                 return false;
+            }
+        }
+
+        public async Task LogoutAsync(string sessionId)
+        {
+            if (string.IsNullOrWhiteSpace(sessionId)) return;
+            try
+            {
+                _credCache.Remove(sessionId);
+                using var connection = new OracleConnection(_connectionString);
+                await connection.OpenAsync();
+                using var cmd = new OracleCommand("UPDATE TAI_KHOAN SET SESSION_ID_HIENTAI = NULL WHERE SESSION_ID_HIENTAI = :sid", connection)
+                { BindByName = true };
+                cmd.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sessionId;
+                await cmd.ExecuteNonQueryAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during logout for session {SessionId}", sessionId);
             }
         }
     }

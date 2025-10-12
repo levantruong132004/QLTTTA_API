@@ -42,9 +42,10 @@ namespace QLTTTA_API.Controllers
         }
 
         [HttpPost("logout")]
-        public IActionResult Logout()
+        public async Task<IActionResult> Logout()
         {
-            // Xử lý logout logic nếu cần
+            var sid = Request.Headers["X-Session-Id"].FirstOrDefault() ?? Request.Query["sessionId"].FirstOrDefault();
+            await _authService.LogoutAsync(sid ?? "");
             return Ok(new { Success = true, Message = "Đăng xuất thành công" });
         }
 

@@ -115,7 +115,13 @@ namespace QLTTTA_WEB.Controllers
             try
             {
                 // Gọi API logout nếu cần
-                await _httpClient.PostAsync("api/auth/logout", null);
+                var sid = Request.Cookies["SessionId"];
+                if (!string.IsNullOrEmpty(sid))
+                {
+                    var req = new HttpRequestMessage(HttpMethod.Post, "api/auth/logout");
+                    req.Headers.Add("X-Session-Id", sid);
+                    await _httpClient.SendAsync(req);
+                }
             }
             catch (Exception ex)
             {
@@ -124,6 +130,8 @@ namespace QLTTTA_WEB.Controllers
 
             // Xóa session
             HttpContext.Session.Clear();
+            // Xóa cookie
+            Response.Cookies.Delete("SessionId");
 
             TempData["InfoMessage"] = "Bạn đã đăng xuất thành công!";
             return RedirectToAction("Login");

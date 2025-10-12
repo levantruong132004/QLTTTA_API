@@ -15,8 +15,8 @@ namespace QLTTTA_API.Services
 
     public class CourseService : BaseService, ICourseService
     {
-        public CourseService(IConfiguration configuration, ILogger<CourseService> logger)
-            : base(configuration, logger) { }
+        public CourseService(IConfiguration configuration, ILogger<CourseService> logger, IOracleConnectionProvider userConnProvider)
+            : base(configuration, logger, userConnProvider) { }
 
         public async Task<PaginatedResponse<Course>> GetCoursesAsync(int pageNumber = 1, int pageSize = 10, string? search = null)
         {

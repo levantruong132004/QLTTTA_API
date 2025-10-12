@@ -11,6 +11,9 @@ try
     builder.Services.AddControllers();
 
     // Đăng ký services
+    builder.Services.AddHttpContextAccessor();
+    builder.Services.AddSingleton<IUserCredentialCache, InMemoryUserCredentialCache>();
+    builder.Services.AddScoped<IOracleConnectionProvider, OracleUserConnectionProvider>();
     builder.Services.AddScoped<IAuthService, AuthService>();
     builder.Services.AddScoped<IStudentService, StudentService>();
     builder.Services.AddScoped<ICourseService, CourseService>();

@@ -14,11 +14,15 @@ builder.Services.AddSession(options =>
     options.Cookie.IsEssential = true;
 });
 
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddTransient<QLTTTA_WEB.Infrastructure.SessionHeaderHandler>();
 builder.Services.AddHttpClient("ApiClient", client =>
 {
     // Địa chỉ của API backend
     client.BaseAddress = new Uri("http://localhost:7158/"); // port API
-});
+})
+.AddHttpMessageHandler<QLTTTA_WEB.Infrastructure.SessionHeaderHandler>();
+
 
 var app = builder.Build();
 

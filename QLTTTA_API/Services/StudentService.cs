@@ -16,8 +16,8 @@ namespace QLTTTA_API.Services
 
     public class StudentService : BaseService, IStudentService
     {
-        public StudentService(IConfiguration configuration, ILogger<StudentService> logger)
-            : base(configuration, logger) { }
+        public StudentService(IConfiguration configuration, ILogger<StudentService> logger, IOracleConnectionProvider userConnProvider)
+            : base(configuration, logger, userConnProvider) { }
 
         public async Task<PaginatedResponse<Student>> GetStudentsAsync(int pageNumber = 1, int pageSize = 10, string? search = null)
         {

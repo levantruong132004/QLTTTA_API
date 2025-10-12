@@ -6,21 +6,46 @@ namespace QLTTTA_API.Services
     public interface IBaseService
     {
         Task<OracleConnection> GetConnectionAsync();
+        Task<OracleConnection> GetAdminConnectionAsync();
     }
 
     public class BaseService : IBaseService
     {
         protected readonly string _connectionString;
+        private readonly IOracleConnectionProvider? _userConnProvider;
         protected readonly ILogger _logger;
 
-        public BaseService(IConfiguration configuration, ILogger logger)
+        public BaseService(IConfiguration configuration, ILogger logger, IOracleConnectionProvider? userConnProvider = null)
         {
             _connectionString = configuration.GetConnectionString("OracleDbConnection") ??
                 throw new ArgumentNullException("Connection string not found");
             _logger = logger;
+            _userConnProvider = userConnProvider;
         }
 
         public async Task<OracleConnection> GetConnectionAsync()
+        {
+            if (_userConnProvider != null)
+            {
+                try
+                {
+                    return await _userConnProvider.GetUserConnectionAsync();
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to obtain user connection, falling back to admin connection");
+                }
+            }
+            var connection = new OracleConnection(_connectionString);
+            await connection.OpenAsync();
+            return connection;
+        }
+
+        public async Task<OracleConnection> GetAdminConnectionAsync()
         {
             var connection = new OracleConnection(_connectionString);
             await connection.OpenAsync();
