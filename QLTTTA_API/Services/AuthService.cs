@@ -10,7 +10,7 @@ namespace QLTTTA_API.Services
         Task<RegisterResponse> RegisterAsync(RegisterRequest request);
         Task<string> TestDatabaseAsync();
         Task<bool> CheckSessionAsync(string username, string sessionId);
-        Task LogoutAsync(string sessionId);
+        Task LogoutAsync(string username, string sessionId);
     }
 
     public class AuthService : IAuthService
@@ -32,6 +32,27 @@ namespace QLTTTA_API.Services
             {
                 // 1) Thử kết nối bằng tài khoản người dùng để xác thực username/password thật
                 _logger.LogInformation("Login attempt - Username: {Username}", request.Username);
+                // Kiểm tra USER Oracle có tồn tại không (tránh trường hợp chỉ tạo dòng trong TAI_KHOAN)
+                try
+                {
+                    using var adminCheckConn = new OracleConnection(_connectionString);
+                    await adminCheckConn.OpenAsync();
+                    using var existCmd = new OracleCommand("SELECT COUNT(*) FROM ALL_USERS WHERE USERNAME = :u", adminCheckConn)
+                    { BindByName = true };
+                    existCmd.Parameters.Add(":u", OracleDbType.Varchar2).Value = (request.Username ?? string.Empty).Trim().ToUpperInvariant();
+                    var cntObj = await existCmd.ExecuteScalarAsync();
+                    var cnt = Convert.ToInt32(cntObj ?? 0);
+                    if (cnt == 0)
+                    {
+                        _logger.LogWarning("Oracle USER does not exist for username {Username}", request.Username);
+                        return new LoginResponse { Success = false, Message = "Tài khoản chưa được tạo trong Oracle (USER không tồn tại)" };
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Could not verify ALL_USERS, continue with credential test");
+                    // Không chặn, tiếp tục xác thực bằng credential
+                }
                 var baseCs = new OracleConnectionStringBuilder(_connectionString);
                 var userCs = new OracleConnectionStringBuilder
                 {
@@ -66,6 +87,7 @@ namespace QLTTTA_API.Services
                                LEFT JOIN HOC_VIEN hv ON hv.ID_HOC_VIEN = tk.ID_NGUOI_DUNG
                                    WHERE tk.TEN_DANG_NHAP = :u";
                 using var infoCmd = new OracleCommand(infoSql, adminConn) { BindByName = true };
+                infoCmd.CommandTimeout = 10;
                 infoCmd.Parameters.Add(":u", OracleDbType.Varchar2).Value = request.Username?.Trim();
                 using var rdr = await infoCmd.ExecuteReaderAsync(CommandBehavior.SingleRow);
                 if (!await rdr.ReadAsync())
@@ -94,14 +116,55 @@ namespace QLTTTA_API.Services
                     FullName = (ordFull >= 0 && !rdr.IsDBNull(ordFull)) ? rdr.GetString(ordFull) : string.Empty
                 };
 
-                // Tạo và lưu Session ID mới (ngăn đăng nhập đồng thời)
+                // Tạo và lưu Session ID mới (ngăn đăng nhập đồng thời) trong transaction để tránh race và cập nhật sai
                 var sessionId = Guid.NewGuid().ToString("N");
-                using (var upCmd = new OracleCommand("UPDATE TAI_KHOAN SET SESSION_ID_HIENTAI = :sid WHERE TEN_DANG_NHAP = :u", adminConn))
+                var maxAttempts = 3;
+                var attempt = 0;
+                bool updated = false;
+                while (attempt < maxAttempts && !updated)
                 {
+                    attempt++;
+                    using var tx = adminConn.BeginTransaction();
+                    using var lockCmd = new OracleCommand("SELECT 1 FROM TAI_KHOAN WHERE ID_NGUOI_DUNG = :id FOR UPDATE WAIT 1", adminConn);
+                    using var upCmd = new OracleCommand("UPDATE TAI_KHOAN SET SESSION_ID_HIENTAI = :sid WHERE ID_NGUOI_DUNG = :id", adminConn);
+
+                    lockCmd.Transaction = tx;
+                    lockCmd.BindByName = true;
+                    lockCmd.Parameters.Add(":id", OracleDbType.Int32).Value = userInfo.UserId;
+                    lockCmd.CommandTimeout = 3;
+                    try
+                    {
+                        await lockCmd.ExecuteScalarAsync(); // cố gắng lock hàng, chờ tối đa 1s
+                    }
+                    catch (OracleException oex) when (oex.Number == 54 || oex.Number == 30006)
+                    {
+                        await tx.RollbackAsync();
+                        _logger.LogWarning(oex, "Row locked (attempt {Attempt}/{Max}) when setting session for userId={UserId}", attempt, maxAttempts, userInfo.UserId);
+                        if (attempt >= maxAttempts)
+                        {
+                            return new LoginResponse { Success = false, Message = "Tài khoản đang được cập nhật. Vui lòng thử lại sau ít phút." };
+                        }
+                        await Task.Delay(300); // backoff nhẹ
+                        continue;
+                    }
+
+                    upCmd.Transaction = tx;
                     upCmd.BindByName = true;
                     upCmd.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sessionId;
-                    upCmd.Parameters.Add(":u", OracleDbType.Varchar2).Value = userInfo.Username;
-                    await upCmd.ExecuteNonQueryAsync();
+                    upCmd.Parameters.Add(":id", OracleDbType.Int32).Value = userInfo.UserId;
+                    upCmd.CommandTimeout = 3;
+                    var affected = await upCmd.ExecuteNonQueryAsync();
+                    if (affected == 1)
+                    {
+                        await tx.CommitAsync();
+                        updated = true;
+                    }
+                    else
+                    {
+                        await tx.RollbackAsync();
+                        _logger.LogError("Unexpected rows affected when setting session: {Affected} for user {User}", affected, userInfo.Username);
+                        return new LoginResponse { Success = false, Message = "Không thể tạo phiên đăng nhập (lỗi cập nhật phiên)" };
+                    }
                 }
 
                 // Lưu thông tin chứng thực tạm thời để các request tiếp theo mở kết nối theo user
@@ -274,23 +337,21 @@ namespace QLTTTA_API.Services
             }
         }
 
-        public async Task LogoutAsync(string sessionId)
+        public Task LogoutAsync(string username, string sessionId)
         {
-            if (string.IsNullOrWhiteSpace(sessionId)) return;
+            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(sessionId)) return Task.CompletedTask;
             try
             {
                 _credCache.Remove(sessionId);
-                using var connection = new OracleConnection(_connectionString);
-                await connection.OpenAsync();
-                using var cmd = new OracleCommand("UPDATE TAI_KHOAN SET SESSION_ID_HIENTAI = NULL WHERE SESSION_ID_HIENTAI = :sid", connection)
-                { BindByName = true };
-                cmd.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sessionId;
-                await cmd.ExecuteNonQueryAsync();
+                // Theo yêu cầu mới: KHÔNG set NULL SESSION_ID_HIENTAI khi logout.
+                // Cơ chế kiểm tra phiên sẽ dựa vào so khớp cookie với SESSION_ID_HIENTAI hiện tại trong DB.
+                // Nếu người dùng đăng nhập nơi khác, SESSION_ID_HIENTAI sẽ được cập nhật giá trị mới và thiết bị cũ tự bị out do mismatch.
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during logout for session {SessionId}", sessionId);
+                _logger.LogError(ex, "Error during logout for user {Username} session {SessionId}", username, sessionId);
             }
+            return Task.CompletedTask;
         }
     }
 }

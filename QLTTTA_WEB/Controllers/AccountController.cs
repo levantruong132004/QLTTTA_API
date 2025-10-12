@@ -115,13 +115,15 @@ namespace QLTTTA_WEB.Controllers
             try
             {
                 // Gọi API logout nếu cần
+                var username = HttpContext.Session.GetString("Username") ?? string.Empty;
                 var sid = Request.Cookies["SessionId"];
+                var url = $"api/auth/logout?username={Uri.EscapeDataString(username)}";
+                var req = new HttpRequestMessage(HttpMethod.Post, url);
                 if (!string.IsNullOrEmpty(sid))
                 {
-                    var req = new HttpRequestMessage(HttpMethod.Post, "api/auth/logout");
                     req.Headers.Add("X-Session-Id", sid);
-                    await _httpClient.SendAsync(req);
                 }
+                await _httpClient.SendAsync(req);
             }
             catch (Exception ex)
             {

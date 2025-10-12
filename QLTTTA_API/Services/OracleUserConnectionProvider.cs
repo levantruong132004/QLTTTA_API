@@ -93,9 +93,20 @@ namespace QLTTTA_API.Services
                 var adminCs = _configuration.GetConnectionString("OracleDbConnection") ?? throw new Exception("Missing OracleDbConnection");
                 using var adminConn = new OracleConnection(adminCs);
                 await adminConn.OpenAsync(ct);
-                using var checkCmd = new OracleCommand("SELECT COUNT(*) FROM TAI_KHOAN WHERE TEN_DANG_NHAP = :u AND SESSION_ID_HIENTAI = :sid", adminConn)
+                int? userId = null;
+                using (var findCmd = new OracleCommand("SELECT ID_NGUOI_DUNG FROM TAI_KHOAN WHERE TEN_DANG_NHAP = :u", adminConn) { BindByName = true })
+                {
+                    findCmd.Parameters.Add(":u", OracleDbType.Varchar2).Value = cred.Username;
+                    var o = await findCmd.ExecuteScalarAsync(ct);
+                    if (o != null && int.TryParse(o.ToString(), out var idVal)) userId = idVal;
+                }
+                if (!userId.HasValue)
+                {
+                    throw new UnauthorizedAccessException("Không tìm thấy tài khoản");
+                }
+                using var checkCmd = new OracleCommand("SELECT COUNT(*) FROM TAI_KHOAN WHERE ID_NGUOI_DUNG = :id AND SESSION_ID_HIENTAI = :sid", adminConn)
                 { BindByName = true };
-                checkCmd.Parameters.Add(":u", OracleDbType.Varchar2).Value = cred.Username;
+                checkCmd.Parameters.Add(":id", OracleDbType.Int32).Value = userId.Value;
                 checkCmd.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sessionId;
                 var cntObj = await checkCmd.ExecuteScalarAsync(ct);
                 var cnt = Convert.ToInt32(cntObj ?? 0);

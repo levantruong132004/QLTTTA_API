@@ -17,12 +17,12 @@ namespace QLTTTA_API.Controllers
         }
 
         [HttpGet]
-        public IActionResult GetCourses()
+        public async Task<IActionResult> GetCourses()
         {
             try
             {
                 // Dùng service để hưởng per-user connection
-                var list = _courseService.GetAllCoursesAsync().GetAwaiter().GetResult();
+                var list = await _courseService.GetAllCoursesAsync();
                 var shaped = list.Select(c => new
                 {
                     CourseId = c.CourseId,

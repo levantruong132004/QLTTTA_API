@@ -1,0 +1,54 @@
+@model QLTTTA_WEB.Models.StudentProfileViewModel
+@{
+    ViewData["Title"] = "Thông tin cá nhân";
+}
+<div class="retro-card">
+    <div class="retro-card-header">
+        <h2 class="retro-title"><i class="fas fa-id-card"></i> Thông tin cá nhân</h2>
+    </div>
+    <div class="retro-card-body">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success">@TempData["SuccessMessage"]</div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+        }
+        <form asp-action="UpdateProfile" method="post" class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Họ tên</label>
+                <input asp-for="HoTen" class="form-control" readonly />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Mã học viên</label>
+                <input asp-for="MaHocVien" class="form-control" readonly />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Giới tính</label>
+                <input asp-for="GioiTinh" class="form-control" readonly />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Ngày sinh</label>
+                <input asp-for="NgaySinh" type="date" class="form-control" readonly />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Số điện thoại</label>
+                <input asp-for="SoDienThoai" class="form-control" />
+            </div>
+            <div class="col-md-8">
+                <label class="form-label">Địa chỉ</label>
+                <input asp-for="DiaChi" class="form-control" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Email</label>
+                <input asp-for="Email" class="form-control" readonly />
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Lưu (SĐT, Địa chỉ)</button>
+                <a asp-controller="Student" asp-action="Courses" class="btn btn-outline-secondary"><i
+                        class="fas fa-book"></i> Danh sách khóa học</a>
+            </div>
+        </form>
+    </div>
+</div>

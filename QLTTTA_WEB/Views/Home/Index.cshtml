@@ -1,4 +1,4 @@
-﻿@model List<QLTTTA_WEB.Models.SimpleCourseViewModel>
+﻿@model QLTTTA_WEB.Models.HomeDashboardViewModel
 @{
     ViewData["Title"] = "Trang chủ";
 }
@@ -92,18 +92,16 @@
         left: 0;
         right: 0;
         bottom: 0;
-        background: repeating-linear-gradient(
-            0deg,
-            transparent,
-            transparent 2px,
-            rgba(0, 255, 0, 0.03) 2px,
-            rgba(0, 255, 0, 0.03) 4px
-        );
+        background: repeating-linear-gradient(0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 255, 0, 0.03) 2px,
+                rgba(0, 255, 0, 0.03) 4px);
         pointer-events: none;
         z-index: 1;
     }
 
-    .retro-container > * {
+    .retro-container>* {
         position: relative;
         z-index: 2;
     }
@@ -114,12 +112,29 @@
     }
 
     @@keyframes glitch {
-        0% { transform: translate(0); }
-        20% { transform: translate(-2px, 2px); }
-        40% { transform: translate(-2px, -2px); }
-        60% { transform: translate(2px, 2px); }
-        80% { transform: translate(2px, -2px); }
-        100% { transform: translate(0); }
+        0% {
+            transform: translate(0);
+        }
+
+        20% {
+            transform: translate(-2px, 2px);
+        }
+
+        40% {
+            transform: translate(-2px, -2px);
+        }
+
+        60% {
+            transform: translate(2px, 2px);
+        }
+
+        80% {
+            transform: translate(2px, -2px);
+        }
+
+        100% {
+            transform: translate(0);
+        }
     }
 
     /* Course name styling */
@@ -161,7 +176,7 @@
         }
 
         <div class="vintage-ornament"></div>
-        
+
         <div class="dashboard-grid">
             <div class="retro-card stat-card">
                 <div class="retro-card-body">
@@ -180,7 +195,7 @@
             <div class="retro-card stat-card">
                 <div class="retro-card-body">
                     <i class="fas fa-book stat-icon"></i>
-                    <div class="stat-number">@(Model?.Count ?? 0)</div>
+                    <div class="stat-number">@(Model?.Courses?.Count ?? 0)</div>
                     <div class="stat-label">Khóa học</div>
                 </div>
             </div>
@@ -197,13 +212,50 @@
         <div class="vintage-divider"></div>
 
         <h2 style="text-align: center; margin-bottom: 1.5rem;">
-            <i class="fas fa-book"></i> DANH SÁCH KHÓA HỌC
+            <i class="fas fa-id-card"></i> THÔNG TIN HỌC VIÊN
         </h2>
 
-        @if (Model != null && Model.Any())
+        @if (Model?.Student != null)
+        {
+            <div class="retro-card">
+                <div class="retro-card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6"><strong>Họ tên:</strong> @Model.Student.HoTen</div>
+                        <div class="col-md-3"><strong>Mã học viên:</strong> @Model.Student.MaHocVien</div>
+                        <div class="col-md-3"><strong>Giới tính:</strong> @Model.Student.GioiTinh</div>
+                        <div class="col-md-3"><strong>Ngày sinh:</strong> @(Model.Student.NgaySinh?.ToString("dd/MM/yyyy"))
+                        </div>
+                        <div class="col-md-3"><strong>SĐT:</strong> @Model.Student.SoDienThoai</div>
+                        <div class="col-md-6"><strong>Địa chỉ:</strong> @Model.Student.DiaChi</div>
+                        <div class="col-md-6"><strong>Email:</strong> @Model.Student.Email</div>
+                        <div class="col-md-12" style="margin-top:10px;">
+                            <a class="btn btn-sm btn-primary" asp-controller="Student" asp-action="Profile"><i
+                                    class="fas fa-edit"></i> Sửa thông tin</a>
+                            <a class="btn btn-sm btn-outline-secondary" asp-controller="Student" asp-action="Courses"><i
+                                    class="fas fa-book"></i> Xem khóa học</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="retro-alert retro-alert-info text-center">
+                <div class="retro-alert-content">
+                    <i class="fas fa-info-circle"></i> Không tải được thông tin học viên.
+                </div>
+            </div>
+        }
+
+        <div class="vintage-divider"></div>
+
+        <h2 style="text-align: center; margin-bottom: 1.5rem;">
+            <i class="fas fa-book"></i> DANH SÁCH KHÓA HỌC
+        </h2>
+        @if (Model?.Courses != null && Model.Courses.Any())
         {
             <div class="course-grid">
-                @foreach (var course in Model)
+                @foreach (var course in Model.Courses.Take(6))
                 {
                     <div class="course-item">
                         <div class="course-title">
@@ -220,9 +272,14 @@
         {
             <div class="retro-alert retro-alert-info text-center">
                 <div class="retro-alert-content">
-                    <i class="fas fa-info-circle"></i> Hiện tại chưa có khóa học nào trong hệ thống.
+                    <i class="fas fa-info-circle"></i> Hiện tại chưa có khóa học nào.
                 </div>
             </div>
         }
+        <div class="text-center mb-3" style="margin-top:1rem;">
+            <a asp-controller="Student" asp-action="Courses" class="btn btn-success">
+                <i class="fas fa-list"></i> Xem tất cả và đăng ký
+            </a>
+        </div>
     </div>
 </div>

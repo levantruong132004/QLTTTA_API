@@ -29,16 +29,25 @@ namespace QLTTTA_WEB.Controllers
             ViewBag.Role = HttpContext.Session.GetString("Role");
 
             var client = _httpClientFactory.CreateClient("ApiClient");
-            var response = await client.GetAsync("api/courses");
-            List<SimpleCourseViewModel> courses = new();
+            var dashboard = new HomeDashboardViewModel();
 
-            if (response.IsSuccessStatusCode)
+            // Lấy thông tin cá nhân từ view V_THONGTIN_CANHAN_HV qua API /api/profile
+            var profileRes = await client.GetAsync("api/profile");
+            if (profileRes.IsSuccessStatusCode)
             {
-                var content = await response.Content.ReadAsStringAsync();
-                courses = JsonSerializer.Deserialize<List<SimpleCourseViewModel>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<SimpleCourseViewModel>();
+                var json = await profileRes.Content.ReadAsStringAsync();
+                dashboard.Student = JsonSerializer.Deserialize<StudentProfileViewModel>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             }
 
-            return View(courses);
+            // Lấy danh sách khoá học công khai từ API /api/profile/courses (dựa trên V_DANHSACH_KHOAHOC)
+            var coursesRes = await client.GetAsync("api/profile/courses");
+            if (coursesRes.IsSuccessStatusCode)
+            {
+                var json = await coursesRes.Content.ReadAsStringAsync();
+                dashboard.Courses = JsonSerializer.Deserialize<List<PublicCourseItem>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+            }
+
+            return View(dashboard);
         }
 
         public IActionResult Privacy()

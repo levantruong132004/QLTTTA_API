@@ -17,6 +17,7 @@ try
     builder.Services.AddScoped<IAuthService, AuthService>();
     builder.Services.AddScoped<IStudentService, StudentService>();
     builder.Services.AddScoped<ICourseService, CourseService>();
+    builder.Services.AddScoped<IProfileService, ProfileService>();
 
     // Add CORS
     builder.Services.AddCors(options =>

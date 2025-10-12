@@ -28,12 +28,12 @@
                 @if (Context.Session.GetString("UserId") != null)
                 {
                     <li class="retro-nav-item">
-                        <a class="retro-nav-link" asp-controller="Students" asp-action="Index">
+                        <a class="retro-nav-link" asp-controller="Student" asp-action="Profile">
                             <i class="fas fa-user-graduate"></i> Học viên
                         </a>
                     </li>
                     <li class="retro-nav-item">
-                        <a class="retro-nav-link" href="#">
+                        <a class="retro-nav-link" asp-controller="Student" asp-action="Courses">
                             <i class="fas fa-book"></i> Khóa học
                         </a>
                     </li>

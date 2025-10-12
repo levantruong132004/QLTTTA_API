@@ -1,5 +1,7 @@
 using QLTTTA_API.Models;
 using QLTTTA_API.Models.DTOs;
+using Oracle.ManagedDataAccess.Client;
+using System.Data;
 
 namespace QLTTTA_API.Services
 {
@@ -234,7 +236,46 @@ namespace QLTTTA_API.Services
         public async Task<List<Course>> GetAllCoursesAsync()
         {
             var sql = "SELECT * FROM QLTT_ADMIN.COURSES ORDER BY COURSE_NAME";
-            return await ExecuteQueryAsync<Course>(sql);
+            // Cố gắng dùng kết nối user trước; nếu phiên user không còn (sau khi server restart), fallback sang admin cho truy vấn công khai này
+            try
+            {
+                using var conn = await GetConnectionAsync();
+                using var cmd = new OracleCommand(sql, conn);
+                using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.Default);
+                var list = new List<Course>();
+                while (await reader.ReadAsync())
+                {
+                    list.Add(new Course
+                    {
+                        CourseId = reader.GetInt32(reader.GetOrdinal("COURSE_ID")),
+                        CourseCode = reader.GetString(reader.GetOrdinal("COURSE_CODE")),
+                        CourseName = reader.GetString(reader.GetOrdinal("COURSE_NAME")),
+                        Description = reader.IsDBNull(reader.GetOrdinal("DESCRIPTION")) ? string.Empty : reader.GetString(reader.GetOrdinal("DESCRIPTION")),
+                        StandardFee = reader.IsDBNull(reader.GetOrdinal("STANDARD_FEE")) ? 0 : Convert.ToInt32(reader["STANDARD_FEE"]) // NUMBER -> int
+                    });
+                }
+                return list;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                _logger.LogWarning("User session missing/invalid. Falling back to admin connection for public course list.");
+                using var conn = await GetAdminConnectionAsync();
+                using var cmd = new OracleCommand(sql, conn);
+                using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.Default);
+                var list = new List<Course>();
+                while (await reader.ReadAsync())
+                {
+                    list.Add(new Course
+                    {
+                        CourseId = reader.GetInt32(reader.GetOrdinal("COURSE_ID")),
+                        CourseCode = reader.GetString(reader.GetOrdinal("COURSE_CODE")),
+                        CourseName = reader.GetString(reader.GetOrdinal("COURSE_NAME")),
+                        Description = reader.IsDBNull(reader.GetOrdinal("DESCRIPTION")) ? string.Empty : reader.GetString(reader.GetOrdinal("DESCRIPTION")),
+                        StandardFee = reader.IsDBNull(reader.GetOrdinal("STANDARD_FEE")) ? 0 : Convert.ToInt32(reader["STANDARD_FEE"]) // NUMBER -> int
+                    });
+                }
+                return list;
+            }
         }
     }
 }
