@@ -4,18 +4,21 @@ using QLTTTA_WEB.Models;
 using System.Text;
 using System.Text.Json;
 using QRCoder;
+using Microsoft.Extensions.Configuration;
 
 namespace QLTTTA_WEB.Controllers
 {
     public class StudentsController : Controller
     {
-        private readonly HttpClient _httpClient;
-        private readonly ILogger<StudentsController> _logger;
+    private readonly HttpClient _httpClient;
+    private readonly ILogger<StudentsController> _logger;
+    private readonly IConfiguration _configuration;
 
-        public StudentsController(IHttpClientFactory httpClientFactory, ILogger<StudentsController> logger)
+        public StudentsController(IHttpClientFactory httpClientFactory, ILogger<StudentsController> logger, IConfiguration configuration)
         {
             _httpClient = httpClientFactory.CreateClient("ApiClient");
             _logger = logger;
+            _configuration = configuration;
         }
 
         private bool CheckAuthentication()
@@ -25,10 +28,26 @@ namespace QLTTTA_WEB.Controllers
 
         private string BuildPublicProfileUrl(int id)
         {
-            // Build absolute URL for public profile (no auth)
+            // Prefer configured public base URL (use LAN IP or domain in dev/prod) to avoid encoding localhost in QR
+            var configuredBase = _configuration["PublicBaseUrl"];
+
+            var path = Url.Action("PublicProfile", "Students", new { id }) ?? $"/Students/PublicProfile/{id}";
+
+            if (!string.IsNullOrWhiteSpace(configuredBase))
+            {
+                var baseUrl = configuredBase.TrimEnd('/');
+                // Ensure scheme exists in baseUrl; if missing, default to http
+                if (!baseUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                    !baseUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                {
+                    baseUrl = $"http://{baseUrl}";
+                }
+                return $"{baseUrl}{path}";
+            }
+
+            // Fallback to current request (works on same machine)
             var scheme = Request.Scheme;
             var host = Request.Host.ToString();
-            var path = Url.Action("PublicProfile", "Students", new { id }) ?? $"/Students/PublicProfile/{id}";
             return $"{scheme}://{host}{path}";
         }
 
@@ -165,6 +184,10 @@ namespace QLTTTA_WEB.Controllers
             using var data = generator.CreateQrCode(url, QRCodeGenerator.ECCLevel.Q);
             var pngQr = new PngByteQRCode(data);
             var bytes = pngQr.GetGraphic(6);
+            // Prevent caching to avoid stale QR content when PublicBaseUrl changes
+            Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0";
+            Response.Headers["Pragma"] = "no-cache";
+            Response.Headers["Expires"] = "0";
             return File(bytes, "image/png");
         }
 

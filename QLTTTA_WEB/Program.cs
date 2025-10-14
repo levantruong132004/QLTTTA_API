@@ -1,7 +1,7 @@
 ﻿var builder = WebApplication.CreateBuilder(args);
 
-// Run the MVC app on HTTP port 5165 to avoid localhost certificate warnings.
-builder.WebHost.UseUrls("http://localhost:5165");
+// Run the MVC app on HTTP port 5165 and bind to all interfaces so mobile devices in the same LAN can access it via your PC IP.
+builder.WebHost.UseUrls("http://0.0.0.0:5165");
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
