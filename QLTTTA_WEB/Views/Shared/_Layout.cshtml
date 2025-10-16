@@ -1,0 +1,104 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Trung tâm Tiếng Anh LDA</title>
+    <!-- Retro Vintage Theme -->
+    <link rel="stylesheet" href="~/css/retro-vintage.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+
+<body>
+    <header class="retro-header">
+        <nav class="retro-nav">
+            <a class="retro-brand" asp-area="" asp-controller="Home" asp-action="Index">
+                <i class="fas fa-graduation-cap"></i> LDA
+            </a>
+            <ul class="retro-nav-links">
+                <li class="retro-nav-item">
+                    <a class="retro-nav-link" asp-area="" asp-controller="Home" asp-action="Index">
+                        <i class="fas fa-home"></i> Trang chủ
+                    </a>
+                </li>
+                @if (Context.Session.GetString("UserId") != null)
+                {
+                    <li class="retro-nav-item">
+                        <a class="retro-nav-link" asp-controller="Students" asp-action="Index">
+                            <i class="fas fa-user-graduate"></i> Học viên
+                        </a>
+                    </li>
+                    <li class="retro-nav-item">
+                        <a class="retro-nav-link" href="#">
+                            <i class="fas fa-book"></i> Khóa học
+                        </a>
+                    </li>
+                    <li class="retro-nav-item">
+                        <a class="retro-nav-link" href="#">
+                            <i class="fas fa-chalkboard-teacher"></i> Lớp học
+                        </a>
+                    </li>
+                    <li class="retro-nav-item">
+                        <form asp-controller="Account" asp-action="Logout" method="post" style="display: inline;">
+                            <button type="submit" class="retro-nav-link" style="border: none; cursor: pointer;">
+                                <i class="fas fa-sign-out-alt"></i> Đăng xuất (@Context.Session.GetString("Username"))
+                            </button>
+                        </form>
+                    </li>
+                }
+            </ul>
+        </nav>
+    </header>
+
+    <div class="container" style="margin-top: 2rem;">
+        <main role="main" class="pb-3">
+            @RenderBody()
+        </main>
+    </div>
+
+    <footer class="retro-footer">
+        <div class="vintage-ornament"></div>
+        <p><strong>TRUNG TÂM TIẾNG ANH LDA</strong></p>
+        <p>&copy; 2025 - Bản quyền thuộc về Trung tâm Tiếng Anh LDA</p>
+        <p><a asp-area="" asp-controller="Home" asp-action="Privacy">Chính sách bảo mật</a></p>
+    </footer>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script>
+        (function () {
+            // Short polling kiểm tra phiên làm việc mỗi 5 giây
+            const username = '@Context.Session.GetString("Username")';
+            const sessionId = (document.cookie.match(/(?:^|; )SessionId=([^;]+)/) || [])[1];
+            if (!username || !sessionId) return;
+
+            async function checkSession() {
+                try {
+                    const url = new URL('api/auth/check-session', 'http://localhost:7158/');
+                    url.searchParams.set('username', username);
+                    url.searchParams.set('sessionId', sessionId);
+                    const res = await fetch(url.toString(), { credentials: 'include' });
+                    const data = await res.json();
+                    if (data?.status === 'invalid') {
+                        alert('Phiên đăng nhập của bạn không còn hợp lệ do đăng nhập ở nơi khác. Hệ thống sẽ đăng xuất.');
+                        // Post form logout
+                        const f = document.createElement('form');
+                        f.method = 'POST'; f.action = '/Account/Logout';
+                        document.body.appendChild(f); f.submit();
+                    }
+                } catch (e) {
+                    // im lặng, lần sau kiểm tra tiếp
+                }
+            }
+
+            setInterval(checkSession, 5000);
+        })();
+    </script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+
+</html>

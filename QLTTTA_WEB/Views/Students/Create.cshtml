@@ -1,0 +1,343 @@
+@model StudentCreateViewModel
+@{
+    ViewData["Title"] = "Thêm học viên mới";
+}
+
+<style>
+    .form-container {
+        background: var(--vintage-cream);
+        border: 3px solid var(--vintage-brown);
+        border-radius: 0;
+        box-shadow: 8px 8px 0 var(--vintage-dark-brown);
+        margin: 20px auto;
+        max-width: 800px;
+        position: relative;
+    }
+
+    .form-header {
+        background: var(--vintage-brown);
+        color: var(--vintage-cream);
+        padding: 30px;
+        text-align: center;
+        position: relative;
+        border-bottom: 3px solid var(--vintage-gold);
+    }
+
+    .form-header h1 {
+        margin: 0;
+        font-family: 'Times New Roman', serif;
+        font-size: 1.8rem;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        color: var(--vintage-cream);
+    }
+
+    .form-content {
+        padding: 40px;
+    }
+
+    .form-group {
+        margin-bottom: 25px;
+    }
+
+    .form-label {
+        color: var(--vintage-brown);
+        font-family: 'Times New Roman', serif;
+        font-weight: bold;
+        margin-bottom: 8px;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .form-control {
+        border: 2px solid var(--vintage-tan);
+        border-radius: 0;
+        padding: 12px 16px;
+        font-family: 'Times New Roman', serif;
+        font-size: 1rem;
+        transition: all 0.2s ease;
+        background-color: var(--vintage-cream);
+        color: var(--vintage-dark-brown);
+    }
+
+    .form-control:focus {
+        border-color: var(--vintage-brown);
+        background-color: white;
+        box-shadow: 2px 2px 4px rgba(125, 90, 59, 0.2);
+    }
+
+    .form-select {
+        border: 2px solid var(--vintage-tan);
+        border-radius: 0;
+        padding: 12px 16px;
+        font-family: 'Times New Roman', serif;
+        font-size: 1rem;
+        transition: all 0.2s ease;
+        background-color: var(--vintage-cream);
+        color: var(--vintage-dark-brown);
+    }
+
+    .form-select:focus {
+        border-color: var(--vintage-brown);
+        background-color: white;
+        box-shadow: 2px 2px 4px rgba(125, 90, 59, 0.2);
+    }
+
+    .btn-primary {
+        background: var(--vintage-brown);
+        border: 3px solid var(--vintage-dark-brown);
+        border-radius: 0;
+        color: var(--vintage-cream);
+        font-family: 'Times New Roman', serif;
+        font-weight: bold;
+        font-size: 1rem;
+        padding: 14px 30px;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        box-shadow: 4px 4px 0 var(--vintage-dark-brown);
+    }
+
+    .btn-primary:hover {
+        transform: translateX(2px) translateY(2px);
+        box-shadow: 2px 2px 0 var(--vintage-dark-brown);
+        background: var(--vintage-dark-brown);
+        color: var(--vintage-cream);
+    }
+
+    .btn-secondary {
+        background: var(--vintage-tan);
+        border: 3px solid var(--vintage-brown);
+        border-radius: 0;
+        color: var(--vintage-dark-brown);
+        font-family: 'Times New Roman', serif;
+        font-weight: bold;
+        font-size: 1rem;
+        padding: 14px 30px;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        box-shadow: 4px 4px 0 var(--vintage-brown);
+    }
+
+    .btn-secondary:hover {
+        background: var(--vintage-brown);
+        color: var(--vintage-cream);
+        transform: translateX(2px) translateY(2px);
+        box-shadow: 2px 2px 0 var(--vintage-brown);
+        text-decoration: none;
+    }
+
+    .text-validation-error {
+        color: var(--vintage-rust);
+        font-family: 'Times New Roman', serif;
+        font-weight: bold;
+        font-size: 0.8rem;
+        margin-top: 5px;
+    }
+
+    .alert {
+        border: none;
+        border-radius: 12px;
+        padding: 15px 20px;
+        margin-bottom: 20px;
+        font-weight: 500;
+    }
+
+    .alert-danger {
+        background-color: #fed7d7;
+        color: #c53030;
+    }
+
+    .button-group {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        margin-top: 30px;
+    }
+
+    .row {
+        margin-left: -10px;
+        margin-right: -10px;
+    }
+
+    .col-md-6 {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+
+    @@medi a (max-width: 768px) {
+        .form-container {
+            margin: 10px;
+            border-radius: 15px;
+        }
+
+        .form-content {
+            padding: 30px 20px;
+        }
+
+        .button-group {
+            flex-direction: column;
+        }
+
+        .btn-primary,
+        .btn-secondary {
+            justify-content: center;
+        }
+    }
+</style>
+
+<div class="form-container">
+    <div class="form-header">
+        <h1><i class="fas fa-user-plus me-2"></i>Thêm học viên mới</h1>
+    </div>
+
+    <div class="form-content">
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Vui lòng kiểm tra lại thông tin đã nhập
+                <ul class="mb-0 mt-2">
+                    @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                    {
+                        <li>@error.ErrorMessage</li>
+                    }
+                </ul>
+            </div>
+        }
+
+        <form asp-action="Create" method="post">
+            @Html.AntiForgeryToken()
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label asp-for="FullName" class="form-label">
+                            <i class="fas fa-user me-1"></i>@Html.DisplayNameFor(model => model.FullName)
+                        </label>
+                        <input asp-for="FullName" class="form-control" placeholder="Nhập họ tên học viên" />
+                        <span asp-validation-for="FullName" class="text-validation-error"></span>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label asp-for="StudentCode" class="form-label">
+                            <i class="fas fa-id-card me-1"></i>@Html.DisplayNameFor(model => model.StudentCode)
+                        </label>
+                        <input asp-for="StudentCode" class="form-control" placeholder="Sẽ tự sinh " disabled readonly />
+                        --<small class="form-text text-muted">Mã học viên sẽ được hệ thống tự động tạo. </small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label asp-for="Sex" class="form-label">
+                            <i class="fas fa-venus-mars me-1"></i>@Html.DisplayNameFor(model => model.Sex)
+                        </label>
+                        <select asp-for="Sex" class="form-select">
+                            <option value="">-- Chọn giới tính --</option>
+                            <option value="Nam">Nam</option>
+                            <option value="Nữ">Nữ</option>
+                        </select>
+                        <span asp-validation-for="Sex" class="text-validation-error"></span>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label asp-for="DateOfBirth" class="form-label">
+                            <i class="fas fa-calendar me-1"></i>@Html.DisplayNameFor(model => model.DateOfBirth)
+                        </label>
+                        <input asp-for="DateOfBirth" type="date" class="form-control" />
+                        <span asp-validation-for="DateOfBirth" class="text-validation-error"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label asp-for="PhoneNumber" class="form-label">
+                            <i class="fas fa-phone me-1"></i>@Html.DisplayNameFor(model => model.PhoneNumber)
+                        </label>
+                        <input asp-for="PhoneNumber" class="form-control" placeholder="Nhập số điện thoại" />
+                        <span asp-validation-for="PhoneNumber" class="text-validation-error"></span>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label asp-for="Address" class="form-label">
+                            <i class="fas fa-map-marker-alt me-1"></i>@Html.DisplayNameFor(model => model.Address)
+                        </label>
+                        <input asp-for="Address" class="form-control" placeholder="Nhập địa chỉ" />
+                        <span asp-validation-for="Address" class="text-validation-error"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label asp-for="Username" class="form-label">
+                            <i class="fas fa-user-circle me-1"></i>@Html.DisplayNameFor(m => m.Username)
+                        </label>
+                        <input asp-for="Username" class="form-control" placeholder="Tên đăng nhập" />
+                        <span asp-validation-for="Username" class="text-validation-error"></span>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label asp-for="Password" class="form-label">
+                            <i class="fas fa-lock me-1"></i>@Html.DisplayNameFor(m => m.Password)
+                        </label>
+                        <input asp-for="Password" class="form-control" placeholder="Mật khẩu" />
+                        <span asp-validation-for="Password" class="text-validation-error"></span>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label asp-for="Email" class="form-label">
+                            <i class="fas fa-envelope me-1"></i>@Html.DisplayNameFor(m => m.Email)
+                        </label>
+                        <input asp-for="Email" class="form-control" placeholder="Email" />
+                        <span asp-validation-for="Email" class="text-validation-error"></span>
+                    </div>
+                </div>
+            </div>
+
+
+            <div class="button-group">
+                <button type="submit" class="btn-primary">
+                    <i class="fas fa-save"></i>
+                    Lưu thông tin
+                </button>
+                <a asp-action="Index" class="btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    Quay lại
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}

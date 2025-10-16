@@ -1,0 +1,284 @@
+@model StudentViewModel
+@{
+    ViewData["Title"] = "Chi tiết học viên";
+}
+
+<style>
+    .details-container {
+        background: var(--vintage-cream);
+        border: 3px solid var(--vintage-brown);
+        border-radius: 0;
+        box-shadow: 8px 8px 0 var(--vintage-dark-brown);
+        margin: 20px auto;
+        max-width: 800px;
+        position: relative;
+    }
+
+    .details-header {
+        background: var(--vintage-brown);
+        color: var(--vintage-cream);
+        padding: 30px;
+        text-align: center;
+        position: relative;
+        border-bottom: 3px solid var(--vintage-gold);
+    }
+
+    .details-header h1 {
+        margin: 0;
+        font-family: 'Times New Roman', serif;
+        font-size: 1.8rem;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        color: var(--vintage-cream);
+    }
+
+    .details-content {
+        padding: 40px;
+    }
+
+    .info-card {
+        background: var(--vintage-cream);
+        border: 2px solid var(--vintage-tan);
+        border-radius: 0;
+        padding: 30px;
+        box-shadow: 4px 4px 0 var(--vintage-brown);
+        margin-bottom: 25px;
+        position: relative;
+    }
+
+    .info-row {
+        display: flex;
+        padding: 15px 0;
+        border-bottom: 1px solid var(--vintage-tan);
+        align-items: center;
+    }
+
+    .info-row:last-child {
+        border-bottom: none;
+    }
+
+    .info-label {
+        font-family: 'Times New Roman', serif;
+        font-weight: bold;
+        color: var(--vintage-brown);
+        min-width: 180px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        flex-shrink: 0;
+    }
+
+    .info-value {
+        font-family: 'Times New Roman', serif;
+        color: var(--vintage-dark-brown);
+        flex: 1;
+        font-weight: 500;
+    }
+
+    .btn-primary {
+        background: var(--vintage-brown);
+        border: 3px solid var(--vintage-dark-brown);
+        border-radius: 0;
+        color: var(--vintage-cream);
+        font-family: 'Times New Roman', serif;
+        font-weight: bold;
+        font-size: 1rem;
+        padding: 14px 30px;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        box-shadow: 4px 4px 0 var(--vintage-dark-brown);
+    }
+
+    .btn-primary:hover {
+        transform: translateX(2px) translateY(2px);
+        box-shadow: 2px 2px 0 var(--vintage-dark-brown);
+        background: var(--vintage-dark-brown);
+        color: var(--vintage-cream);
+        text-decoration: none;
+    }
+
+    .btn-secondary {
+        background: var(--vintage-tan);
+        border: 3px solid var(--vintage-brown);
+        border-radius: 0;
+        color: var(--vintage-dark-brown);
+        font-family: 'Times New Roman', serif;
+        font-weight: bold;
+        font-size: 1rem;
+        padding: 14px 30px;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        box-shadow: 4px 4px 0 var(--vintage-brown);
+    }
+
+    .btn-secondary:hover {
+        background: var(--vintage-brown);
+        color: var(--vintage-cream);
+        transform: translateX(2px) translateY(2px);
+        box-shadow: 2px 2px 0 var(--vintage-brown);
+        text-decoration: none;
+    }
+
+    .button-group {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        margin-top: 30px;
+    }
+
+    .avatar-section {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .avatar {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 20px;
+        color: white;
+        font-size: 3rem;
+    }
+
+    .student-name {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #2d3748;
+        margin-bottom: 5px;
+    }
+
+    .student-code {
+        font-size: 1.1rem;
+        color: #718096;
+        font-weight: 500;
+    }
+
+    @@media (max-width: 768px) {
+        .details-container {
+            margin: 10px;
+            border-radius: 15px;
+        }
+        
+        .details-content {
+            padding: 20px;
+        }
+        
+        .info-card {
+            padding: 20px;
+        }
+        
+        .info-row {
+            flex-direction: column;
+            align-items: flex-start;
+            text-align: left;
+        }
+        
+        .info-label {
+            min-width: auto;
+            margin-bottom: 5px;
+        }
+        
+        .button-group {
+            flex-direction: column;
+        }
+        
+        .btn-primary, .btn-secondary {
+            justify-content: center;
+        }
+    }
+</style>
+
+<div class="details-container">
+    <div class="details-header">
+        <h1><i class="fas fa-user-graduate me-2"></i>Chi tiết học viên</h1>
+    </div>
+
+    <div class="details-content">
+        <div class="avatar-section">
+            <div class="avatar">
+                <i class="fas fa-user"></i>
+            </div>
+            <div class="student-name">@Model.FullName</div>
+            <div class="student-code">Mã: @Model.StudentCode</div>
+        </div>
+
+        <div class="info-card">
+            <div class="info-row">
+                <div class="info-label">
+                    <i class="fas fa-id-card"></i>
+                    Mã học viên:
+                </div>
+                <div class="info-value">@Model.StudentCode</div>
+            </div>
+
+            <div class="info-row">
+                <div class="info-label">
+                    <i class="fas fa-user"></i>
+                    Họ tên:
+                </div>
+                <div class="info-value">@Model.FullName</div>
+            </div>
+
+            <div class="info-row">
+                <div class="info-label">
+                    <i class="fas fa-venus-mars"></i>
+                    Giới tính:
+                </div>
+                <div class="info-value">@(Model.Sex ?? "Chưa cập nhật")</div>
+            </div>
+
+            <div class="info-row">
+                <div class="info-label">
+                    <i class="fas fa-calendar"></i>
+                    Ngày sinh:
+                </div>
+                <div class="info-value">@(Model.DateOfBirth?.ToString("dd/MM/yyyy") ?? "Chưa cập nhật")</div>
+            </div>
+
+            <div class="info-row">
+                <div class="info-label">
+                    <i class="fas fa-phone"></i>
+                    Số điện thoại:
+                </div>
+                <div class="info-value">@Model.PhoneNumber</div>
+            </div>
+
+            <div class="info-row">
+                <div class="info-label">
+                    <i class="fas fa-map-marker-alt"></i>
+                    Địa chỉ:
+                </div>
+                <div class="info-value">@(Model.Address ?? "Chưa cập nhật")</div>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <a asp-action="Edit" asp-route-id="@Model.StudentId" class="btn-primary">
+                <i class="fas fa-edit"></i>
+                Chỉnh sửa
+            </a>
+            <a asp-action="Index" class="btn-secondary">
+                <i class="fas fa-arrow-left"></i>
+                Quay lại danh sách
+            </a>
+        </div>
+    </div>
+</div>

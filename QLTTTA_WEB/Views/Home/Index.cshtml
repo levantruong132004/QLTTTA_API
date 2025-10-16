@@ -1,0 +1,228 @@
+﻿@model List<QLTTTA_WEB.Models.SimpleCourseViewModel>
+@{
+    ViewData["Title"] = "Trang chủ";
+}
+
+<style>
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 2rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        text-align: center;
+    }
+
+    .stat-icon {
+        font-size: 3rem;
+        color: var(--vintage-rust);
+        margin-bottom: 1rem;
+    }
+
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: var(--vintage-brown);
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+        font-size: 1rem;
+        color: var(--vintage-gray);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .course-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1.5rem;
+        margin-top: 2rem;
+    }
+
+    .course-item {
+        border: 3px solid var(--vintage-brown);
+        padding: 1.5rem;
+        background: var(--vintage-off-white);
+        transition: all 0.3s ease;
+        position: relative;
+    }
+
+    .course-item::before {
+        content: '';
+        position: absolute;
+        top: 6px;
+        left: 6px;
+        right: 6px;
+        bottom: 6px;
+        border: 1px solid var(--vintage-tan);
+        pointer-events: none;
+    }
+
+    .course-item:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-deep);
+    }
+
+    .course-title {
+        font-family: 'Courier New', monospace;
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: var(--vintage-brown);
+        margin-bottom: 1rem;
+        text-transform: uppercase;
+    }
+
+    .course-meta {
+        margin: 0.5rem 0;
+        color: var(--vintage-gray);
+    }
+
+    .tbody tr:nth-child(odd) {
+        background: rgba(0, 255, 0, 0.05);
+    }
+
+    /* Scan lines effect */
+    .retro-container::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: repeating-linear-gradient(
+            0deg,
+            transparent,
+            transparent 2px,
+            rgba(0, 255, 0, 0.03) 2px,
+            rgba(0, 255, 0, 0.03) 4px
+        );
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    .retro-container > * {
+        position: relative;
+        z-index: 2;
+    }
+
+    /* Glitch effect on hover */
+    .retro-title:hover {
+        animation: glitch 0.3s infinite;
+    }
+
+    @@keyframes glitch {
+        0% { transform: translate(0); }
+        20% { transform: translate(-2px, 2px); }
+        40% { transform: translate(-2px, -2px); }
+        60% { transform: translate(2px, 2px); }
+        80% { transform: translate(2px, -2px); }
+        100% { transform: translate(0); }
+    }
+
+    /* Course name styling */
+    .course-name {
+        font-weight: bold;
+        color: #ffff00;
+        text-shadow: 0 0 3px #ffff00;
+    }
+
+    .course-description {
+        color: #00ffff;
+        font-style: italic;
+    }
+
+    /* Style cho tiêu đề chính */
+    .main-title {
+        color: var(--vintage-gold) !important;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        font-size: 2.2rem;
+        letter-spacing: 2px;
+    }
+</style>
+
+<div class="retro-card corner-decorated">
+    <div class="retro-card-header text-center">
+        <h1 class="retro-card-title main-title">
+            <i class="fas fa-graduation-cap"></i> TRUNG TÂM TIẾNG ANH LDA
+        </h1>
+    </div>
+
+    <div class="retro-card-body">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-success">
+                <div class="retro-alert-content">
+                    @TempData["SuccessMessage"]
+                </div>
+            </div>
+        }
+
+        <div class="vintage-ornament"></div>
+        
+        <div class="dashboard-grid">
+            <div class="retro-card stat-card">
+                <div class="retro-card-body">
+                    <i class="fas fa-user-circle stat-icon"></i>
+                    <div class="stat-label">Tài khoản</div>
+                    <div style="margin-top: 1rem;">
+                        <p><strong>@ViewBag.Username</strong></p>
+                        <p><span class="retro-badge retro-badge-success">@ViewBag.Role</span></p>
+                        <p style="font-size: 0.875rem; color: var(--vintage-gray); margin-top: 0.5rem;">
+                            @DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss")
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="retro-card stat-card">
+                <div class="retro-card-body">
+                    <i class="fas fa-book stat-icon"></i>
+                    <div class="stat-number">@(Model?.Count ?? 0)</div>
+                    <div class="stat-label">Khóa học</div>
+                </div>
+            </div>
+
+            <div class="retro-card stat-card">
+                <div class="retro-card-body">
+                    <i class="fas fa-user-graduate stat-icon"></i>
+                    <div class="stat-number">-</div>
+                    <div class="stat-label">Học viên</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="vintage-divider"></div>
+
+        <h2 style="text-align: center; margin-bottom: 1.5rem;">
+            <i class="fas fa-book"></i> DANH SÁCH KHÓA HỌC
+        </h2>
+
+        @if (Model != null && Model.Any())
+        {
+            <div class="course-grid">
+                @foreach (var course in Model)
+                {
+                    <div class="course-item">
+                        <div class="course-title">
+                            <i class="fas fa-bookmark"></i> @course.CourseName
+                        </div>
+                        <div class="course-meta">
+                            <i class="fas fa-align-left"></i> @course.Description
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="retro-alert retro-alert-info text-center">
+                <div class="retro-alert-content">
+                    <i class="fas fa-info-circle"></i> Hiện tại chưa có khóa học nào trong hệ thống.
+                </div>
+            </div>
+        }
+    </div>
+</div>

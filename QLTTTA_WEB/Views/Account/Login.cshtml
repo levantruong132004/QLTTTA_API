@@ -1,0 +1,230 @@
+@model QLTTTA_WEB.Models.LoginViewModel
+@{
+    ViewData["Title"] = "Đăng nhập";
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Trung tâm Tiếng Anh LDA</title>
+
+    <!-- Retro Vintage CSS -->
+    <link rel="stylesheet" href="~/css/retro-vintage.css" asp-append-version="true" />
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .login-container {
+            max-width: 500px;
+            width: 100%;
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .login-header h1 {
+            font-size: 3rem;
+            color: var(--vintage-brown);
+            text-shadow: var(--text-shadow-vintage);
+            margin-bottom: 0.5rem;
+        }
+
+        .login-header .subtitle {
+            font-family: 'Times New Roman', 'Georgia', serif !important;
+            font-size: 1.1rem;
+            color: var(--vintage-rust);
+            font-style: italic;
+            letter-spacing: 0px !important;
+            text-transform: none !important;
+        }
+
+        .login-form {
+            margin-bottom: 0;
+        }
+
+        .form-control:focus {
+            border-color: #5a67d8;
+            background-color: white;
+            box-shadow: 0 0 0 3px rgba(90, 103, 216, 0.1);
+        }
+
+        .input-group {
+            position: relative;
+        }
+
+        .input-group .form-control {
+            padding-left: 48px;
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #a0aec0;
+            z-index: 5;
+        }
+
+        .btn-login {
+            background: linear-gradient(135deg, #5a67d8, #667eea);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-weight: 600;
+            font-size: 1rem;
+            padding: 14px 0;
+            width: 100%;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(90, 103, 216, 0.3);
+            background: linear-gradient(135deg, #4c51bf, #5a67d8);
+        }
+
+        .text-validation-error {
+            color: var(--vintage-burgundy);
+            font-size: 0.85rem;
+            margin-top: 5px;
+            font-style: italic;
+        }
+
+        .login-footer {
+            text-align: center;
+            margin-top: 2rem;
+            padding: 1rem;
+            font-size: 0.9rem;
+            color: var(--vintage-gray);
+        }
+
+        .login-link a:hover {
+            color: var(--vintage-brown);
+            text-decoration: underline;
+        }
+
+        /* Placeholder font style */
+        .form-control-retro::placeholder {
+            font-family: 'Times New Roman', 'Georgia', serif !important;
+            font-style: italic;
+            color: #999;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <i class="fas fa-graduation-cap" style="font-size: 3rem; color: var(--vintage-rust);"></i>
+            <h1>TRUNG TÂM LDA</h1>
+            <p class="subtitle">~ Hệ thống quản lý tiếng Anh ~</p>
+        </div>
+
+        <div class="retro-form corner-decorated">
+            @if (!ViewData.ModelState.IsValid)
+            {
+                <div class="retro-alert retro-alert-danger">
+                    <div class="retro-alert-content">
+                        @Html.ValidationSummary(false)
+                    </div>
+                </div>
+            }
+
+            @if (TempData["SuccessMessage"] != null)
+            {
+                <div class="retro-alert retro-alert-success">
+                    <div class="retro-alert-content">
+                        @TempData["SuccessMessage"]
+                    </div>
+                </div>
+            }
+
+            @if (TempData["InfoMessage"] != null)
+            {
+                <div class="retro-alert retro-alert-info">
+                    <div class="retro-alert-content">
+                        @TempData["InfoMessage"]
+                    </div>
+                </div>
+            }
+
+            <form asp-action="Login" method="post" id="loginForm" class="login-form">
+                @Html.AntiForgeryToken()
+
+                <div class="form-group-retro">
+                    <label asp-for="Username" class="form-label-retro">
+                        <i class="fas fa-user"></i> Tên tài khoản
+                    </label>
+                    <input asp-for="Username" class="form-control-retro" placeholder="Nhập tên tài khoản"
+                        autocomplete="username" />
+                    <span asp-validation-for="Username" class="text-validation-error"></span>
+                </div>
+
+                <div class="form-group-retro">
+                    <label asp-for="Password" class="form-label-retro">
+                        <i class="fas fa-lock"></i> Mật khẩu
+                    </label>
+                    <input asp-for="Password" class="form-control-retro" type="password" placeholder="Nhập mật khẩu"
+                        autocomplete="current-password" />
+                    <span asp-validation-for="Password" class="text-validation-error"></span>
+                    <div style="text-align:right; margin-top:8px;">
+                        <a asp-action="ForgotPassword" class="text-muted" style="font-size:0.9rem;">Quên mật khẩu?</a>
+                    </div>
+                </div>
+
+                <div class="form-check-retro" style="margin: 1.5rem 0;">
+                    <input asp-for="RememberMe" type="checkbox" id="RememberMe" />
+                    <label asp-for="RememberMe" for="RememberMe">
+                        Ghi nhớ đăng nhập
+                    </label>
+                </div>
+
+                <button type="submit" class="btn-retro btn-retro-primary" style="width: 100%;" id="loginBtn">
+                    <i class="fas fa-sign-in-alt"></i> ĐĂNG NHẬP
+                </button>
+            </form>
+
+            <div class="login-link" style="margin-top: 1.5rem; text-align: center; padding: 1rem; background: rgba(139, 69, 19, 0.05); border-radius: 8px; border: 1px solid rgba(139, 69, 19, 0.2);">
+                <p><i class="fas fa-user-plus"></i> Chưa có tài khoản? 
+                    <a asp-action="Register" style="color: var(--vintage-rust); text-decoration: none; font-weight: 600; transition: all 0.3s ease;"><i class="fas fa-user-plus"></i> Đăng ký ngay</a>
+                </p>
+            </div>
+        </div>
+
+        <div class="login-footer">
+            <div class="vintage-divider"></div>
+            <p>&copy; 2025 Trung tâm Tiếng Anh LDA. Bảo lưu mọi quyền.</p>
+        </div>
+    </div>
+
+    <script>
+        // Tự động focus vào username khi trang load
+        window.addEventListener('load', function () {
+            document.getElementById('Username')?.focus();
+        });
+    </script>
+
+    @section Scripts {
+        @{
+            await Html.RenderPartialAsync("_ValidationScriptsPartial");
+        }
+    }
+</body>
+
+</html>
