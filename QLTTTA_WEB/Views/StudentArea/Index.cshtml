@@ -1,0 +1,33 @@
+@{
+    ViewData["Title"] = "Đơn đăng ký của tôi";
+}
+<div class="retro-card">
+    <div class="retro-card-header">
+        <h2 class="retro-title"><i class="fas fa-list"></i> Đơn đăng ký của tôi</h2>
+    </div>
+    <div class="retro-card-body">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Lớp</th>
+                    <th>Khóa</th>
+                    <th>Trạng thái</th>
+                    <th>Ngày đăng ký</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in (IEnumerable<dynamic>)Model)
+                {
+                    <tr>
+                        <td>@r.RegistrationId</td>
+                        <td>@(r.ClassName ?? ("#" + r.ClassId.ToString()))</td>
+                        <td>@(r.CourseName ?? "-")</td>
+                        <td>@r.Status</td>
+                        <td>@(r.RegistrationDate is DateTime dt ? dt.ToString("dd/MM/yyyy") : r.RegistrationDate)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
