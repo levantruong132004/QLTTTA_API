@@ -88,7 +88,47 @@ namespace QLTTTA_API.Services
                                      MO_TA             AS DESCRIPTION,
                                      HOC_PHI_TIEU_CHUAN AS STANDARD_FEE
                                  FROM KHOA_HOC WHERE ID_KHOA_HOC = :id";
-            return await ExecuteQuerySingleAsync<Course>(sql, new { id });
+
+            // Thử dùng kết nối theo user trước; nếu phiên user thiếu/hết hạn, fallback sang kết nối admin
+            try
+            {
+                using var conn = await GetConnectionAsync();
+                using var cmd = new Oracle.ManagedDataAccess.Client.OracleCommand(sql, conn);
+                cmd.Parameters.Add(":id", id);
+                using var reader = await cmd.ExecuteReaderAsync(System.Data.CommandBehavior.SingleRow);
+                if (await reader.ReadAsync())
+                {
+                    return new Course
+                    {
+                        CourseId = reader.GetInt32(reader.GetOrdinal("COURSE_ID")),
+                        CourseCode = reader.IsDBNull(reader.GetOrdinal("COURSE_CODE")) ? null : reader.GetString(reader.GetOrdinal("COURSE_CODE")),
+                        CourseName = reader.IsDBNull(reader.GetOrdinal("COURSE_NAME")) ? null : reader.GetString(reader.GetOrdinal("COURSE_NAME")),
+                        Description = reader.IsDBNull(reader.GetOrdinal("DESCRIPTION")) ? string.Empty : reader.GetString(reader.GetOrdinal("DESCRIPTION")),
+                        StandardFee = reader.IsDBNull(reader.GetOrdinal("STANDARD_FEE")) ? 0 : Convert.ToInt32(Math.Round(Convert.ToDecimal(reader["STANDARD_FEE"])))
+                    };
+                }
+                return null;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                _logger.LogWarning("User session missing/invalid. Falling back to admin connection for public course detail {CourseId}.", id);
+                using var conn = await GetAdminConnectionAsync();
+                using var cmd = new Oracle.ManagedDataAccess.Client.OracleCommand(sql, conn);
+                cmd.Parameters.Add(":id", id);
+                using var reader = await cmd.ExecuteReaderAsync(System.Data.CommandBehavior.SingleRow);
+                if (await reader.ReadAsync())
+                {
+                    return new Course
+                    {
+                        CourseId = reader.GetInt32(reader.GetOrdinal("COURSE_ID")),
+                        CourseCode = reader.IsDBNull(reader.GetOrdinal("COURSE_CODE")) ? null : reader.GetString(reader.GetOrdinal("COURSE_CODE")),
+                        CourseName = reader.IsDBNull(reader.GetOrdinal("COURSE_NAME")) ? null : reader.GetString(reader.GetOrdinal("COURSE_NAME")),
+                        Description = reader.IsDBNull(reader.GetOrdinal("DESCRIPTION")) ? string.Empty : reader.GetString(reader.GetOrdinal("DESCRIPTION")),
+                        StandardFee = reader.IsDBNull(reader.GetOrdinal("STANDARD_FEE")) ? 0 : Convert.ToInt32(Math.Round(Convert.ToDecimal(reader["STANDARD_FEE"])))
+                    };
+                }
+                return null;
+            }
         }
 
         /// <summary>

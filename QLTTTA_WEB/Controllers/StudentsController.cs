@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using QLTTTA_WEB.Models;
 using System.Text;
 using System.Text.Json;
@@ -97,6 +98,29 @@ namespace QLTTTA_WEB.Controllers
             }
 
             return RedirectToAction(nameof(Index));
+        }
+
+        // Public course details for QR landing
+        [HttpGet("Students/CourseDetails/{courseId}")]
+        [AllowAnonymous]
+        public async Task<IActionResult> CourseDetails(int courseId)
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync($"api/courses/{courseId}");
+                if (response.IsSuccessStatusCode)
+                {
+                    var jsonString = await response.Content.ReadAsStringAsync();
+                    var course = JsonSerializer.Deserialize<CourseViewModel>(jsonString, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    if (course != null)
+                        return View("PublicCourseDetails", course);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error loading public course details {CourseId}", courseId);
+            }
+            return View("PublicNotFound");
         }
 
         public IActionResult Create()

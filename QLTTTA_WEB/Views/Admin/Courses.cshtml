@@ -61,6 +61,16 @@
                                 <input type="hidden" name="courseId" value="@c.CourseId" />
                                 <button class="btn btn-sm btn-danger">Xóa</button>
                             </form>
+                            <button type="button" class="btn btn-sm btn-info ms-1"
+                                onclick="generateQrCode('@c.CourseId', this)">Tạo QR</button>
+                        </td>
+                    </tr>
+                    <tr id="qr-row-@c.CourseId" style="display:none;">
+                        <td colspan="4">
+                            <div class="d-flex align-items-center">
+                                <div id="qrcode-@c.CourseId"></div>
+                                <div class="ms-3 small text-muted">Quét mã để xem thông tin khóa học công khai</div>
+                            </div>
                         </td>
                     </tr>
                 }
@@ -68,3 +78,24 @@
         </table>
     </div>
 </div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <script>
+        function generateQrCode(courseId, btn) {
+            var row = document.getElementById('qr-row-' + courseId);
+            var container = document.getElementById('qrcode-' + courseId);
+            if (row.style.display === 'none') {
+                container.innerHTML = '';
+                var base = (window.publicBaseUrl && window.publicBaseUrl.length > 0) ? window.publicBaseUrl.replace(/\/$/, '') : window.location.origin;
+                var url = base + '/Students/CourseDetails/' + courseId;
+                new QRCode(container, { text: url, width: 160, height: 160 });
+                row.style.display = 'table-row';
+                if (btn) btn.textContent = 'Ẩn QR';
+            } else {
+                row.style.display = 'none';
+                if (btn) btn.textContent = 'Tạo QR';
+            }
+        }
+    </script>
+}
