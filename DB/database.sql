@@ -37,7 +37,9 @@ CREATE TABLE TAI_KHOAN (
     EMAIL           VARCHAR2(100)   NOT NULL UNIQUE,
     ID_VAI_TRO      NUMBER(10)      NOT NULL,
     TRANG_THAI_KICH_HOAT NUMBER(1)  DEFAULT 1 NOT NULL,
-    SESSION_ID_HIENTAI VARCHAR2(255) ,
+    session_id_pc     varchar2(64),
+    session_id_mobile varchar2(64),
+    --SESSION_ID_HIENTAI VARCHAR2(255) ,
     CONSTRAINT FK_TAIKHOAN_VAITRO FOREIGN KEY (ID_VAI_TRO) REFERENCES VAI_TRO(ID_VAI_TRO)
 );
 COMMENT ON TABLE TAI_KHOAN IS 'Bảng cơ sở chứa thông tin đăng nhập chung của các tác nhân';

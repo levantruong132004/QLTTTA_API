@@ -98,7 +98,9 @@ namespace QLTTTA_API.Services
             }
 
             var headers = httpContext.Request.Headers;
-            var sessionId = headers["X-Session-Id"].FirstOrDefault(); // Header do Web tự gắn từ cookie SessionId
+            var sessionId = headers["X-Session-Id"].FirstOrDefault(); // Header do Web/Mobile tự gắn từ cookie/local storage
+            var deviceType = headers["X-Device-Type"].FirstOrDefault()?.Trim().ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(deviceType)) deviceType = "pc"; // mặc định web là PC
             if (string.IsNullOrWhiteSpace(sessionId))
             {
                 _logger.LogWarning("Missing X-Session-Id header in request to {Path}", httpContext.Request.Path);
@@ -128,7 +130,9 @@ namespace QLTTTA_API.Services
                 {
                     throw new UnauthorizedAccessException("Không tìm thấy tài khoản");
                 }
-                using var checkCmd = new OracleCommand("SELECT COUNT(*) FROM TAI_KHOAN WHERE ID_NGUOI_DUNG = :id AND SESSION_ID_HIENTAI = :sid", adminConn) // xác nhận sessionId còn khớp
+                // xác nhận sessionId còn khớp theo loại thiết bị
+                var col = deviceType == "mobile" ? "SESSION_ID_MOBILE" : "SESSION_ID_PC";
+                using var checkCmd = new OracleCommand($"SELECT COUNT(*) FROM TAI_KHOAN WHERE ID_NGUOI_DUNG = :id AND {col} = :sid", adminConn)
                 { BindByName = true };
                 checkCmd.Parameters.Add(":id", OracleDbType.Int32).Value = userId.Value;
                 checkCmd.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sessionId;

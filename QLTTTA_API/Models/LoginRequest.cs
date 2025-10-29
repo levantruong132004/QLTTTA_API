@@ -9,6 +9,11 @@ namespace QLTTTA_API.Models
 
         [Required(ErrorMessage = "Mật khẩu là bắt buộc")]
         public string Password { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Loại thiết bị đăng nhập: "pc" hoặc "mobile". Mặc định là "pc" nếu không gửi.
+        /// </summary>
+        public string? DeviceType { get; set; }
     }
 
     public class RegisterRequest

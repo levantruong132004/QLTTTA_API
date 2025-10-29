@@ -15,7 +15,16 @@ try
     builder.Services.AddSingleton<IUserCredentialCache, InMemoryUserCredentialCache>();
     builder.Services.AddSingleton<IOtpStore, InMemoryOtpStore>();
     builder.Services.AddSingleton<IEmailService, MailKitEmailService>();
-    builder.Services.AddScoped<IOracleConnectionProvider, OracleUserConnectionProvider>();
+    // Chọn provider kết nối Oracle theo cấu hình: UserPassword (mặc định) hoặc Proxy
+    var connMode = builder.Configuration["Oracle:ConnectionMode"] ?? "UserPassword";
+    if (string.Equals(connMode, "Proxy", StringComparison.OrdinalIgnoreCase))
+    {
+        builder.Services.AddScoped<IOracleConnectionProvider, OracleProxyConnectionProvider>();
+    }
+    else
+    {
+        builder.Services.AddScoped<IOracleConnectionProvider, OracleUserConnectionProvider>();
+    }
     builder.Services.AddScoped<IAuthService, AuthService>();
     builder.Services.AddScoped<IStudentService, StudentService>();
     builder.Services.AddScoped<ICourseService, CourseService>();

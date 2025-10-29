@@ -69,6 +69,7 @@ namespace QLTTTA_WEB.Models
     {
         public string Username { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;
+        public string DeviceType { get; set; } = "pc"; // Web mặc định là PC
     }
 
     public class LoginApiResponse

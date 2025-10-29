@@ -42,7 +42,8 @@ namespace QLTTTA_WEB.Controllers
                 var loginRequest = new LoginApiRequest
                 {
                     Username = model.Username,
-                    Password = model.Password
+                    Password = model.Password,
+                    DeviceType = "pc"
                 };
 
                 var json = JsonSerializer.Serialize(loginRequest);
@@ -138,6 +139,32 @@ namespace QLTTTA_WEB.Controllers
 
             TempData["InfoMessage"] = "Bạn đã đăng xuất thành công!";
             return RedirectToAction("Login");
+        }
+
+        // Check session validity (used by client-side polling to auto sign-out if session replaced)
+        [HttpGet]
+        public async Task<IActionResult> CheckSessionStatus()
+        {
+            try
+            {
+                var username = HttpContext.Session.GetString("Username") ?? string.Empty;
+                var sid = Request.Cookies["SessionId"] ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(sid))
+                {
+                    return Ok(new { status = "invalid", reason = "missing" });
+                }
+                var url = $"api/auth/check-session?username={Uri.EscapeDataString(username)}&sessionId={Uri.EscapeDataString(sid)}";
+                var resp = await _httpClient.GetAsync(url);
+                var body = await resp.Content.ReadAsStringAsync();
+                var parsed = JsonSerializer.Deserialize<CheckSessionResponse>(body, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                var status = parsed?.Status ?? (resp.IsSuccessStatusCode ? "valid" : "invalid");
+                return Ok(new { status });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "CheckSessionStatus error");
+                return Ok(new { status = "invalid", reason = "error" });
+            }
         }
 
         [HttpGet]

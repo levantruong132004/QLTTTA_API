@@ -23,6 +23,9 @@ namespace QLTTTA_WEB.Infrastructure
                 {
                     request.Headers.Remove("X-Session-Id");
                     request.Headers.Add("X-Session-Id", sessionId);
+                    // Gắn loại thiết bị cho Web: pc
+                    request.Headers.Remove("X-Device-Type");
+                    request.Headers.Add("X-Device-Type", "pc");
                 }
             }
             catch
