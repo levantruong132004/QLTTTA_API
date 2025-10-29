@@ -1,0 +1,66 @@
+@model IEnumerable<QLTTTA_WEB.Models.AdminRegistrationItem>
+@{
+    ViewData["Title"] = "Duyệt đơn đăng ký";
+}
+<div class="retro-card">
+    <div class="retro-card-header">
+        <h2 class="retro-title"><i class="fas fa-clipboard-check"></i> Duyệt đơn đăng ký</h2>
+    </div>
+    <div class="retro-card-body">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success">@TempData["SuccessMessage"]</div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+        }
+
+        <form asp-action="Registrations" method="get" class="row g-2 mb-3">
+            <div class="col-md-3"><input name="status" class="form-control" placeholder="Trạng thái" /></div>
+            <div class="col-md-3"><input name="classId" class="form-control" placeholder="ID lớp" /></div>
+            <div class="col-md-2"><button class="btn btn-primary w-100">Lọc</button></div>
+        </form>
+
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>HV</th>
+                    <th>Lớp</th>
+                    <th>Khóa</th>
+                    <th>Trạng thái</th>
+                    <th>Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model != null)
+                {
+                    foreach (var r in Model)
+                    {
+                        <tr>
+                            <td>@r.RegistrationId</td>
+                            <td>@r.StudentId</td>
+                            <td>@(r.ClassName ?? (r.ClassId > 0 ? ("#" + r.ClassId) : "-"))</td>
+                            <td>@(r.CourseName ?? "-")</td>
+                            <td>@r.Status</td>
+                            <td>
+                                <form asp-action="ApproveRegistration" method="post" class="d-inline">
+                                    <input type="hidden" name="id" value="@r.RegistrationId" />
+                                    <input type="number" name="classId" placeholder="ClassId" value="@r.ClassId" class="form-control d-inline" style="width:120px;display:inline-block;" />
+                                    <button class="btn btn-sm btn-success">Duyệt</button>
+                                </form>
+                                <form asp-action="RejectRegistration" method="post" class="d-inline">
+                                    <input type="hidden" name="id" value="@r.RegistrationId" />
+                                    <button class="btn btn-sm btn-danger">Từ chối</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@* Dynamic helper functions removed after strong typing *@

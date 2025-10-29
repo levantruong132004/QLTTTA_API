@@ -1,0 +1,222 @@
+﻿@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Trung tâm Tiếng Anh LDA</title>
+    <!-- Retro Vintage Theme -->
+    <link rel="stylesheet" href="~/css/retro-vintage.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+
+<body>
+    <header class="retro-header">
+        <nav class="retro-nav">
+            <a class="retro-brand" asp-area="" asp-controller="Home" asp-action="Index">
+                <i class="fas fa-graduation-cap"></i> LDA
+            </a>
+
+            @* ===================== DESKTOP NAVIGATION (>= md) ===================== *@
+            <ul class="retro-nav-links d-none d-md-flex">
+                <li class="retro-nav-item">
+                    <a class="retro-nav-link" asp-area="" asp-controller="Home" asp-action="Index">
+                        <i class="fas fa-home"></i> Trang chủ
+                    </a>
+                </li>
+                @if (Context.Session.GetString("UserId") != null)
+                {
+                    var __roleIdStr = Context.Session.GetString("RoleId");
+                    int __roleId = 0; int.TryParse(__roleIdStr, out __roleId);
+                    var __roleName = Context.Session.GetString("Role") ?? string.Empty;
+                    <li class="retro-nav-item">
+                        <a class="retro-nav-link" asp-controller="Student" asp-action="Profile">
+                            <i class="fas fa-user-graduate"></i> Học viên
+                        </a>
+                    </li>
+                    <li class="retro-nav-item">
+                        <a class="retro-nav-link" asp-controller="Student" asp-action="Courses">
+                            <i class="fas fa-book"></i> Khóa học
+                        </a>
+                    </li>
+                    @if (__roleName.Contains("HocVien", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <li class="retro-nav-item">
+                            <a class="retro-nav-link" asp-controller="MyRegistrations" asp-action="Index">
+                                <i class="fas fa-list"></i> Đơn Đăng Ký
+                            </a>
+                        </li>
+                    }
+                    @if (__roleName.Contains("KeToan", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <li class="retro-nav-item">
+                            <a class="retro-nav-link" asp-controller="Accountant" asp-action="Index">
+                                <i class="fas fa-file-invoice-dollar"></i> Thanh Toán
+                            </a>
+                        </li>
+                    }
+                    @if (__roleId == 4 || __roleName.Contains("NhanVienHocVu", StringComparison.OrdinalIgnoreCase) ||
+                                    __roleName.Contains("QuanTri", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <li class="retro-nav-item dropdown">
+                            <a class="retro-nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"
+                                aria-expanded="false">
+                                <i class="fas fa-cog"></i> Quản trị
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" asp-controller="Manage" asp-action="Courses"><i
+                                            class="fas fa-book"></i> Quản lý khóa học</a></li>
+                                <li><a class="dropdown-item" asp-controller="Manage" asp-action="Classes"><i
+                                            class="fas fa-chalkboard"></i> Quản lý lớp</a></li>
+                                <li><a class="dropdown-item" asp-controller="Manage" asp-action="Registrations"><i
+                                            class="fas fa-clipboard-check"></i> Duyệt đăng ký</a></li>
+                            </ul>
+                        </li>
+                    }
+                    <li class="retro-nav-item">
+                        <form asp-controller="Account" asp-action="Logout" method="post" style="display: inline;">
+                            <button type="submit" class="retro-nav-link" style="border: none; cursor: pointer;">
+                                <i class="fas fa-sign-out-alt"></i> Đăng xuất (@Context.Session.GetString("Username"))
+                            </button>
+                        </form>
+                    </li>
+                }
+            </ul>
+
+            @* ===================== MOBILE NAVIGATION (< md) ===================== *@
+            <div class="d-flex d-md-none align-items-center" style="gap:0.75rem;">
+                <button id="mobileNavToggle" class="btn btn-sm btn-outline-light" type="button">
+                    <i class="fas fa-bars"></i> Menu
+                </button>
+            </div>
+        </nav>
+        @* Off-canvas / collapsible menu for mobile *@
+        <div id="mobileNavPanel" class="d-md-none"
+            style="display:none; background:#3e2d21; border-top:2px solid var(--vintage-brown);">
+            <ul class="list-unstyled mb-0 py-2 px-3" style="font-size:0.95rem;">
+                <li class="mb-2">
+                    <a class="retro-nav-link" style="display:block;" asp-controller="Home" asp-action="Index"><i
+                            class="fas fa-home"></i> Trang chủ</a>
+                </li>
+                @if (Context.Session.GetString("UserId") != null)
+                {
+                    var __mRoleIdStr = Context.Session.GetString("RoleId");
+                    int __mRoleId = 0; int.TryParse(__mRoleIdStr, out __mRoleId);
+                    var __mRoleName = Context.Session.GetString("Role") ?? string.Empty;
+                    <li class="mb-2">
+                        <a class="retro-nav-link" style="display:block;" asp-controller="Student" asp-action="Profile"><i
+                                class="fas fa-user-graduate"></i> Học viên</a>
+                    </li>
+                    <li class="mb-2">
+                        <a class="retro-nav-link" style="display:block;" asp-controller="Student" asp-action="Courses"><i
+                                class="fas fa-book"></i> Khóa học</a>
+                    </li>
+                    @if (__mRoleName.Contains("HocVien", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <li class="mb-2">
+                            <a class="retro-nav-link" style="display:block;" asp-controller="MyRegistrations" asp-action="Index"><i
+                                    class="fas fa-list"></i> Đơn Đăng Ký</a>
+                        </li>
+                    }
+                    @if (__mRoleName.Contains("KeToan", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <li class="mb-2">
+                            <a class="retro-nav-link" style="display:block;" asp-controller="Accountant" asp-action="Index"><i
+                                    class="fas fa-file-invoice-dollar"></i> Kế toán</a>
+                        </li>
+                    }
+                    @if (__mRoleId == 4 || __mRoleName.Contains("NhanVienHocVu", StringComparison.OrdinalIgnoreCase) ||
+                                    __mRoleName.Contains("QuanTri", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <li class="mb-2">
+                            <a class="retro-nav-link" style="display:block;" asp-controller="Manage" asp-action="Courses"><i
+                                    class="fas fa-book"></i> Quản lý khóa học</a>
+                        </li>
+                        <li class="mb-2">
+                            <a class="retro-nav-link" style="display:block;" asp-controller="Manage" asp-action="Classes"><i
+                                    class="fas fa-chalkboard"></i> Quản lý lớp</a>
+                        </li>
+                        <li class="mb-2">
+                            <a class="retro-nav-link" style="display:block;" asp-controller="Manage"
+                                asp-action="Registrations"><i class="fas fa-clipboard-check"></i> Duyệt đăng ký</a>
+                        </li>
+                    }
+                    <li class="mb-2">
+                        <form asp-controller="Account" asp-action="Logout" method="post">
+                            <button type="submit" class="retro-nav-link" style="border:none; background:none; padding:0;">
+                                <i class="fas fa-sign-out-alt"></i> Đăng xuất (@Context.Session.GetString("Username"))
+                            </button>
+                        </form>
+                    </li>
+                }
+            </ul>
+        </div>
+    </header>
+
+    <div class="container" style="margin-top: 2rem;">
+        <main role="main" class="pb-3">
+            @RenderBody()
+        </main>
+    </div>
+
+    <footer class="retro-footer">
+        <div class="vintage-ornament"></div>
+        <p><strong>TRUNG TÂM TIẾNG ANH LDA</strong></p>
+        <p>&copy; 2025 - Bản quyền thuộc về Trung tâm Tiếng Anh LDA</p>
+        <p><a asp-area="" asp-controller="Home" asp-action="Privacy">Chính sách bảo mật</a></p>
+    </footer>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script>
+        // Base URL used to generate QR links for mobile devices (set in appsettings)
+        window.publicBaseUrl = '@(Configuration["PublicBaseUrl"] ?? "")';
+    </script>
+    <script>
+        (function () {
+            // Short polling kiểm tra phiên làm việc mỗi 5 giây
+            const username = '@Context.Session.GetString("Username")';
+            const sessionId = (document.cookie.match(/(?:^|; )SessionId=([^;]+)/) || [])[1];
+            if (!username || !sessionId) return;
+
+            async function checkSession() {
+                try {
+                    const url = new URL('api/auth/check-session', 'http://localhost:7158/');
+                    url.searchParams.set('username', username);
+                    url.searchParams.set('sessionId', sessionId);
+                    const res = await fetch(url.toString(), { credentials: 'include' });
+                    const data = await res.json();
+                    if (data?.status === 'invalid') {
+                        alert('Phiên đăng nhập của bạn không còn hợp lệ do đăng nhập ở nơi khác. Hệ thống sẽ đăng xuất.');
+                        // Post form logout
+                        const f = document.createElement('form');
+                        f.method = 'POST'; f.action = '/Account/Logout';
+                        document.body.appendChild(f); f.submit();
+                    }
+                } catch (e) {
+                    // im lặng, lần sau kiểm tra tiếp
+                }
+            }
+
+            setInterval(checkSession, 5000);
+        })();
+
+        // Toggle mobile navigation panel
+        (function () {
+            const btn = document.getElementById('mobileNavToggle');
+            const panel = document.getElementById('mobileNavPanel');
+            if (!btn || !panel) return;
+            btn.addEventListener('click', function () {
+                const isShown = panel.style.display === 'block';
+                panel.style.display = isShown ? 'none' : 'block';
+            });
+        })();
+    </script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+
+</html>
