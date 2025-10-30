@@ -1,0 +1,185 @@
+@model List<QLTTTA_WEB.Models.CourseViewModel>
+@{
+    ViewData["Title"] = "Khóa học";
+    var roleName = Context.Session.GetString("Role") ?? string.Empty;
+    var roleIdStr = Context.Session.GetString("RoleId");
+    int.TryParse(roleIdStr, out var roleId);
+    bool isStaff = roleId == 4 || roleName.Contains("NhanVienHocVu", StringComparison.OrdinalIgnoreCase) || roleName.Contains("QuanTri", StringComparison.OrdinalIgnoreCase) || roleName.Contains("Admin", StringComparison.OrdinalIgnoreCase);
+}
+
+<div class="retro-card corner-decorated">
+    <div class="retro-card-header d-flex justify-content-between align-items-center">
+        <h2 class="retro-card-title"><i class="fas fa-book"></i> Danh sách khóa học</h2>
+        @if (isStaff)
+        {
+            <a class="btn-retro btn-retro-primary" asp-controller="Manage" asp-action="Courses"><i class="fas fa-tools"></i> Quản lý</a>
+        }
+    </div>
+    <div class="retro-card-body">
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-danger">@TempData["ErrorMessage"]</div>
+        }
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-success">@TempData["SuccessMessage"]</div>
+        }
+
+        <div class="row g-2 mb-3">
+            <div class="col-md-3"><input id="filterCode" class="form-control" placeholder="Lọc theo mã" /></div>
+            <div class="col-md-5"><input id="filterName" class="form-control" placeholder="Lọc theo tên" /></div>
+            <div class="col-md-4 text-muted d-flex align-items-center">Tổng: <span id="courseCount">@Model.Count</span> khóa học</div>
+        </div>
+
+        @if (Model.Count == 0)
+        {
+            <div class="text-center p-4">
+                <i class="fas fa-info-circle" style="font-size: 3rem; color: var(--vintage-gray);"></i>
+                <h3 style="margin-top: 1rem;">Hiện tại chưa có khóa học nào</h3>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="retro-table">
+                    <thead>
+                        <tr>
+                            <th style="width:15%">Mã khóa học</th>
+                            <th style="width:25%">Tên khóa học</th>
+                            <th style="width:40%">Mô tả</th>
+                            <th style="width:10%" class="text-end">Học phí</th>
+                            <th style="width:10%" class="text-end">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="courseList">
+                        @foreach (var c in Model)
+                        {
+                            <tr class="course-item" data-code="@c.CourseCode" data-name="@c.CourseName">
+                                <td><span class="badge bg-secondary">@c.CourseCode</span></td>
+                                <td><strong>@c.CourseName</strong></td>
+                                <td class="text-muted">@c.Description</td>
+                                <td class="text-end"><strong>@c.StandardFee.ToString("N0") VNĐ</strong></td>
+                                <td class="text-end">
+                                    <button type="button" class="btn-retro btn-retro-primary btn-retro-sm" onclick="showOpenClasses('@c.CourseCode')">
+                                        <i class="fas fa-clipboard-check"></i> ĐĂNG KÝ
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr id="oc-@c.CourseCode" class="open-classes-row" style="display:none;">
+                                <td colspan="5">
+                                    <div class="p-3" style="border: 2px solid var(--vintage-brown); background: var(--vintage-offwhite);">
+                                        <div id="oc-content-@c.CourseCode">
+                                            <em>Đang tải danh sách lớp đang tuyển...</em>
+                                        </div>
+                                        <form id="reg-form-@c.CourseCode" method="post" asp-action="RegisterClass" asp-controller="Courses" class="mt-3">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="classId" id="reg-classId-@c.CourseCode" />
+                                            <input type="hidden" name="returnCourseCode" value="@c.CourseCode" />
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <small class="text-muted">Chọn lớp muốn đăng ký rồi nhấn Xác nhận</small>
+                                                </div>
+                                                <div>
+                                                    <button type="submit" class="btn-retro btn-retro-success btn-retro-sm" disabled id="reg-submit-@c.CourseCode">
+                                                        <i class="fas fa-check"></i> Xác nhận đăng ký
+                                                    </button>
+                                                    <button type="button" class="btn-retro btn-retro-secondary btn-retro-sm" onclick="hideOpenClasses('@c.CourseCode')">
+                                                        <i class="fas fa-times"></i> Đóng
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts{
+<script>
+    (function(){
+        const code = document.getElementById('filterCode');
+        const name = document.getElementById('filterName');
+        const items = Array.from(document.querySelectorAll('.course-item'));
+        const countEl = document.getElementById('courseCount');
+        function apply(){
+            const c = (code.value || '').toLowerCase();
+            const n = (name.value || '').toLowerCase();
+            let cnt = 0;
+            for(const el of items){
+                const ok = (el.dataset.code||'').toLowerCase().includes(c) && (el.dataset.name||'').toLowerCase().includes(n);
+                el.style.display = ok ? '' : 'none';
+                if(ok) cnt++;
+            }
+            if(countEl) countEl.textContent = cnt;
+        }
+        if(code) code.addEventListener('input', apply);
+        if(name) name.addEventListener('input', apply);
+    })();
+
+    async function showOpenClasses(code){
+        const row = document.getElementById('oc-' + code);
+        const content = document.getElementById('oc-content-' + code);
+        const submitBtn = document.getElementById('reg-submit-' + code);
+        const hiddenInput = document.getElementById('reg-classId-' + code);
+        if(row){ row.style.display = ''; }
+        if(content){ content.innerHTML = '<em>Đang tải danh sách lớp đang tuyển...</em>'; }
+        if(submitBtn){ submitBtn.disabled = true; }
+        if(hiddenInput){ hiddenInput.value = ''; }
+        try{
+            const resp = await fetch('@Url.Action("OpenClasses","Courses")?courseCode=' + encodeURIComponent(code), {
+                headers: { 'Accept': 'application/json' }
+            });
+            if(!resp.ok){
+                content.innerHTML = '<div class="retro-alert retro-alert-danger">Không tải được danh sách lớp (HTTP ' + resp.status + ')</div>';
+                return;
+            }
+            const list = await resp.json();
+            if(!Array.isArray(list) || list.length === 0){
+                content.innerHTML = '<div class="retro-alert retro-alert-warning">Không có lớp nào đang tuyển sinh cho khóa này.</div>';
+                return;
+            }
+            let html = '<div class="table-responsive"><table class="retro-table"><thead><tr><th>Mã lớp</th><th>Tên lớp</th><th>Lịch học</th><th>Sĩ số tối đa</th><th>Chọn</th></tr></thead><tbody>';
+            for(const it of list){
+                html += '<tr>'
+                      + '<td><span class="badge bg-secondary">' + (it.classCode||'') + '</span></td>'
+                      + '<td><strong>' + (it.className||'') + '</strong><div class="text-muted">' + (it.courseName||'') + '</div></td>'
+                      + '<td>' + (it.scheduleText||'') + '</td>'
+                      + '<td class="text-end">' + (it.maxSize||0) + '</td>'
+                      + '<td class="text-center">'
+                      +   '<input type="radio" name="pick-'+code+'" value="' + it.classId + '" onchange="pickClass(\''+code+'\',' + it.classId + ')">'
+                      + '</td>'
+                      + '</tr>';
+            }
+            html += '</tbody></table></div>';
+            content.innerHTML = html;
+        }catch(e){
+            if(content){ content.innerHTML = '<div class="retro-alert retro-alert-danger">Lỗi: ' + (e && e.message ? e.message : e) + '</div>'; }
+        }
+    }
+    function hideOpenClasses(code){
+        const row = document.getElementById('oc-' + code);
+        if(row){ row.style.display = 'none'; }
+    }
+    function pickClass(code, classId){
+        const submitBtn = document.getElementById('reg-submit-' + code);
+        const hiddenInput = document.getElementById('reg-classId-' + code);
+        if(hiddenInput){ hiddenInput.value = String(classId||''); }
+        if(submitBtn){ submitBtn.disabled = !classId; }
+    }
+    // If redirected back with ?code=XYZ then auto open its classes
+    (function(){
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get('code');
+        if(code){
+            const row = document.querySelector('.course-item[data-code="' + code + '"]');
+            if(row){ showOpenClasses(code); row.scrollIntoView({behavior:'smooth', block:'center'}); }
+        }
+    })();
+</script>
+}

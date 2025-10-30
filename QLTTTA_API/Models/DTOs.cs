@@ -88,6 +88,7 @@ namespace QLTTTA_API.Models.DTOs
     public class ClassUpdateDto : ClassCreateDto
     {
         public int ClassId { get; set; }
+        public string? Status { get; set; }
     }
 
     // Registration DTOs
@@ -198,6 +199,17 @@ namespace QLTTTA_API.Models.DTOs
         public int ScheduleId { get; set; }
     }
 
+    // Student-facing: open classes listing item
+    public class OpenClassItem
+    {
+        public int ClassId { get; set; }
+        public string ClassCode { get; set; } = string.Empty;
+        public string ClassName { get; set; } = string.Empty;
+        public int MaxSize { get; set; }
+        public string CourseName { get; set; } = string.Empty;
+        public string? ScheduleText { get; set; }
+    }
+
     // Response DTOs
     public class ApiResponse<T>
     {
@@ -214,5 +226,21 @@ namespace QLTTTA_API.Models.DTOs
         public int PageNumber { get; set; }
         public int PageSize { get; set; }
         public int TotalPages => (int)Math.Ceiling((double)TotalRecords / PageSize);
+    }
+
+    // Accountant detail DTO for registrations
+    public class AccountantRegDetail
+    {
+        public int RegistrationId { get; set; }
+        public DateTime? RegistrationDate { get; set; }
+        public string? Status { get; set; }
+        public int StudentId { get; set; }
+        public string? StudentName { get; set; }
+        public string? Email { get; set; }
+        public string? PhoneNumber { get; set; }
+        public int ClassId { get; set; }
+        public string? ClassName { get; set; }
+        public string? CourseName { get; set; }
+        public int StandardFee { get; set; }
     }
 }

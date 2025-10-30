@@ -55,10 +55,11 @@ namespace QLTTTA_API.Services
                 await adminConn.OpenAsync();
 
                 // Kiểm tra kích hoạt và lấy thông tin người dùng từ schema tiếng Việt
-                var infoSql = @"SELECT tk.ID_NGUOI_DUNG,
+             var infoSql = @"SELECT tk.ID_NGUOI_DUNG,
                                          tk.TEN_DANG_NHAP,
                                          tk.EMAIL,
                                          tk.TRANG_THAI_KICH_HOAT,
+                                 tk.ID_VAI_TRO,
                                          vt.TEN_VAI_TRO,
                                          hv.HO_TEN
                                     FROM TAI_KHOAN tk
@@ -76,6 +77,7 @@ namespace QLTTTA_API.Services
                 int ordUser = rdr.GetOrdinal("TEN_DANG_NHAP");
                 int ordEmail = rdr.GetOrdinal("EMAIL");
                 int ordActive = rdr.GetOrdinal("TRANG_THAI_KICH_HOAT");
+                int ordRoleId = rdr.GetOrdinal("ID_VAI_TRO");
                 int ordRole = rdr.GetOrdinal("TEN_VAI_TRO");
                 int ordFull = -1; try { ordFull = rdr.GetOrdinal("HO_TEN"); } catch { }
 
@@ -90,6 +92,7 @@ namespace QLTTTA_API.Services
                     UserId = rdr.IsDBNull(ordId) ? 0 : rdr.GetInt32(ordId),
                     Username = rdr.IsDBNull(ordUser) ? string.Empty : rdr.GetString(ordUser),
                     Email = rdr.IsDBNull(ordEmail) ? string.Empty : rdr.GetString(ordEmail),
+                    RoleId = rdr.IsDBNull(ordRoleId) ? 0 : rdr.GetInt32(ordRoleId),
                     Role = rdr.IsDBNull(ordRole) ? string.Empty : rdr.GetString(ordRole),
                     FullName = (ordFull >= 0 && !rdr.IsDBNull(ordFull)) ? rdr.GetString(ordFull) : string.Empty
                 };
@@ -168,7 +171,7 @@ namespace QLTTTA_API.Services
                 }
 
                 // Lấy lại thông tin user vừa tạo
-                using (var infoCmd = new OracleCommand(@"SELECT tk.ID_NGUOI_DUNG, tk.TEN_DANG_NHAP, tk.EMAIL, vt.TEN_VAI_TRO, hv.HO_TEN
+                using (var infoCmd = new OracleCommand(@"SELECT tk.ID_NGUOI_DUNG, tk.TEN_DANG_NHAP, tk.EMAIL, tk.ID_VAI_TRO, vt.TEN_VAI_TRO, hv.HO_TEN
                                                          FROM TAI_KHOAN tk
                                                          LEFT JOIN VAI_TRO vt ON vt.ID_VAI_TRO = tk.ID_VAI_TRO
                                                          LEFT JOIN HOC_VIEN hv ON hv.ID_HOC_VIEN = tk.ID_NGUOI_DUNG
@@ -184,6 +187,7 @@ namespace QLTTTA_API.Services
                             UserId = rdr.IsDBNull(rdr.GetOrdinal("ID_NGUOI_DUNG")) ? 0 : rdr.GetInt32(rdr.GetOrdinal("ID_NGUOI_DUNG")),
                             Username = rdr.IsDBNull(rdr.GetOrdinal("TEN_DANG_NHAP")) ? string.Empty : rdr.GetString(rdr.GetOrdinal("TEN_DANG_NHAP")),
                             Email = rdr.IsDBNull(rdr.GetOrdinal("EMAIL")) ? string.Empty : rdr.GetString(rdr.GetOrdinal("EMAIL")),
+                            RoleId = rdr.IsDBNull(rdr.GetOrdinal("ID_VAI_TRO")) ? 0 : rdr.GetInt32(rdr.GetOrdinal("ID_VAI_TRO")),
                             Role = rdr.IsDBNull(rdr.GetOrdinal("TEN_VAI_TRO")) ? string.Empty : rdr.GetString(rdr.GetOrdinal("TEN_VAI_TRO")),
                             FullName = rdr.IsDBNull(rdr.GetOrdinal("HO_TEN")) ? string.Empty : rdr.GetString(rdr.GetOrdinal("HO_TEN"))
                         };

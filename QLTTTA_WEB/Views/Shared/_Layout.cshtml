@@ -1,6 +1,7 @@
 ﻿<!DOCTYPE html>
 <html lang="vi">
 
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -25,21 +26,54 @@
                         <i class="fas fa-home"></i> Trang chủ
                     </a>
                 </li>
+                @{ 
+                    var roleIdStr = Context.Session.GetString("RoleId");
+                    int roleId = 0; int.TryParse(roleIdStr, out roleId);
+                    var roleName = Context.Session.GetString("Role") ?? string.Empty;
+                    var acctIdCfg = Configuration["Roles:AccountantRoleId"]; 
+                    bool showAccountant = false; 
+                    if (int.TryParse(acctIdCfg, out var acctId) && acctId > 0) { showAccountant = roleId == acctId; }
+                    else { showAccountant = roleName.Equals("KETOAN", StringComparison.OrdinalIgnoreCase) || roleName.Equals("Kế toán", StringComparison.OrdinalIgnoreCase) || roleName.Equals("Ke toan", StringComparison.OrdinalIgnoreCase); }
+                    bool showStaff = roleId == 4 || roleName.Contains("NhanVienHocVu", StringComparison.OrdinalIgnoreCase) || roleName.Contains("QuanTri", StringComparison.OrdinalIgnoreCase) || roleName.Contains("Admin", StringComparison.OrdinalIgnoreCase);
+                }
                 @if (Context.Session.GetString("UserId") != null)
                 {
                     <li class="retro-nav-item">
-                        <a class="retro-nav-link" asp-controller="Students" asp-action="Index">
-                            <i class="fas fa-user-graduate"></i> Học viên
-                        </a>
+                        @{
+                            var __userId = Context.Session.GetString("UserId");
+                        }
+                        @if (roleId == 1 && !string.IsNullOrEmpty(__userId))
+                        {
+                            <a class="retro-nav-link" asp-controller="Students" asp-action="PublicProfile" asp-route-id="@__userId">
+                                <i class="fas fa-user-graduate"></i> Học viên
+                            </a>
+                        }
+                        else
+                        {
+                            <a class="retro-nav-link" asp-controller="Students" asp-action="Index">
+                                <i class="fas fa-user-graduate"></i> Học viên
+                            </a>
+                        }
                     </li>
+                    @if (showStaff)
+                    {
+                        <li class="retro-nav-item">
+                            <a class="retro-nav-link" asp-controller="Registrations" asp-action="Approver">
+                                <i class="fas fa-clipboard-check"></i> Duyệt đơn
+                            </a>
+                        </li>
+                    }
+                    @if (showAccountant)
+                    {
+                        <li class="retro-nav-item">
+                            <a class="retro-nav-link" asp-controller="Registrations" asp-action="Accountant">
+                                <i class="fas fa-file-invoice-dollar"></i> ĐƠN&DUYỆT ĐƠN
+                            </a>
+                        </li>
+                    }
                     <li class="retro-nav-item">
-                        <a class="retro-nav-link" href="#">
+                        <a class="retro-nav-link" asp-controller="Courses" asp-action="Index">
                             <i class="fas fa-book"></i> Khóa học
-                        </a>
-                    </li>
-                    <li class="retro-nav-item">
-                        <a class="retro-nav-link" href="#">
-                            <i class="fas fa-chalkboard-teacher"></i> Lớp học
                         </a>
                     </li>
                     <li class="retro-nav-item">

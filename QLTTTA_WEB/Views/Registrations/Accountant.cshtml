@@ -1,0 +1,112 @@
+@model QLTTTA_WEB.Models.AccountantIndexViewModel
+@{
+    ViewData["Title"] = "Kế toán - Đơn đăng ký";
+}
+
+<div class="retro-card corner-decorated">
+    <div class="retro-card-header">
+        <h2 class="retro-card-title"><i class="fas fa-file-invoice-dollar"></i> Danh sách đơn đăng ký (Kế toán)</h2>
+    </div>
+    <div class="retro-card-body">
+        <form method="get" class="row g-3 mb-3">
+            <div class="col-md-5">
+                <label class="form-label">Khóa học</label>
+                <select class="form-select" name="courseId" onchange="this.form.submit()">
+                    <option value="">-- Tất cả --</option>
+                    @foreach (var c in Model.Courses)
+                    {
+                        if (Model.SelectedCourseId == c.Id)
+                        {
+                            <option value="@c.Id" selected>@c.Name</option>
+                        }
+                        else
+                        {
+                            <option value="@c.Id">@c.Name</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-md-5">
+                <label class="form-label">Lớp học</label>
+                <select class="form-select" name="classId" @(Model.SelectedCourseId.HasValue ? null : "disabled") onchange="this.form.submit()">
+                    <option value="">-- Tất cả --</option>
+                    @foreach (var cl in Model.Classes)
+                    {
+                        if (Model.SelectedClassId == cl.Id)
+                        {
+                            <option value="@cl.Id" selected>@cl.Name</option>
+                        }
+                        else
+                        {
+                            <option value="@cl.Id">@cl.Name</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn-retro btn-retro-primary w-100"><i class="fas fa-filter"></i> Lọc</button>
+            </div>
+        </form>
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-success">
+                <div class="retro-alert-content">@TempData["SuccessMessage"]</div>
+            </div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-danger">
+                <div class="retro-alert-content">@TempData["ErrorMessage"]</div>
+            </div>
+        }
+
+        @if (Model.Items.Any())
+        {
+            <div class="table-responsive">
+                <table class="retro-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Ngày đăng ký</th>
+                            <th>Học viên</th>
+                            <th>Lớp học</th>
+                            <th>Khóa học</th>
+                            <th>Trạng thái</th>
+                            <th>Số tiền</th>
+                            <th class="text-center">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model.Items)
+                        {
+                            <tr>
+                                <td>@item.RegistrationId</td>
+                                <td>@(item.RegistrationDate?.ToString("dd/MM/yyyy") ?? "")</td>
+                                <td>
+                                    <div><strong>@item.StudentName</strong></div>
+                                    <small>@item.Email | @item.PhoneNumber</small>
+                                </td>
+                                <td>@item.ClassName</td>
+                                <td>@item.CourseName</td>
+                                <td>@item.Status</td>
+                                <td>@item.StandardFee.ToString("N0")</td>
+                                <td class="text-center">
+                                    <a asp-action="AccountantDetail" asp-route-id="@item.RegistrationId" class="btn-retro btn-retro-primary btn-retro-sm">
+                                        <i class="fas fa-eye"></i> Chi tiết
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="text-center p-4">
+                <i class="fas fa-file-invoice" style="font-size: 3rem; color: var(--vintage-gray);"></i>
+                <h3 style="margin-top: 1rem;">Chưa có đơn đăng ký nào</h3>
+            </div>
+        }
+    </div>
+</div>

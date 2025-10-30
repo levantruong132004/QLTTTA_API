@@ -22,26 +22,26 @@ namespace QLTTTA_API.Services
         {
             var offset = (pageNumber - 1) * pageSize;
             var whereClause = string.IsNullOrEmpty(search) ? "" :
-                "WHERE UPPER(COURSE_NAME) LIKE UPPER(:search) OR UPPER(COURSE_CODE) LIKE UPPER(:search)";
+                "WHERE UPPER(TEN_KHOA_HOC) LIKE UPPER(:search) OR UPPER(MA_KHOA_HOC) LIKE UPPER(:search)";
 
             var countSql = $@"
                 SELECT COUNT(*) 
-                FROM QLTT_ADMIN.COURSES 
+                FROM KHOA_HOC 
                 {whereClause}";
 
             var dataSql = $@"
                 SELECT * FROM (
-                    SELECT c.*, ROW_NUMBER() OVER (ORDER BY COURSE_ID) as rn
-                    FROM QLTT_ADMIN.COURSES c
+                    SELECT c.*, ROW_NUMBER() OVER (ORDER BY ID_KHOA_HOC) as rn
+                    FROM KHOA_HOC c
                     {whereClause}
                 ) WHERE rn BETWEEN :offset + 1 AND :offset + :pagesize";
 
             var parameters = new { search = $"%{search}%", offset, pagesize = pageSize };
 
-            var totalRecords = Convert.ToInt32(await ExecuteScalarAsync(countSql,
+            var totalRecords = Convert.ToInt32(await ExecuteScalarAdminAsync(countSql,
                 string.IsNullOrEmpty(search) ? null : new { search = $"%{search}%" }));
 
-            var courses = await ExecuteQueryAsync<Course>(dataSql,
+            var courses = await ExecuteQueryAdminAsync<Course>(dataSql,
                 string.IsNullOrEmpty(search) ? new { offset, pagesize = pageSize } : parameters);
 
             return new PaginatedResponse<Course>
@@ -55,8 +55,8 @@ namespace QLTTTA_API.Services
 
         public async Task<Course?> GetCourseByIdAsync(int id)
         {
-            var sql = "SELECT * FROM QLTT_ADMIN.COURSES WHERE COURSE_ID = :id";
-            return await ExecuteQuerySingleAsync<Course>(sql, new { id });
+            var sql = "SELECT * FROM KHOA_HOC WHERE ID_KHOA_HOC = :id";
+            return await ExecuteQuerySingleAdminAsync<Course>(sql, new { id });
         }
 
         public async Task<ApiResponse<Course>> CreateCourseAsync(CourseCreateDto dto)
@@ -64,8 +64,8 @@ namespace QLTTTA_API.Services
             try
             {
                 // Kiểm tra mã khóa học đã tồn tại
-                var existingSql = "SELECT COUNT(*) FROM QLTT_ADMIN.COURSES WHERE COURSE_CODE = :coursecode";
-                var exists = Convert.ToInt32(await ExecuteScalarAsync(existingSql, new { coursecode = dto.CourseCode }));
+                var existingSql = "SELECT COUNT(*) FROM KHOA_HOC WHERE MA_KHOA_HOC = :coursecode";
+                var exists = Convert.ToInt32(await ExecuteScalarAdminAsync(existingSql, new { coursecode = dto.CourseCode }));
 
                 if (exists > 0)
                 {
@@ -77,8 +77,8 @@ namespace QLTTTA_API.Services
                 }
 
                 var sql = @"
-                    INSERT INTO QLTT_ADMIN.COURSES 
-                    (COURSE_CODE, COURSE_NAME, DESCRIPTION, STANDARD_FEE)
+                    INSERT INTO KHOA_HOC 
+                    (MA_KHOA_HOC, TEN_KHOA_HOC, MO_TA, HOC_PHI_TIEU_CHUAN)
                     VALUES (:coursecode, :coursename, :description, :standardfee)";
 
                 var parameters = new
@@ -89,11 +89,11 @@ namespace QLTTTA_API.Services
                     standardfee = dto.StandardFee
                 };
 
-                await ExecuteNonQueryAsync(sql, parameters);
+                await ExecuteNonQueryAdminAsync(sql, parameters);
 
                 // Lấy thông tin khóa học vừa tạo
-                var newCourse = await ExecuteQuerySingleAsync<Course>(
-                    "SELECT * FROM QLTT_ADMIN.COURSES WHERE COURSE_CODE = :coursecode",
+                var newCourse = await ExecuteQuerySingleAdminAsync<Course>(
+                    "SELECT * FROM KHOA_HOC WHERE MA_KHOA_HOC = :coursecode",
                     new { coursecode = dto.CourseCode });
 
                 return new ApiResponse<Course>
@@ -131,9 +131,9 @@ namespace QLTTTA_API.Services
 
                 // Kiểm tra mã khóa học trùng (ngoại trừ chính nó)
                 var existingSql = @"
-                    SELECT COUNT(*) FROM QLTT_ADMIN.COURSES 
-                    WHERE COURSE_CODE = :coursecode AND COURSE_ID != :courseid";
-                var exists = Convert.ToInt32(await ExecuteScalarAsync(existingSql,
+                    SELECT COUNT(*) FROM KHOA_HOC 
+                    WHERE MA_KHOA_HOC = :coursecode AND ID_KHOA_HOC != :courseid";
+                var exists = Convert.ToInt32(await ExecuteScalarAdminAsync(existingSql,
                     new { coursecode = dto.CourseCode, courseid = dto.CourseId }));
 
                 if (exists > 0)
@@ -146,12 +146,12 @@ namespace QLTTTA_API.Services
                 }
 
                 var sql = @"
-                    UPDATE QLTT_ADMIN.COURSES SET
-                        COURSE_CODE = :coursecode,
-                        COURSE_NAME = :coursename,
-                        DESCRIPTION = :description,
-                        STANDARD_FEE = :standardfee
-                    WHERE COURSE_ID = :courseid";
+                    UPDATE KHOA_HOC SET
+                        MA_KHOA_HOC = :coursecode,
+                        TEN_KHOA_HOC = :coursename,
+                        MO_TA = :description,
+                        HOC_PHI_TIEU_CHUAN = :standardfee
+                    WHERE ID_KHOA_HOC = :courseid";
 
                 var parameters = new
                 {
@@ -162,7 +162,7 @@ namespace QLTTTA_API.Services
                     courseid = dto.CourseId
                 };
 
-                await ExecuteNonQueryAsync(sql, parameters);
+                await ExecuteNonQueryAdminAsync(sql, parameters);
 
                 var updatedCourse = await GetCourseByIdAsync(dto.CourseId);
 
@@ -189,8 +189,8 @@ namespace QLTTTA_API.Services
             try
             {
                 // Kiểm tra khóa học có lớp học không
-                var classSql = "SELECT COUNT(*) FROM QLTT_ADMIN.CLASSES WHERE COURSE_ID = :id";
-                var hasClasses = Convert.ToInt32(await ExecuteScalarAsync(classSql, new { id }));
+                var classSql = "SELECT COUNT(*) FROM LOP_HOC WHERE ID_KHOA_HOC = :id";
+                var hasClasses = Convert.ToInt32(await ExecuteScalarAdminAsync(classSql, new { id }));
 
                 if (hasClasses > 0)
                 {
@@ -201,8 +201,8 @@ namespace QLTTTA_API.Services
                     };
                 }
 
-                var sql = "DELETE FROM QLTT_ADMIN.COURSES WHERE COURSE_ID = :id";
-                var rowsAffected = await ExecuteNonQueryAsync(sql, new { id });
+                var sql = "DELETE FROM KHOA_HOC WHERE ID_KHOA_HOC = :id";
+                var rowsAffected = await ExecuteNonQueryAdminAsync(sql, new { id });
 
                 if (rowsAffected == 0)
                 {
@@ -233,8 +233,8 @@ namespace QLTTTA_API.Services
 
         public async Task<List<Course>> GetAllCoursesAsync()
         {
-            var sql = "SELECT * FROM QLTT_ADMIN.COURSES ORDER BY COURSE_NAME";
-            return await ExecuteQueryAsync<Course>(sql);
+            var sql = "SELECT * FROM KHOA_HOC ORDER BY TEN_KHOA_HOC";
+            return await ExecuteQueryAdminAsync<Course>(sql);
         }
     }
 }

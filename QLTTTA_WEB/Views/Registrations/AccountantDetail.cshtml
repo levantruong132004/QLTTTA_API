@@ -1,0 +1,123 @@
+@model QLTTTA_WEB.Models.AccountantRegistrationDetailViewModel
+@{
+    ViewData["Title"] = "Chi tiết đơn đăng ký";
+}
+
+<div class="retro-card corner-decorated">
+    <div class="retro-card-header">
+        <h2 class="retro-card-title"><i class="fas fa-file-invoice-dollar"></i> Chi tiết đơn đăng ký #@Model.RegistrationId</h2>
+    </div>
+    <div class="retro-card-body">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-success">
+                <div class="retro-alert-content">@TempData["SuccessMessage"]</div>
+            </div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-danger">
+                <div class="retro-alert-content">@TempData["ErrorMessage"]</div>
+            </div>
+        }
+
+        <div class="row">
+            <div class="col-md-7">
+                <div class="retro-section">
+                    <h5 class="retro-section-title"><i class="fas fa-user"></i> Học viên</h5>
+                    <p><strong>@Model.StudentName</strong> (ID: @Model.StudentId)</p>
+                    <p>Email: @Model.Email | SĐT: @Model.PhoneNumber</p>
+                </div>
+                <div class="retro-section">
+                    <h5 class="retro-section-title"><i class="fas fa-chalkboard-teacher"></i> Lớp học</h5>
+                    <p>@Model.ClassName</p>
+                    <p>Khóa học: <strong>@Model.CourseName</strong></p>
+                </div>
+                <div class="retro-section">
+                    <h5 class="retro-section-title"><i class="fas fa-info-circle"></i> Trạng thái đơn</h5>
+                    <p>Ngày đăng ký: @(Model.RegistrationDate?.ToString("dd/MM/yyyy") ?? "")</p>
+                    <p>Trạng thái: <strong>@(Model.Status ?? "")</strong></p>
+                </div>
+
+                <div class="retro-section">
+                    <a asp-action="Accountant" class="btn-retro btn-retro-secondary"><i class="fas fa-arrow-left"></i> Quay lại danh sách</a>
+                </div>
+            </div>
+            <div class="col-md-5">
+                <div class="retro-section">
+                    <h5 class="retro-section-title"><i class="fas fa-receipt"></i> Hóa đơn</h5>
+                    @if (Model.Invoice == null)
+                    {
+                        @if (string.Equals(Model.Status, "Đã duyệt", StringComparison.OrdinalIgnoreCase))
+                        {
+                            <form asp-action="CreateInvoice" method="post">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="registrationId" value="@Model.RegistrationId" />
+                                <div class="mb-2">
+                                    <label class="form-label">Ngày đến hạn</label>
+                                    <input class="form-control" type="date" name="dueDate" value="@DateTime.Now.AddDays(7).ToString("yyyy-MM-dd")" />
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">Số tiền</label>
+                                    <input class="form-control" type="number" name="amount" value="@Model.StandardFee" min="0" step="10000" />
+                                </div>
+                                <button type="submit" class="btn-retro btn-retro-primary"><i class="fas fa-plus"></i> Tạo hóa đơn</button>
+                            </form>
+                        }
+                        else
+                        {
+                            <p>Đơn chưa được duyệt. Vui lòng duyệt đơn trước khi tạo hóa đơn.</p>
+                        }
+                    }
+                    else
+                    {
+                        <div class="retro-card compact">
+                            <div><strong>Mã hóa đơn:</strong> @Model.Invoice.InvoiceCode</div>
+                            <div><strong>Ngày tạo:</strong> @Model.Invoice.CreatedDate?.ToString("dd/MM/yyyy")</div>
+                            <div><strong>Đến hạn:</strong> @Model.Invoice.DueDate?.ToString("dd/MM/yyyy")</div>
+                            <div><strong>Số tiền:</strong> @Model.Invoice.Amount.ToString("N0")</div>
+                            <div><strong>Trạng thái:</strong> @Model.Invoice.Status</div>
+                        </div>
+
+                        @if (!string.Equals(Model.Invoice.Status, "Đã thanh toán", StringComparison.OrdinalIgnoreCase))
+                        {
+                            <h6 class="mt-3">Ghi nhận thanh toán</h6>
+                            <form asp-action="CreatePayment" method="post">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="registrationId" value="@Model.RegistrationId" />
+                                <input type="hidden" name="invoiceId" value="@Model.Invoice.InvoiceId" />
+                                <div class="mb-2">
+                                    <label class="form-label">Số tiền</label>
+                                    <input class="form-control" type="number" name="amount" value="@Model.Invoice.Amount" min="0" step="10000" />
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">Phương thức</label>
+                                    <select class="form-select" name="paymentMethod">
+                                        <option>Tiền mặt</option>
+                                        <option>Chuyển khoản</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn-retro btn-retro-success"><i class="fas fa-money-bill-wave"></i> Xác nhận thanh toán</button>
+                            </form>
+                        }
+
+                        <h6 class="mt-3">Lịch sử thanh toán</h6>
+                        @if (Model.Payments.Any())
+                        {
+                            <ul>
+                                @foreach (var p in Model.Payments)
+                                {
+                                    <li>#@p.PaymentId - @p.PaymentDate?.ToString("dd/MM/yyyy HH:mm") - @p.Amount.ToString("N0") - @p.PaymentMethod</li>
+                                }
+                            </ul>
+                        }
+                        else
+                        {
+                            <p>Chưa có lịch sử thanh toán.</p>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

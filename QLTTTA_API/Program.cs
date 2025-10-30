@@ -13,10 +13,18 @@ try
     // Đăng ký services
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddSingleton<IUserCredentialCache, InMemoryUserCredentialCache>();
+    builder.Services.AddSingleton<IOtpStore, InMemoryOtpStore>();
+    builder.Services.AddSingleton<IEmailService, MailKitEmailService>();
     builder.Services.AddScoped<IOracleConnectionProvider, OracleUserConnectionProvider>();
     builder.Services.AddScoped<IAuthService, AuthService>();
     builder.Services.AddScoped<IStudentService, StudentService>();
     builder.Services.AddScoped<ICourseService, CourseService>();
+    builder.Services.AddScoped<IProfileService, ProfileService>();
+    builder.Services.AddScoped<IClassService, ClassService>();
+    builder.Services.AddScoped<IScheduleService, ScheduleService>();
+    builder.Services.AddScoped<IRegistrationService, RegistrationService>();
+    builder.Services.AddScoped<IInvoiceService, InvoiceService>();
+    builder.Services.AddScoped<IPaymentService, PaymentService>();
 
     // Add CORS
     builder.Services.AddCors(options =>

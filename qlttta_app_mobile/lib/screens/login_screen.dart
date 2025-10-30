@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:qlttta_app_mobile/screens/home_screen.dart';
 import 'package:qlttta_app_mobile/screens/register_screen.dart';
 import 'package:qlttta_app_mobile/services/auth_service.dart';
+import 'package:qlttta_app_mobile/screens/forgot_password_screen.dart';
 import 'package:qlttta_app_mobile/theme/retro_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -19,38 +20,54 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
 
   void _login() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    final success = await _authService.login(
-      _usernameController.text,
-      _passwordController.text,
-    );
-
-    if (success) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('username', _usernameController.text);
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
-      );
-    } else {
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text;
+    if (username.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Đăng nhập thất bại!'),
+          content: const Text('Vui lòng nhập đủ tên đăng nhập và mật khẩu'),
           backgroundColor: RetroColors.vintageBurgundy,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.zero,
-            side: const BorderSide(color: RetroColors.vintageDarkBrown, width: 2),
-          ),
         ),
       );
+      return;
     }
 
-    setState(() {
-      _isLoading = false;
-    });
+    setState(() => _isLoading = true);
+    try {
+      final success = await _authService.login(username, password);
+      if (success) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('username', username);
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Đăng nhập thất bại. Kiểm tra lại thông tin.'),
+            backgroundColor: RetroColors.vintageBurgundy,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.zero,
+              side: const BorderSide(color: RetroColors.vintageDarkBrown, width: 2),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Không thể kết nối máy chủ. Hãy kiểm tra API (10.0.2.2:7158) và mạng.\nChi tiết: $e'),
+          backgroundColor: RetroColors.vintageBurgundy,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -220,6 +237,29 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         const SizedBox(height: 32),
+                        // Forgot password link
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const ForgotPasswordScreen(),
+                                ),
+                              );
+                            },
+                            child: const Text(
+                              'Quên mật khẩu?',
+                              style: TextStyle(
+                                color: RetroColors.vintageRust,
+                                fontWeight: FontWeight.bold,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
                         // Login button
                         _isLoading
                             ? const Center(

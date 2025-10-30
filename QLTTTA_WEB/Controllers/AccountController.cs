@@ -66,6 +66,7 @@ namespace QLTTTA_WEB.Controllers
                         HttpContext.Session.SetString("Username", loginResponse.User.Username);
                         HttpContext.Session.SetString("Email", loginResponse.User.Email);
                         HttpContext.Session.SetString("Role", loginResponse.User.Role);
+                        HttpContext.Session.SetString("RoleId", loginResponse.User.RoleId.ToString());
                         HttpContext.Session.SetString("Token", loginResponse.Token);
 
                         // Lưu SessionId vào cookie cho short polling kiểm tra đăng nhập đồng thời

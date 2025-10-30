@@ -68,12 +68,16 @@ namespace QLTTTA_API.Models
     public class Registration
     {
         public int RegistrationId { get; set; }
+        public string? RegistrationCode { get; set; }
         public DateTime? RegistrationDate { get; set; }
         public string? Status { get; set; }
         public DateTime? StudyDate { get; set; }
         public int StudentId { get; set; }
         public int ClassId { get; set; }
         public int StaffId { get; set; }
+        // Convenience fields for joined results
+        public string? ClassName { get; set; }
+        public string? CourseName { get; set; }
     }
 
     // Nhân viên học vụ

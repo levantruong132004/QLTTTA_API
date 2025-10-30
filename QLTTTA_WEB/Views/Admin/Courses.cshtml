@@ -1,0 +1,119 @@
+@model IEnumerable<QLTTTA_WEB.Models.CourseViewModel>
+@{
+    ViewData["Title"] = "Quản lý khóa học";
+}
+<div class="retro-card">
+    <div class="retro-card-header">
+        <h2 class="retro-title"><i class="fas fa-book"></i> Quản lý khóa học</h2>
+    </div>
+    <div class="retro-card-body">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-success">@TempData["SuccessMessage"]</div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-danger">@TempData["ErrorMessage"]</div>
+        }
+
+        <form asp-action="CreateCourse" method="post" class="row g-2">
+            <div class="col-md-2"><input name="courseCode" class="form-control" placeholder="Mã khóa" required /></div>
+            <div class="col-md-3"><input name="courseName" class="form-control" placeholder="Tên khóa" required /></div>
+            <div class="col-md-4"><input name="description" class="form-control" placeholder="Mô tả" /></div>
+            <div class="col-md-2"><input name="standardFee" type="number" min="0" class="form-control" placeholder="Học phí" required /></div>
+            <div class="col-md-1"><button type="submit" class="btn-retro btn-retro-success w-100">Thêm</button></div>
+        </form>
+
+        <div class="vintage-divider"></div>
+
+        <div class="table-responsive">
+            <table class="retro-table">
+                <thead>
+                    <tr>
+                        <th>Mã</th>
+                        <th>Tên</th>
+                        <th>Mô tả</th>
+                        <th>Học phí</th>
+                        <th class="text-center">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var c in Model)
+                {
+                    <tr>
+                        <td>@c.CourseCode</td>
+                        <td>@c.CourseName</td>
+                        <td>@c.Description</td>
+                        <td>@c.StandardFee.ToString("N0")</td>
+                        <td class="text-center">
+                            <button type="button" class="btn-retro btn-retro-primary btn-retro-sm" data-bs-toggle="modal" data-bs-target="#editModal"
+                                    data-id="@c.CourseId" data-code="@c.CourseCode" data-name="@c.CourseName" data-desc="@c.Description" data-fee="@c.StandardFee">
+                                <i class="fas fa-edit"></i> Sửa
+                            </button>
+                            <form asp-action="DeleteCourse" method="post" class="d-inline" onsubmit="return confirm('Xóa khóa này?');">
+                                <input type="hidden" name="courseId" value="@c.CourseId" />
+                                <button class="btn-retro btn-retro-danger btn-retro-sm"><i class="fas fa-trash"></i> Xóa</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Edit Modal -->
+        <div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
+          <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-pen"></i> Sửa khóa học</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <form asp-action="EditCourse" method="post">
+                <div class="modal-body">
+                    <input type="hidden" name="courseId" id="edit-courseId" />
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Mã khóa</label>
+                            <input class="form-control" name="courseCode" id="edit-courseCode" required />
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label">Tên khóa</label>
+                            <input class="form-control" name="courseName" id="edit-courseName" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Học phí</label>
+                            <input type="number" min="0" class="form-control" name="standardFee" id="edit-standardFee" required />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Mô tả</label>
+                            <textarea class="form-control" rows="3" name="description" id="edit-description"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn-retro btn-retro-secondary" data-bs-dismiss="modal">Đóng</button>
+                  <button type="submit" class="btn-retro btn-retro-primary">Lưu thay đổi</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts{
+<script>
+    const editModal = document.getElementById('editModal');
+    if (editModal) {
+        editModal.addEventListener('show.bs.modal', function (event) {
+            const btn = event.relatedTarget;
+            document.getElementById('edit-courseId').value = btn.getAttribute('data-id');
+            document.getElementById('edit-courseCode').value = btn.getAttribute('data-code');
+            document.getElementById('edit-courseName').value = btn.getAttribute('data-name');
+            document.getElementById('edit-description').value = btn.getAttribute('data-desc');
+            document.getElementById('edit-standardFee').value = btn.getAttribute('data-fee');
+        });
+    }
+</script>
+}

@@ -292,4 +292,79 @@ namespace QLTTTA_WEB.Models
         public DateTime? RegistrationDate { get; set; }
         public string Status { get; set; } = string.Empty;
     }
+
+    // Accountant views
+    public class AccountantRegistrationItemViewModel
+    {
+        public int RegistrationId { get; set; }
+        public DateTime? RegistrationDate { get; set; }
+        public string? Status { get; set; }
+        public int StudentId { get; set; }
+        public string? StudentName { get; set; }
+        public string? Email { get; set; }
+        public string? PhoneNumber { get; set; }
+        public int ClassId { get; set; }
+        public string? ClassName { get; set; }
+        public string? CourseName { get; set; }
+        public int StandardFee { get; set; }
+    }
+
+    // Simple select options
+    public class OptionItem
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+    }
+
+    public class AccountantIndexViewModel
+    {
+        public List<AccountantRegistrationItemViewModel> Items { get; set; } = new();
+        public int? SelectedCourseId { get; set; }
+        public int? SelectedClassId { get; set; }
+        public List<OptionItem> Courses { get; set; } = new();
+        public List<OptionItem> Classes { get; set; } = new();
+    }
+
+    public class InvoiceSummaryViewModel
+    {
+        public int InvoiceId { get; set; }
+        public string InvoiceCode { get; set; } = string.Empty;
+        public DateTime? CreatedDate { get; set; }
+        public DateTime? DueDate { get; set; }
+        public int Amount { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public int RegistrationId { get; set; }
+    }
+
+    public class PaymentSummaryViewModel
+    {
+        public int PaymentId { get; set; }
+        public DateTime? PaymentDate { get; set; }
+        public int Amount { get; set; }
+        public string? PaymentMethod { get; set; }
+        public int InvoiceId { get; set; }
+        public int AccountantId { get; set; }
+    }
+
+    public class AccountantRegistrationDetailViewModel
+    {
+        // Registration detail
+        public int RegistrationId { get; set; }
+        public DateTime? RegistrationDate { get; set; }
+        public string? Status { get; set; }
+        public int StudentId { get; set; }
+        public string? StudentName { get; set; }
+        public string? Email { get; set; }
+        public string? PhoneNumber { get; set; }
+        public int ClassId { get; set; }
+        public string? ClassName { get; set; }
+        public string? CourseName { get; set; }
+        public int StandardFee { get; set; }
+
+        // Related invoice (if any)
+        public InvoiceSummaryViewModel? Invoice { get; set; }
+
+        // Related payments (if any)
+        public List<PaymentSummaryViewModel> Payments { get; set; } = new();
+    }
 }

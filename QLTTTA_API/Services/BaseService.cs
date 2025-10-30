@@ -340,6 +340,7 @@ namespace QLTTTA_API.Services
                 "CourseId" => new[] { "COURSE_ID", "ID_KHOA_HOC" },
                 "CourseCode" => new[] { "COURSE_CODE", "MA_KHOA_HOC" },
                 "CourseName" => new[] { "COURSE_NAME", "TEN_KHOA_HOC" },
+                "Description" => new[] { "DESCRIPTION", "MO_TA" },
                 "StandardFee" => new[] { "STANDARD_FEE", "HOC_PHI_TIEU_CHUAN" },
                 _ => Array.Empty<string>()
             };

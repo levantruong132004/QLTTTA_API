@@ -1,0 +1,75 @@
+@model QLTTTA_WEB.Models.AccountantRegistrationDetailViewModel
+@{
+    ViewData["Title"] = "Duyệt đơn";
+}
+
+<div class="retro-card corner-decorated">
+    <div class="retro-card-header">
+        <h2 class="retro-card-title"><i class="fas fa-clipboard-check"></i> Chi tiết đơn đăng ký #@Model.RegistrationId</h2>
+    </div>
+    <div class="retro-card-body">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-success">
+                <div class="retro-alert-content">@TempData["SuccessMessage"]</div>
+            </div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-danger">
+                <div class="retro-alert-content">@TempData["ErrorMessage"]</div>
+            </div>
+        }
+
+        <div class="row">
+            <div class="col-md-8">
+                <div class="retro-section">
+                    <h5 class="retro-section-title"><i class="fas fa-user"></i> Học viên</h5>
+                    <p><strong>@Model.StudentName</strong> (ID: @Model.StudentId)</p>
+                    <p>Email: @Model.Email | SĐT: @Model.PhoneNumber</p>
+                </div>
+                <div class="retro-section">
+                    <h5 class="retro-section-title"><i class="fas fa-chalkboard-teacher"></i> Lớp học</h5>
+                    <p>@Model.ClassName</p>
+                    <p>Khóa học: <strong>@Model.CourseName</strong></p>
+                </div>
+                <div class="retro-section">
+                    <h5 class="retro-section-title"><i class="fas fa-info-circle"></i> Trạng thái đơn</h5>
+                    <p>Ngày đăng ký: @(Model.RegistrationDate?.ToString("dd/MM/yyyy") ?? "")</p>
+                    <p>Trạng thái: <strong>@(Model.Status ?? "")</strong></p>
+                </div>
+
+                <div class="retro-section">
+                    <a asp-action="Approver" class="btn-retro btn-retro-secondary"><i class="fas fa-arrow-left"></i> Quay lại danh sách</a>
+                    @{ // Chỉ hiển thị nút khi đơn đang ở trạng thái chờ duyệt
+                        var st = (Model.Status ?? string.Empty).Trim();
+                        bool isPending = string.Equals(st, "Chờ duyệt", StringComparison.OrdinalIgnoreCase)
+                                        || string.Equals(st, "Cho duyet", StringComparison.OrdinalIgnoreCase)
+                                        || string.Equals(st, "Pending", StringComparison.OrdinalIgnoreCase)
+                                        || string.Equals(st, "Chờ xử lý", StringComparison.OrdinalIgnoreCase)
+                                        || string.Equals(st, "Cho xu ly", StringComparison.OrdinalIgnoreCase);
+                    }
+                    @if (isPending)
+                    {
+                        <form asp-action="Approve" method="post" style="display:inline-block; margin-left:8px;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@Model.RegistrationId" />
+                            <button type="submit" class="btn-retro btn-retro-success"><i class="fas fa-check"></i> Duyệt đơn</button>
+                        </form>
+                        <form asp-action="Reject" method="post" style="display:inline-block; margin-left:8px;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@Model.RegistrationId" />
+                            <button type="submit" class="btn-retro btn-retro-danger"><i class="fas fa-times"></i> Từ chối</button>
+                        </form>
+                    }
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="retro-section">
+                    <h5 class="retro-section-title"><i class="fas fa-receipt"></i> Ghi chú</h5>
+                    <p>Sau khi đơn được duyệt, bộ phận Kế toán sẽ tạo hóa đơn và ghi nhận thanh toán.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

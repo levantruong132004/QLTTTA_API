@@ -9,6 +9,7 @@
   <ItemGroup>
     <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.9.1" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+    <PackageReference Include="MailKit" Version="4.7.1" />
   </ItemGroup>
 
 </Project>

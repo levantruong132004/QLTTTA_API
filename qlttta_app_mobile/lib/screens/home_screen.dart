@@ -3,8 +3,8 @@ import 'package:qlttta_app_mobile/models/student.dart';
 import 'package:qlttta_app_mobile/screens/login_screen.dart';
 import 'package:qlttta_app_mobile/screens/student_profile_screen.dart';
 import 'package:qlttta_app_mobile/services/student_service.dart';
+import 'package:qlttta_app_mobile/services/auth_service.dart';
 import 'package:qlttta_app_mobile/theme/retro_theme.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,6 +15,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final StudentService _studentService = StudentService();
+  final AuthService _authService = AuthService();
   late Future<List<Student>> _studentsFuture;
 
   @override
@@ -24,8 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _logout(BuildContext context) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('username');
+    await _authService.logout();
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const LoginScreen()),
       (Route<dynamic> route) => false,
