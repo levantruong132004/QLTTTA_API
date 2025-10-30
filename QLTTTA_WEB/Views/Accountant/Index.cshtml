@@ -1,0 +1,154 @@
+@model QLTTTA_WEB.Models.AccountantHomeViewModel
+@{
+    ViewData["Title"] = "Trang chủ Kế toán";
+}
+
+<div class="retro-card corner-decorated">
+    <div class="retro-card-header text-center">
+        <h2 class="retro-card-title"><i class="fas fa-file-invoice-dollar"></i> Trang chủ Kế toán</h2>
+    </div>
+    <div class="retro-card-body">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-success"><div class="retro-alert-content">@TempData["SuccessMessage"]</div></div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-danger"><div class="retro-alert-content">@TempData["ErrorMessage"]</div></div>
+        }
+
+        <!-- Menu nhanh cho chữ ký số -->
+        <div class="text-center mb-4">
+            <a class="btn btn-primary" asp-controller="Accountant" asp-action="DigitalSignature">
+                <i class="fas fa-signature"></i> Quản lý Chữ ký số
+            </a>
+        </div>
+
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-5">
+                <label class="form-label"><i class="fas fa-filter"></i> Chọn khóa học</label>
+                @if (Model.Courses != null && Model.Courses.Any())
+                {
+                    @Html.DropDownList(
+                        "courseId",
+                        new Microsoft.AspNetCore.Mvc.Rendering.SelectList(Model.Courses, nameof(QLTTTA_WEB.Models.SimpleCourseViewModel.CourseId), nameof(QLTTTA_WEB.Models.SimpleCourseViewModel.CourseName), Model.SelectedCourseId),
+                        new { @class = "form-select", onchange = "this.form.submit()" }
+                    )
+                }
+                else
+                {
+                    <select name="courseId" class="form-select"><option value="">-- Không có khóa học --</option></select>
+                }
+            </div>
+            <div class="col-md-5">
+                <label class="form-label"><i class="fas fa-chalkboard"></i> Chọn lớp</label>
+                @if (Model.Classes != null && Model.Classes.Any())
+                {
+                    @Html.DropDownList(
+                        "classId",
+                        new Microsoft.AspNetCore.Mvc.Rendering.SelectList(Model.Classes, nameof(QLTTTA_WEB.Models.AdminClassItem.ClassId), nameof(QLTTTA_WEB.Models.AdminClassItem.ClassName), Model.SelectedClassId),
+                        new { @class = "form-select", onchange = "this.form.submit()" }
+                    )
+                }
+                else
+                {
+                    <select name="classId" class="form-select"><option value="">-- Không có lớp --</option></select>
+                }
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-primary w-100"><i class="fas fa-search"></i> Lọc</button>
+            </div>
+        </form>
+
+        <div class="vintage-divider"></div>
+
+        @* Hiển thị danh sách lớp như giao diện nhân viên *@
+        <div class="course-grid" style="margin-top:1rem;">
+            @if (Model.Classes != null && Model.Classes.Any())
+            {
+                foreach (var cls in Model.Classes)
+                {
+                    <div class="course-item">
+                        <div class="course-title">
+                            <i class="fas fa-chalkboard"></i> @cls.ClassName (@cls.ClassCode)
+                        </div>
+                        <div class="course-meta">
+                            <i class="fas fa-calendar-alt"></i>
+                            @(cls.StartDate?.ToString("dd/MM/yyyy")) - @(cls.EndDate?.ToString("dd/MM/yyyy"))
+                        </div>
+                        <div class="course-meta">
+                            <i class="fas fa-users"></i> Sĩ số tối đa: @cls.MaxSize
+                        </div>
+                        <div class="course-meta">
+                            <i class="fas fa-info-circle"></i> @cls.Status
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="retro-alert retro-alert-info text-center" style="grid-column: 1 / -1;">
+                    <div class="retro-alert-content">
+                        <i class="fas fa-info-circle"></i> Không có lớp cho khóa học đã chọn.
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="vintage-divider"></div>
+
+        <div class="table-responsive">
+            <table class="table table-striped align-middle">
+                <thead>
+                    <tr>
+                        <th>Học viên</th>
+                        <th>Email</th>
+                        <th>SĐT</th>
+                        <th>Khóa học</th>
+                        <th>Lớp</th>
+                        <th>Ngày ĐK</th>
+                        <th>Trạng thái</th>
+                        <th style="width:160px">Hóa đơn</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @if (Model.Registrations != null && Model.Registrations.Any())
+                {
+                    foreach (var r in Model.Registrations)
+                    {
+                        <tr>
+                            <td><strong>@r.StudentName</strong></td>
+                            <td>@r.Email</td>
+                            <td>@r.PhoneNumber</td>
+                            <td>@r.CourseName</td>
+                            <td>@r.ClassName</td>
+                            <td>@(r.RegistrationDate?.ToString("dd/MM/yyyy"))</td>
+                            <td>
+                                <span class="retro-badge @(r.Status == "Đã duyệt" ? "retro-badge-success" : r.Status == "Đã từ chối" ? "retro-badge-danger" : "retro-badge-info")">@r.Status</span>
+                            </td>
+                            <td>
+                                @if (string.Equals(r.Status, "Đã duyệt", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <a class="btn btn-sm btn-success" asp-controller="Accountant" asp-action="Invoice" asp-route-id="@r.RegistrationId">
+                                        <i class="fas fa-file-invoice"></i> Xuất hóa đơn
+                                    </a>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-sm btn-secondary" disabled title="Chỉ xuất khi đơn đã duyệt">
+                                        <i class="fas fa-ban"></i> Chưa duyệt
+                                    </button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr><td colspan="8" class="text-center text-muted">Không có dữ liệu</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

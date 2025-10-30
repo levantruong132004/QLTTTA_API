@@ -1,0 +1,89 @@
+@model QLTTTA_WEB.Models.StudentInvoiceDetailViewModel
+@{
+    ViewData["Title"] = "Thanh toán hóa đơn";
+}
+
+<div class="retro-card corner-decorated">
+    <div class="retro-card-header text-center">
+        <h2 class="retro-card-title"><i class="fas fa-credit-card"></i> Thanh toán hóa đơn</h2>
+    </div>
+    <div class="retro-card-body">
+        @if (Model?.Invoice == null)
+        {
+            <div class="retro-alert retro-alert-danger"><div class="retro-alert-content">Không tìm thấy hóa đơn để thanh toán.</div></div>
+        }
+        else
+        {
+            <div class="retro-card mb-3">
+                <div class="retro-card-header"><strong><i class="fas fa-receipt"></i> Thông tin hóa đơn</strong></div>
+                <div class="retro-card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4"><strong>Mã hóa đơn:</strong> @Model.Invoice.InvoiceCode</div>
+                        <div class="col-md-4"><strong>Ngày tạo:</strong> @Model.Invoice.CreatedDate?.ToString("dd/MM/yyyy HH:mm")</div>
+                        <div class="col-md-4"><strong>Hạn thanh toán:</strong> @Model.Invoice.DueDate?.ToString("dd/MM/yyyy")</div>
+                        <div class="col-md-4"><strong>Số tiền:</strong> <span class="text-primary fw-bold">@Model.Invoice.Amount.ToString("N0") đ</span></div>
+                        <div class="col-md-4"><strong>Trạng thái hiện tại:</strong> @Model.Invoice.Status</div>
+                    </div>
+                </div>
+            </div>
+
+            @if (Model?.Registration != null)
+            {
+                <div class="retro-card mb-3">
+                    <div class="retro-card-header"><strong><i class="fas fa-user"></i> Học viên</strong></div>
+                    <div class="retro-card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4"><strong>Email:</strong> @Model.Registration.Email</div>
+                            <div class="col-md-4"><strong>SĐT:</strong> @Model.Registration.PhoneNumber</div>
+                            <div class="col-md-4"><strong>Mã đăng ký:</strong> @Model.Registration.RegistrationCode</div>
+                            <div class="col-md-6"><strong>Khóa học:</strong> @Model.Registration.CourseName</div>
+                            <div class="col-md-6"><strong>Lớp:</strong> @Model.Registration.ClassName</div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @if (Model?.Signature?.IsSigned == true)
+            {
+                <div class="retro-card mb-3">
+                    <div class="retro-card-header"><strong><i class="fas fa-signature"></i> Chữ ký số</strong></div>
+                    <div class="retro-card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4"><strong>Trạng thái:</strong> @(Model.Signature.IsValid ? "Hợp lệ" : "Không hợp lệ")</div>
+                            <div class="col-md-4"><strong>Người ký:</strong> @Model.Signature.SignedBy</div>
+                            <div class="col-md-4"><strong>Ngày ký:</strong> @Model.Signature.SignedDate?.ToString("dd/MM/yyyy HH:mm")</div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <form asp-controller="Student" asp-action="ConfirmPay" method="post" class="retro-card mt-3">
+                @Html.AntiForgeryToken()
+                <div class="retro-card-header"><strong><i class="fas fa-money-bill"></i> Xác nhận thanh toán</strong></div>
+                <div class="retro-card-body">
+                    <input type="hidden" name="registrationId" value="@Model.Invoice.RegistrationId" />
+                    <input type="hidden" name="invoiceId" value="@Model.Invoice.InvoiceId" />
+
+                    <div class="mb-3">
+                        <label class="form-label">Phương thức thanh toán</label>
+                        <select name="paymentMethod" class="form-select" required>
+                            <option value="Chuyển khoản">Chuyển khoản</option>
+                            <option value="Tiền mặt">Tiền mặt</option>
+                        </select>
+                    </div>
+
+                    <div class="retro-alert retro-alert-info">
+                        <div class="retro-alert-content">
+                            <i class="fas fa-info-circle"></i> Sau khi xác nhận, hệ thống sẽ ghi nhận yêu cầu thanh toán của bạn và chờ kế toán xác nhận.
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-success"><i class="fas fa-check"></i> Xác nhận thanh toán</button>
+                        <a class="btn btn-outline-secondary" asp-controller="Student" asp-action="ViewInvoice" asp-route-registrationId="@Model.Invoice.RegistrationId">Quay lại hóa đơn</a>
+                    </div>
+                </div>
+            </form>
+        }
+    </div>
+</div>

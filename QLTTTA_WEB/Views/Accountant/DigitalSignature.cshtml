@@ -1,0 +1,111 @@
+@{
+    ViewData["Title"] = "Quản lý Chữ ký số";
+}
+
+<div class="retro-card corner-decorated">
+    <div class="retro-card-header text-center">
+        <h2 class="retro-card-title"><i class="fas fa-signature"></i> Quản lý Chữ ký số</h2>
+    </div>
+    <div class="retro-card-body">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-success"><div class="retro-alert-content">@TempData["SuccessMessage"]</div></div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-danger"><div class="retro-alert-content">@TempData["ErrorMessage"]</div></div>
+        }
+
+        <div class="row g-4">
+            <!-- Tạo cặp khóa mới -->
+            <div class="col-md-6">
+                <div class="retro-card">
+                    <div class="retro-card-header">
+                        <strong><i class="fas fa-key"></i> Tạo cặp khóa RSA</strong>
+                    </div>
+                    <div class="retro-card-body">
+                        <p>Tạo cặp khóa RSA 2048-bit mới cho việc ký số hóa đơn.</p>
+                        
+                        <div class="retro-alert retro-alert-warning">
+                            <div class="retro-alert-content">
+                                <i class="fas fa-exclamation-triangle"></i> 
+                                <strong>Lưu ý quan trọng:</strong>
+                                <ul class="mb-0 mt-2">
+                                    <li>Public key sẽ được lưu vào database</li>
+                                    <li>Private key phải được lưu an toàn trên máy cá nhân</li>
+                                    <li>Không chia sẻ private key với ai</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <form asp-controller="Accountant" asp-action="GenerateKeyPair" method="post" class="mt-3">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-plus-circle"></i> Tạo cặp khóa mới
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hướng dẫn sử dụng -->
+            <div class="col-md-6">
+                <div class="retro-card">
+                    <div class="retro-card-header">
+                        <strong><i class="fas fa-info-circle"></i> Hướng dẫn sử dụng</strong>
+                    </div>
+                    <div class="retro-card-body">
+                        <h6><i class="fas fa-list-ol"></i> Quy trình sử dụng chữ ký số:</h6>
+                        <ol>
+                            <li><strong>Tạo cặp khóa:</strong> Nhấn nút "Tạo cặp khóa mới"</li>
+                            <li><strong>Lưu Public Key:</strong> Copy và cập nhật vào database</li>
+                            <li><strong>Lưu Private Key:</strong> Lưu file .pem trên máy cá nhân</li>
+                            <li><strong>Ký hóa đơn:</strong> Sử dụng đường dẫn file private key</li>
+                        </ol>
+
+                        <h6 class="mt-3"><i class="fas fa-shield-alt"></i> Tính năng bảo mật:</h6>
+                        <ul>
+                            <li>Thuật toán RSA-2048 với SHA-256</li>
+                            <li>Chữ ký không thể giả mạo</li>
+                            <li>Xác thực người ký và tính toàn vẹn dữ liệu</li>
+                            <li>Tuân thủ tiêu chuẩn chữ ký số quốc tế</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Thông tin kỹ thuật -->
+        <div class="retro-card mt-4">
+            <div class="retro-card-header">
+                <strong><i class="fas fa-cogs"></i> Thông tin kỹ thuật</strong>
+            </div>
+            <div class="retro-card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <strong>Thuật toán:</strong><br>
+                        <span class="badge bg-primary">RSA-2048</span>
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Hash Algorithm:</strong><br>
+                        <span class="badge bg-secondary">SHA-256</span>
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Padding:</strong><br>
+                        <span class="badge bg-info">PKCS#1 v1.5</span>
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Format:</strong><br>
+                        <span class="badge bg-success">PEM</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Nút quay lại -->
+        <div class="text-center mt-4">
+            <a class="btn btn-outline-secondary" asp-controller="Accountant" asp-action="Index">
+                <i class="fas fa-arrow-left"></i> Quay lại danh sách
+            </a>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,322 @@
+@model QLTTTA_WEB.Models.AccountantInvoicePageViewModel
+@{
+    ViewData["Title"] = "Hóa đơn";
+}
+
+<div class="retro-card corner-decorated">
+    <div class="retro-card-header text-center">
+        <h2 class="retro-card-title"><i class="fas fa-file-invoice"></i> Hóa đơn</h2>
+    </div>
+    <div class="retro-card-body">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-success"><div class="retro-alert-content">@TempData["SuccessMessage"]</div></div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-danger"><div class="retro-alert-content">@TempData["ErrorMessage"]</div></div>
+        }
+
+        @if (Model.Registration != null)
+        {
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="retro-card">
+                        <div class="retro-card-header"><strong><i class="fas fa-user"></i> Thông tin học viên</strong></div>
+                        <div class="retro-card-body">
+                            <div><strong>Họ tên:</strong> @Model.Registration.StudentName</div>
+                            <div><strong>Email:</strong> @Model.Registration.Email</div>
+                            <div><strong>SĐT:</strong> @Model.Registration.PhoneNumber</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="retro-card">
+                        <div class="retro-card-header"><strong><i class="fas fa-chalkboard-teacher"></i> Lớp & Khóa học</strong></div>
+                        <div class="retro-card-body">
+                            <div><strong>Khóa:</strong> @Model.Registration.CourseName</div>
+                            <div><strong>Lớp:</strong> @Model.Registration.ClassName</div>
+                            <div><strong>Ngày đăng ký:</strong> @(Model.Registration.RegistrationDate?.ToString("dd/MM/yyyy"))</div>
+                            <div><strong>Học phí tiêu chuẩn:</strong> @Model.Registration.StandardFee.ToString("N0") đ</div>
+                            <div><strong>Trạng thái đơn:</strong> @Model.Registration.Status</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="vintage-divider"></div>
+
+            @if (Model.Invoice != null)
+            {
+                <div class="retro-alert retro-alert-info">
+                    <div class="retro-alert-content">
+                        <i class="fas fa-check-circle"></i> Đã có hóa đơn: <strong>@Model.Invoice.InvoiceCode</strong>
+                        <button class="btn btn-sm btn-primary float-end" onclick="printInvoice()"><i class="fas fa-print"></i> In hóa đơn</button>
+                    </div>
+                </div>
+                <div class="retro-card">
+                    <div class="retro-card-header"><strong><i class="fas fa-receipt"></i> Chi tiết hóa đơn</strong></div>
+                    <div class="retro-card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4"><strong>Mã hóa đơn:</strong> @Model.Invoice.InvoiceCode</div>
+                            <div class="col-md-4"><strong>Ngày tạo:</strong> @Model.Invoice.CreatedDate?.ToString("dd/MM/yyyy HH:mm")</div>
+                            <div class="col-md-4"><strong>Đến hạn:</strong> @Model.Invoice.DueDate?.ToString("dd/MM/yyyy")</div>
+                            <div class="col-md-4"><strong>Số tiền:</strong> @Model.Invoice.Amount.ToString("N0") đ</div>
+                            <div class="col-md-4"><strong>Trạng thái:</strong> @Model.Invoice.Status</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Phần chữ ký số -->
+                @if (Model.Signature != null)
+                {
+                    <div class="retro-card mt-3">
+                        <div class="retro-card-header">
+                            <strong><i class="fas fa-signature"></i> Chữ ký số</strong>
+                        </div>
+                        <div class="retro-card-body">
+                            @if (Model.Signature.IsSigned)
+                            {
+                                <div class="row g-3">
+                                    <div class="col-md-12">
+                                        @if (Model.Signature.IsValid)
+                                        {
+                                            <div class="retro-alert retro-alert-success">
+                                                <div class="retro-alert-content">
+                                                    <i class="fas fa-shield-alt"></i> <strong>Chữ ký hợp lệ</strong> - Hóa đơn đã được ký số
+                                                </div>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="retro-alert retro-alert-danger">
+                                                <div class="retro-alert-content">
+                                                    <i class="fas fa-exclamation-triangle"></i> <strong>Chữ ký không hợp lệ</strong> - Có thể hóa đơn đã bị thay đổi
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                    <div class="col-md-6"><strong>Người ký:</strong> @Model.Signature.SignedBy</div>
+                                    <div class="col-md-6"><strong>Ngày ký:</strong> @Model.Signature.SignedDate?.ToString("dd/MM/yyyy HH:mm")</div>
+                                    <div class="col-md-6"><strong>Thuật toán:</strong> @Model.Signature.Algorithm</div>
+                                    <div class="col-md-6"><strong>Trạng thái:</strong> 
+                                        <span class="badge @(Model.Signature.IsValid ? "bg-success" : "bg-danger")">
+                                            @(Model.Signature.IsValid ? "Hợp lệ" : "Không hợp lệ")
+                                        </span>
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="retro-alert retro-alert-warning">
+                                    <div class="retro-alert-content">
+                                        <i class="fas fa-exclamation-circle"></i> Hóa đơn chưa được ký số
+                                    </div>
+                                </div>
+                                
+                                <!-- Form ký hóa đơn -->
+                                <form asp-controller="Accountant" asp-action="SignInvoice" method="post" class="mt-3">
+                                    <input type="hidden" name="InvoiceId" value="@Model.Invoice.InvoiceId" />
+                                    <input type="hidden" name="AccountantId" value="1" /> <!-- TODO: Lấy từ session -->
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label"><i class="fas fa-key"></i> Đường dẫn file Private Key</label>
+                                        <input name="PrivateKeyPath" type="text" class="form-control" 
+                                               placeholder="C:\Users\ketoan\keys\private_key.pem" required />
+                                        <div class="form-text">Chọn file private key (.pem hoặc .key) đã lưu trên máy của bạn</div>
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-signature"></i> Ký số hóa đơn
+                                    </button>
+                                </form>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+            else if (string.Equals(Model.Registration.Status, "Đã duyệt", StringComparison.OrdinalIgnoreCase))
+            {
+                <!-- Tab cho 2 lựa chọn: Tạo thường hoặc Tạo + Ký -->
+                <ul class="nav nav-tabs" id="invoiceTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="normal-tab" data-bs-toggle="tab" data-bs-target="#normal" type="button" role="tab">
+                            <i class="fas fa-file-invoice"></i> Tạo hóa đơn thường
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="sign-tab" data-bs-toggle="tab" data-bs-target="#sign" type="button" role="tab">
+                            <i class="fas fa-signature"></i> Tạo và ký số
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="invoiceTabsContent">
+                    <!-- Tab tạo hóa đơn thường -->
+                    <div class="tab-pane fade show active" id="normal" role="tabpanel">
+                        <form asp-controller="Accountant" asp-action="CreateInvoice" method="post" class="retro-card">
+                            <div class="retro-card-header"><strong><i class="fas fa-plus-circle"></i> Xuất hóa đơn</strong></div>
+                            <div class="retro-card-body">
+                                <input type="hidden" name="registrationId" value="@Model.Registration.RegistrationId" />
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Ngày đến hạn</label>
+                                        <input name="dueDate" type="date" class="form-control" value="@Model.SuggestedDueDate?.ToString("yyyy-MM-dd")" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Số tiền</label>
+                                        <input name="amount" type="number" min="0" step="10000" class="form-control" value="@Model.SuggestedAmount" />
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <button class="btn btn-success"><i class="fas fa-file-invoice-dollar"></i> Tạo hóa đơn</button>
+                                    <a class="btn btn-outline-secondary" asp-controller="Accountant" asp-action="Index">Quay lại</a>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Tab tạo và ký số -->
+                    <div class="tab-pane fade" id="sign" role="tabpanel">
+                        <form asp-controller="Accountant" asp-action="CreateAndSignInvoice" method="post" class="retro-card">
+                            <div class="retro-card-header"><strong><i class="fas fa-signature"></i> Tạo và ký số hóa đơn</strong></div>
+                            <div class="retro-card-body">
+                                <input type="hidden" name="RegistrationId" value="@Model.Registration.RegistrationId" />
+                                <!-- Bỏ hardcode AccountantId, sẽ được lấy từ session trong controller -->
+                                
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Ngày đến hạn</label>
+                                        <input name="DueDate" type="date" class="form-control" value="@Model.SuggestedDueDate?.ToString("yyyy-MM-dd")" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Số tiền</label>
+                                        <input name="Amount" type="number" min="0" step="10000" class="form-control" value="@Model.SuggestedAmount" />
+                                    </div>
+                                    <div class="col-md-12">
+                                        <label class="form-label"><i class="fas fa-key"></i> Đường dẫn file Private Key</label>
+                                        <input name="PrivateKeyPath" type="text" class="form-control" 
+                                               placeholder="C:\Users\ketoan\keys\private_key.pem" required />
+                                        <div class="form-text">Chọn file private key (.pem hoặc .key) đã lưu trên máy của bạn</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-3">
+                                    <button class="btn btn-primary"><i class="fas fa-signature"></i> Tạo và ký hóa đơn</button>
+                                    <a class="btn btn-outline-secondary" asp-controller="Accountant" asp-action="Index">Quay lại</a>
+                                </div>
+                                
+                                <div class="retro-alert retro-alert-info mt-3">
+                                    <div class="retro-alert-content">
+                                        <i class="fas fa-info-circle"></i> Chế độ này sẽ tạo hóa đơn và ký số cùng lúc. Đảm bảo bạn đã có file private key trên máy.
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="retro-alert retro-alert-warning">
+                    <div class="retro-alert-content"><i class="fas fa-exclamation-triangle"></i> Đơn chưa được duyệt. Chỉ có thể xuất hóa đơn khi đơn ở trạng thái Đã duyệt.</div>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="retro-alert retro-alert-danger"><div class="retro-alert-content">Không tìm thấy dữ liệu đơn đăng ký.</div></div>
+        }
+    </div>
+</div>
+
+<script>
+function printInvoice() {
+    const w = window.open('', '_blank');
+    const html = `
+    <html>
+    <head>
+      <meta charset="utf-8" />
+      <title>Hóa đơn - @Model?.Invoice?.InvoiceCode</title>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 24px; }
+        .header { text-align:center; margin-bottom: 24px; }
+        .row { display:flex; flex-wrap: wrap; margin: 0 -8px; }
+        .col { flex: 1 0 50%; padding: 0 8px; box-sizing: border-box; }
+        .section { margin-bottom: 16px; }
+        .title { font-weight:bold; margin-bottom:8px; border-bottom:1px solid #ddd; padding-bottom:6px; }
+        .kv { margin:4px 0; }
+        .sig { border-top:2px solid #007bff; margin-top:24px; padding-top:16px; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h2>HÓA ĐƠN HỌC PHÍ</h2>
+        <div>TRUNG TÂM ĐÀO TẠO</div>
+      </div>
+
+      <div class="section">
+        <div class="title">Thông tin hóa đơn</div>
+        <div class="row">
+          <div class="col">
+            <div class="kv"><strong>Mã hóa đơn:</strong> @Model?.Invoice?.InvoiceCode</div>
+            <div class="kv"><strong>Ngày tạo:</strong> @Model?.Invoice?.CreatedDate?.ToString("dd/MM/yyyy HH:mm")</div>
+            <div class="kv"><strong>Đến hạn:</strong> @Model?.Invoice?.DueDate?.ToString("dd/MM/yyyy")</div>
+          </div>
+          <div class="col">
+            <div class="kv"><strong>Số tiền:</strong> @Model?.Invoice?.Amount.ToString("N0") đ</div>
+            <div class="kv"><strong>Trạng thái:</strong> @Model?.Invoice?.Status</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="title">Thông tin học viên</div>
+        <div class="row">
+          <div class="col">
+            <div class="kv"><strong>Họ tên:</strong> @Model?.Registration?.StudentName</div>
+            <div class="kv"><strong>Email:</strong> @Model?.Registration?.Email</div>
+            <div class="kv"><strong>SĐT:</strong> @Model?.Registration?.PhoneNumber</div>
+          </div>
+          <div class="col">
+            <div class="kv"><strong>Khóa học:</strong> @Model?.Registration?.CourseName</div>
+            <div class="kv"><strong>Lớp:</strong> @Model?.Registration?.ClassName</div>
+            <div class="kv"><strong>Ngày đăng ký:</strong> @Model?.Registration?.RegistrationDate?.ToString("dd/MM/yyyy")</div>
+          </div>
+        </div>
+      </div>
+
+      @if (Model?.Signature?.IsSigned == true) {
+      <div class="sig">
+        <div class="title">Thông tin chữ ký số</div>
+        <div class="row">
+          <div class="col">
+            <div class="kv"><strong>Trạng thái:</strong> @(Model.Signature.IsValid ? "Chữ ký hợp lệ" : "Chữ ký không hợp lệ")</div>
+            <div class="kv"><strong>Người ký:</strong> @Model.Signature.SignedBy</div>
+          </div>
+          <div class="col">
+            <div class="kv"><strong>Ngày ký:</strong> @Model.Signature.SignedDate?.ToString("dd/MM/yyyy HH:mm")</div>
+            <div class="kv"><strong>Thuật toán:</strong> @Model.Signature.Algorithm</div>
+          </div>
+        </div>
+      </div>
+      }
+
+      <script>
+        window.onload = function(){ window.print(); }
+      <\/script>
+    </body>
+    </html>`;
+    w.document.write(html);
+    w.document.close();
+}
+</script>
+
+<script>
+// Script để hỗ trợ file picker
+document.querySelectorAll('input[name="PrivateKeyPath"]').forEach(input => {
+    input.addEventListener('click', function() {
+        this.placeholder = 'Nhập đường dẫn đầy đủ đến file private key...';
+    });
+});
+</script>

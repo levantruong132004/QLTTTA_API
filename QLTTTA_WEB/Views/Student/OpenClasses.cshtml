@@ -1,0 +1,51 @@
+@model IEnumerable<QLTTTA_WEB.Models.OpenClassItem>
+@{
+    ViewData["Title"] = "Chọn lớp đang tuyển sinh";
+}
+<div class="retro-card">
+    <div class="retro-card-header">
+        <h2 class="retro-title"><i class="fas fa-users"></i> Lớp đang tuyển sinh (@ViewBag.CourseCode)</h2>
+    </div>
+    <div class="retro-card-body">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success">@TempData["SuccessMessage"]</div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+        }
+
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Mã lớp</th>
+                    <th>Tên lớp</th>
+                    <th>Khóa</th>
+                    <th>Lịch học</th>
+                    <th>Sĩ số tối đa</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var c in Model)
+                {
+                    <tr>
+                        <td>@c.ClassCode</td>
+                        <td>@c.ClassName</td>
+                        <td>@c.CourseName</td>
+                        <td>@c.ScheduleText</td>
+                        <td>@c.MaxSize</td>
+                        <td>
+                            <form asp-action="RegisterClass" method="post">
+                                <input type="hidden" name="classId" value="@c.ClassId" />
+                                <input type="hidden" name="courseCode" value="@ViewBag.CourseCode" />
+                                <button class="btn btn-sm btn-success">Đăng ký</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

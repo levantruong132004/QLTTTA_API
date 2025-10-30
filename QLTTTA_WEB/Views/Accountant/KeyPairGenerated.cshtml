@@ -1,0 +1,183 @@
+@model QLTTTA_WEB.Models.GenerateKeyPairViewModel
+@{
+    ViewData["Title"] = "Cặp khóa RSA đã tạo";
+}
+
+<div class="retro-card corner-decorated">
+    <div class="retro-card-header text-center">
+        <h2 class="retro-card-title"><i class="fas fa-check-circle text-success"></i> Tạo cặp khóa thành công</h2>
+    </div>
+    <div class="retro-card-body">
+        <div class="retro-alert retro-alert-success">
+            <div class="retro-alert-content">
+                <i class="fas fa-check-circle"></i> @Model.Message
+            </div>
+        </div>
+
+        <!-- Public Key -->
+        <div class="retro-card mb-4">
+            <div class="retro-card-header">
+                <strong><i class="fas fa-globe"></i> Public Key (Khóa công khai)</strong>
+                <button class="btn btn-sm btn-outline-primary float-end" onclick="copyToClipboard('publicKey')">
+                    <i class="fas fa-copy"></i> Copy
+                </button>
+            </div>
+            <div class="retro-card-body">
+                <div class="retro-alert retro-alert-info">
+                    <div class="retro-alert-content">
+                        <i class="fas fa-database"></i> <strong>Lưu vào Database:</strong> Copy public key này và cập nhật vào bảng KE_TOAN
+                    </div>
+                </div>
+                <textarea id="publicKey" class="form-control font-monospace" rows="8" readonly>@Model.PublicKey</textarea>
+                
+                <div class="mt-3">
+                    <h6><i class="fas fa-terminal"></i> SQL để cập nhật database:</h6>
+                    <div class="bg-dark text-light p-3 rounded">
+                        <code>
+UPDATE KE_TOAN 
+SET KHOA_CONG_PEM = '@Model.PublicKey'
+WHERE ID_KE_TOAN = 1; -- Thay bằng ID kế toán của bạn
+
+COMMIT;
+                        </code>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Private Key -->
+        <div class="retro-card mb-4">
+            <div class="retro-card-header">
+                <strong><i class="fas fa-lock text-danger"></i> Private Key (Khóa bí mật)</strong>
+                <button class="btn btn-sm btn-outline-primary float-end" onclick="copyToClipboard('privateKey')">
+                    <i class="fas fa-copy"></i> Copy
+                </button>
+            </div>
+            <div class="retro-card-body">
+                <div class="retro-alert retro-alert-danger">
+                    <div class="retro-alert-content">
+                        <i class="fas fa-exclamation-triangle"></i> 
+                        <strong>BẢO MẬT TUYỆT ĐỐI:</strong> Lưu file này trên máy cá nhân và không chia sẻ với ai!
+                    </div>
+                </div>
+                <textarea id="privateKey" class="form-control font-monospace" rows="12" readonly>@Model.PrivateKey</textarea>
+                
+                <div class="mt-3">
+                    <h6><i class="fas fa-save"></i> Hướng dẫn lưu Private Key:</h6>
+                    <ol>
+                        <li>Copy toàn bộ nội dung private key ở trên</li>
+                        <li>Tạo file mới với tên: <code>private_key.pem</code></li>
+                        <li>Paste nội dung vào file và lưu</li>
+                        <li>Đặt file ở vị trí an toàn, ví dụ: <code>C:\Users\ketoan\keys\private_key.pem</code></li>
+                        <li>Backup file này ở nơi an toàn khác</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hướng dẫn tiếp theo -->
+        <div class="retro-card">
+            <div class="retro-card-header">
+                <strong><i class="fas fa-arrow-right"></i> Bước tiếp theo</strong>
+            </div>
+            <div class="retro-card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="d-grid">
+                            <button class="btn btn-primary" onclick="downloadPrivateKey()">
+                                <i class="fas fa-download"></i> Tải Private Key xuống máy
+                            </button>
+                        </div>
+                        <small class="text-muted">Tải file .pem để lưu trên máy cá nhân</small>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-grid">
+                            <a class="btn btn-success" asp-controller="Accountant" asp-action="Index">
+                                <i class="fas fa-file-invoice"></i> Bắt đầu ký hóa đơn
+                            </a>
+                        </div>
+                        <small class="text-muted">Quay lại danh sách để ký hóa đơn</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Checklist -->
+        <div class="retro-card mt-4">
+            <div class="retro-card-header">
+                <strong><i class="fas fa-tasks"></i> Checklist hoàn thành</strong>
+            </div>
+            <div class="retro-card-body">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="check1">
+                    <label class="form-check-label" for="check1">
+                        Đã copy và cập nhật Public Key vào database
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="check2">
+                    <label class="form-check-label" for="check2">
+                        Đã lưu Private Key vào file trên máy cá nhân
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="check3">
+                    <label class="form-check-label" for="check3">
+                        Đã backup Private Key ở nơi an toàn
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="check4">
+                    <label class="form-check-label" for="check4">
+                        Đã test ký một hóa đơn thử nghiệm
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Copy to clipboard function
+function copyToClipboard(elementId) {
+    const element = document.getElementById(elementId);
+    element.select();
+    element.setSelectionRange(0, 99999); // For mobile devices
+    navigator.clipboard.writeText(element.value).then(function() {
+        // Show success message
+        const btn = event.target.closest('button');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+        btn.classList.remove('btn-outline-primary');
+        btn.classList.add('btn-success');
+        
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-outline-primary');
+        }, 2000);
+    });
+}
+
+// Download private key as file
+function downloadPrivateKey() {
+    const privateKey = document.getElementById('privateKey').value;
+    const blob = new Blob([privateKey], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'private_key.pem';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    
+    // Update checklist
+    document.getElementById('check2').checked = true;
+}
+
+// Auto-check first item when SQL is copied
+document.getElementById('publicKey').addEventListener('copy', function() {
+    document.getElementById('check1').checked = true;
+});
+</script>
