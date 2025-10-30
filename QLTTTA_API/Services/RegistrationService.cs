@@ -116,13 +116,16 @@ namespace QLTTTA_API.Services
                     return new ApiResponse<bool> { Success = false, Message = "Lớp đã đủ sĩ số" };
                 }
 
-                // Lấy ID nhân viên từ SESSION_ID_HIENTAI
+                // Lấy ID nhân viên theo session per-device
                 var sid = _httpContextAccessor.HttpContext?.Request?.Headers["X-Session-Id"].FirstOrDefault();
+                var deviceType = _httpContextAccessor.HttpContext?.Request?.Headers["X-Device-Type"].FirstOrDefault()?.Trim().ToLowerInvariant() ?? "pc";
+                if (deviceType != "pc" && deviceType != "mobile") deviceType = "pc";
                 int staffId = 0;
                 int? staffIdForUpdate = null;
                 if (!string.IsNullOrWhiteSpace(sid))
                 {
-                    using var findStaff = new OracleCommand("SELECT ID_NGUOI_DUNG FROM TAI_KHOAN WHERE SESSION_ID_HIENTAI = :sid", conn) { BindByName = true };
+                    var columnName = deviceType == "mobile" ? "SESSION_ID_MOBILE" : "SESSION_ID_PC";
+                    using var findStaff = new OracleCommand($"SELECT ID_NGUOI_DUNG FROM TAI_KHOAN WHERE {columnName} = :sid", conn) { BindByName = true };
                     findStaff.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sid;
                     var obj = await findStaff.ExecuteScalarAsync();
                     if (obj != null && obj != DBNull.Value)
@@ -187,13 +190,16 @@ namespace QLTTTA_API.Services
             try
             {
                 using var conn = await GetAdminConnectionAsync();
-                // Lấy ID nhân viên từ SESSION_ID_HIENTAI
+                // Lấy ID nhân viên theo session per-device
                 var sid = _httpContextAccessor.HttpContext?.Request?.Headers["X-Session-Id"].FirstOrDefault();
+                var deviceType = _httpContextAccessor.HttpContext?.Request?.Headers["X-Device-Type"].FirstOrDefault()?.Trim().ToLowerInvariant() ?? "pc";
+                if (deviceType != "pc" && deviceType != "mobile") deviceType = "pc";
                 int staffId = 0;
                 int? staffIdForUpdate = null;
                 if (!string.IsNullOrWhiteSpace(sid))
                 {
-                    using var findStaff = new OracleCommand("SELECT ID_NGUOI_DUNG FROM TAI_KHOAN WHERE SESSION_ID_HIENTAI = :sid", conn) { BindByName = true };
+                    var columnName = deviceType == "mobile" ? "SESSION_ID_MOBILE" : "SESSION_ID_PC";
+                    using var findStaff = new OracleCommand($"SELECT ID_NGUOI_DUNG FROM TAI_KHOAN WHERE {columnName} = :sid", conn) { BindByName = true };
                     findStaff.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sid;
                     var obj = await findStaff.ExecuteScalarAsync();
                     if (obj != null && obj != DBNull.Value)
@@ -233,10 +239,13 @@ namespace QLTTTA_API.Services
         public async Task<List<Registration>> GetMyRegistrationsAsync()
         {
             using var conn = await GetAdminConnectionAsync();
-            // Xác định học viên theo SESSION_ID_HIENTAI từ header
+            // Xác định học viên theo session per-device từ header
             int hvId = 0;
             var sid = _httpContextAccessor.HttpContext?.Request?.Headers["X-Session-Id"].FirstOrDefault();
-            using (var cmd = new OracleCommand("SELECT ID_NGUOI_DUNG FROM TAI_KHOAN WHERE SESSION_ID_HIENTAI = :sid", conn) { BindByName = true })
+            var deviceType = _httpContextAccessor.HttpContext?.Request?.Headers["X-Device-Type"].FirstOrDefault()?.Trim().ToLowerInvariant() ?? "pc";
+            if (deviceType != "pc" && deviceType != "mobile") deviceType = "pc";
+            var columnName = deviceType == "mobile" ? "SESSION_ID_MOBILE" : "SESSION_ID_PC";
+            using (var cmd = new OracleCommand($"SELECT ID_NGUOI_DUNG FROM TAI_KHOAN WHERE {columnName} = :sid", conn) { BindByName = true })
             {
                 cmd.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sid ?? string.Empty;
                 var scalar = await cmd.ExecuteScalarAsync();

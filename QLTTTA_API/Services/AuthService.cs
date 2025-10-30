@@ -22,11 +22,12 @@ namespace QLTTTA_API.Services
         /// </summary>
         Task<string> TestDatabaseAsync();
         /// <summary>
-        /// Kiểm tra phiên hiện tại còn hợp lệ không bằng cách đối chiếu SESSION_ID_HIENTAI trong DB.
+        /// Kiểm tra phiên hiện tại còn hợp lệ không theo loại thiết bị (pc/mobile).
+        /// Kiểm tra theo cột SESSION_ID_PC hoặc SESSION_ID_MOBILE tùy deviceType.
         /// </summary>
-        Task<bool> CheckSessionAsync(string username, string sessionId);
+        Task<bool> CheckSessionAsync(string username, string sessionId, string? deviceType = null);
         /// <summary>
-        /// Đăng xuất: xóa credential cache theo SessionId (không xóa SESSION_ID_HIENTAI trong DB theo yêu cầu mới).
+        /// Đăng xuất: xóa credential cache theo SessionId (không xóa SESSION_ID_PC/SESSION_ID_MOBILE trong DB theo yêu cầu).
         /// </summary>
         Task LogoutAsync(string username, string sessionId);
 
@@ -62,12 +63,14 @@ namespace QLTTTA_API.Services
 
         /// <summary>
         /// Xác thực đăng nhập: kiểm tra tồn tại Oracle USER, thử mở kết nối bằng credential học viên;
-        /// sau đó cập nhật SESSION_ID_HIENTAI (có khóa hàng & retry) và lưu credential vào cache.
+        /// sau đó cập nhật SESSION_ID theo loại thiết bị (SESSION_ID_PC/SESSION_ID_MOBILE) với khóa hàng & retry, và lưu credential vào cache.
         /// </summary>
         public async Task<LoginResponse> AuthenticateAsync(LoginRequest request)
         {
             try
             {
+                var deviceType = (request.DeviceType ?? "pc").Trim().ToLowerInvariant();
+                if (deviceType != "pc" && deviceType != "mobile") deviceType = "pc";
                 // 1) Thử kết nối bằng tài khoản người dùng để xác thực username/password thật
                 _logger.LogInformation("Login attempt - Username: {Username}", request.Username);
                 // Kiểm tra USER Oracle có tồn tại không (tránh trường hợp chỉ tạo dòng trong TAI_KHOAN)
@@ -134,8 +137,8 @@ namespace QLTTTA_API.Services
                     return new LoginResponse { Success = false, Message = "Không thể kết nối. Vui lòng thử lại." };
                 }
 
-                // 2) Dùng kết nối quản trị để lấy thông tin và cập nhật SESSION_ID_HIENTAI, kiểm tra TRANG_THAI_KICH_HOAT
-                // Kết nối admin để truy vấn bảng TAI_KHOAN & cập nhật SESSION_ID_HIENTAI
+                // 2) Dùng kết nối quản trị để lấy thông tin và cập nhật SESSION_ID_{PC|MOBILE}, kiểm tra TRANG_THAI_KICH_HOAT
+                // Kết nối admin để truy vấn bảng TAI_KHOAN & cập nhật session theo loại thiết bị
                 using var adminConn = new OracleConnection(_connectionString);
                 await adminConn.OpenAsync();
 
@@ -183,7 +186,7 @@ namespace QLTTTA_API.Services
                     FullName = (ordFull >= 0 && !rdr.IsDBNull(ordFull)) ? rdr.GetString(ordFull) : string.Empty
                 };
 
-                // Tạo và lưu Session ID mới (ngăn đăng nhập đồng thời) trong transaction để tránh race và cập nhật sai
+                // Tạo và lưu Session ID mới (ngăn đăng nhập đồng thời theo từng loại thiết bị) trong transaction để tránh race
                 var sessionId = Guid.NewGuid().ToString("N"); // SessionId duy nhất dùng làm khóa tra cache & kiểm tra phiên
                 var maxAttempts = 3;
                 var attempt = 0;
@@ -192,16 +195,31 @@ namespace QLTTTA_API.Services
                 {
                     attempt++;
                     using var tx = adminConn.BeginTransaction();
-                    using var lockCmd = new OracleCommand("SELECT 1 FROM TAI_KHOAN WHERE ID_NGUOI_DUNG = :id FOR UPDATE WAIT 1", adminConn);
-                    using var upCmd = new OracleCommand("UPDATE TAI_KHOAN SET SESSION_ID_HIENTAI = :sid WHERE ID_NGUOI_DUNG = :id", adminConn);
+                    // Khóa dòng để kiểm tra/ghi phiên theo loại thiết bị
+                    using var lockCmd = new OracleCommand("SELECT SESSION_ID_PC, SESSION_ID_MOBILE FROM TAI_KHOAN WHERE ID_NGUOI_DUNG = :id FOR UPDATE WAIT 1", adminConn) { BindByName = true };
+                    lockCmd.Parameters.Add(":id", OracleDbType.Int32).Value = userInfo.UserId;
 
                     lockCmd.Transaction = tx;
-                    lockCmd.BindByName = true;
-                    lockCmd.Parameters.Add(":id", OracleDbType.Int32).Value = userInfo.UserId;
                     lockCmd.CommandTimeout = 3;
                     try
                     {
-                        await lockCmd.ExecuteScalarAsync(); // Khóa hàng tránh race condition khi 2 nơi cùng đăng nhập
+                        // Đọc phiên cũ nếu cần dùng cho log (không chặn đăng nhập mới)
+                        using (var rdr2 = await lockCmd.ExecuteReaderAsync(CommandBehavior.SingleRow))
+                        {
+                            if (await rdr2.ReadAsync())
+                            {
+                                var existingPc = rdr2.IsDBNull(0) ? null : rdr2.GetString(0);
+                                var existingMobile = rdr2.IsDBNull(1) ? null : rdr2.GetString(1);
+                                if (deviceType == "pc" && !string.IsNullOrEmpty(existingPc))
+                                {
+                                    _logger.LogInformation("Replacing existing PC session for userId={UserId}", userInfo.UserId);
+                                }
+                                if (deviceType == "mobile" && !string.IsNullOrEmpty(existingMobile))
+                                {
+                                    _logger.LogInformation("Replacing existing Mobile session for userId={UserId}", userInfo.UserId);
+                                }
+                            }
+                        }
                     }
                     catch (OracleException oex) when (oex.Number == 54 || oex.Number == 30006)
                     {
@@ -215,11 +233,13 @@ namespace QLTTTA_API.Services
                         continue;
                     }
 
-                    upCmd.Transaction = tx;
-                    upCmd.BindByName = true;
+                    // Ghi session theo loại thiết bị
+                    var sqlUpdate = deviceType == "mobile"
+                        ? "UPDATE TAI_KHOAN SET SESSION_ID_MOBILE = :sid WHERE ID_NGUOI_DUNG = :id"
+                        : "UPDATE TAI_KHOAN SET SESSION_ID_PC = :sid WHERE ID_NGUOI_DUNG = :id";
+                    using var upCmd = new OracleCommand(sqlUpdate, adminConn) { Transaction = tx, BindByName = true, CommandTimeout = 3 };
                     upCmd.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sessionId;
                     upCmd.Parameters.Add(":id", OracleDbType.Int32).Value = userInfo.UserId;
-                    upCmd.CommandTimeout = 3;
                     var affected = await upCmd.ExecuteNonQueryAsync();
                     if (affected == 1)
                     {
@@ -394,21 +414,27 @@ namespace QLTTTA_API.Services
         }
 
         /// <summary>
-        /// Kiểm tra phiên (SessionId) của người dùng còn khớp trong DB (TAI_KHOAN.SESSION_ID_HIENTAI) hay không.
+        /// Kiểm tra phiên (SessionId) của người dùng còn khớp trong DB hay không.
+        /// Chỉ kiểm tra theo cột SESSION_ID_PC/SESSION_ID_MOBILE tùy deviceType.
         /// </summary>
-        public async Task<bool> CheckSessionAsync(string username, string sessionId)
+        public async Task<bool> CheckSessionAsync(string username, string sessionId, string? deviceType = null)
         {
             try
             {
+                deviceType = (deviceType ?? "pc").Trim().ToLowerInvariant();
+                if (deviceType != "pc" && deviceType != "mobile") deviceType = "pc";
+
                 using var connection = new OracleConnection(_connectionString);
                 await connection.OpenAsync();
-                var sql = "SELECT SESSION_ID_HIENTAI FROM TAI_KHOAN WHERE TEN_DANG_NHAP = :u";
-                using var cmd = new OracleCommand(sql, connection) { BindByName = true };
-                cmd.Parameters.Add(":u", OracleDbType.Varchar2).Value = username?.Trim();
-                var dbVal = await cmd.ExecuteScalarAsync();
-                var currentSid = dbVal?.ToString();
-                if (string.IsNullOrEmpty(currentSid)) return false; // chưa có phiên hợp lệ
-                return string.Equals(currentSid, sessionId, StringComparison.Ordinal);
+
+                var columnName = deviceType == "mobile" ? "SESSION_ID_MOBILE" : "SESSION_ID_PC";
+                var sqlNew = $"SELECT {columnName} FROM TAI_KHOAN WHERE TEN_DANG_NHAP = :u";
+                using var cmdNew = new OracleCommand(sqlNew, connection) { BindByName = true };
+                cmdNew.Parameters.Add(":u", OracleDbType.Varchar2).Value = username?.Trim();
+                var dbValNew = await cmdNew.ExecuteScalarAsync();
+                var currentSidNew = dbValNew?.ToString();
+                if (string.IsNullOrEmpty(currentSidNew)) return false;
+                return string.Equals(currentSidNew, sessionId, StringComparison.Ordinal);
             }
             catch (Exception ex)
             {

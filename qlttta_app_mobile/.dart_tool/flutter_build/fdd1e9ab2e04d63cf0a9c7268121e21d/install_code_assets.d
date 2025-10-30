@@ -1,0 +1,1 @@
+ D:\\Doan_KLTN\\QLTTTA_API\\qlttta_app_mobile\\.dart_tool\\flutter_build\\fdd1e9ab2e04d63cf0a9c7268121e21d\\native_assets.json: 

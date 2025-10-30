@@ -277,7 +277,10 @@ WHERE UPPER(TEN_DANG_NHAP) = USER";
                             return (false, "Phiên đăng nhập không hợp lệ hoặc đã hết hạn");
                         }
                         using var adminConn = await GetAdminConnectionAsync();
-                        using var findCmd = new OracleCommand("SELECT ID_NGUOI_DUNG FROM TAI_KHOAN WHERE SESSION_ID_HIENTAI = :sid", adminConn) { BindByName = true };
+                        var deviceType = _httpContextAccessor.HttpContext?.Request?.Headers["X-Device-Type"].FirstOrDefault()?.Trim().ToLowerInvariant() ?? "pc";
+                        if (deviceType != "pc" && deviceType != "mobile") deviceType = "pc";
+                        var columnName = deviceType == "mobile" ? "SESSION_ID_MOBILE" : "SESSION_ID_PC";
+                        using var findCmd = new OracleCommand($"SELECT ID_NGUOI_DUNG FROM TAI_KHOAN WHERE {columnName} = :sid", adminConn) { BindByName = true };
                         findCmd.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sessionId;
                         var obj = await findCmd.ExecuteScalarAsync();
                         if (obj == null || obj == DBNull.Value)
@@ -288,14 +291,17 @@ WHERE UPPER(TEN_DANG_NHAP) = USER";
                     }
                     catch (OracleException oex) when (oex.Number == 942 || oex.Number == 1031)
                     {
-                        // 2) Fallback: dùng SESSION_ID_HIENTAI qua kết nối admin
+                        // 2) Fallback theo cơ chế session header nhưng vẫn theo cột per-device
                         var sessionId = _httpContextAccessor.HttpContext?.Request?.Headers["X-Session-Id"].FirstOrDefault();
                         if (string.IsNullOrWhiteSpace(sessionId))
                         {
                             return (false, "Phiên đăng nhập không hợp lệ hoặc đã hết hạn");
                         }
                         using var adminConn = await GetAdminConnectionAsync();
-                        using var findCmd = new OracleCommand("SELECT ID_NGUOI_DUNG FROM TAI_KHOAN WHERE SESSION_ID_HIENTAI = :sid", adminConn) { BindByName = true };
+                        var deviceType2 = _httpContextAccessor.HttpContext?.Request?.Headers["X-Device-Type"].FirstOrDefault()?.Trim().ToLowerInvariant() ?? "pc";
+                        if (deviceType2 != "pc" && deviceType2 != "mobile") deviceType2 = "pc";
+                        var columnName2 = deviceType2 == "mobile" ? "SESSION_ID_MOBILE" : "SESSION_ID_PC";
+                        using var findCmd = new OracleCommand($"SELECT ID_NGUOI_DUNG FROM TAI_KHOAN WHERE {columnName2} = :sid", adminConn) { BindByName = true };
                         findCmd.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sessionId;
                         var obj = await findCmd.ExecuteScalarAsync();
                         if (obj == null || obj == DBNull.Value)
@@ -359,7 +365,7 @@ WHERE UPPER(TEN_DANG_NHAP) = USER";
                 using var conn = await GetConnectionAsync();
                 using var cmd = new OracleCommand(sql, conn);
                 using var reader = await cmd.ExecuteReaderAsync();
-                
+
                 var registrations = new List<StudentRegistrationWithInvoiceDto>();
                 while (await reader.ReadAsync())
                 {
@@ -378,7 +384,7 @@ WHERE UPPER(TEN_DANG_NHAP) = USER";
                         HasDigitalSignature = reader.IsDBNull(10) ? false : reader.GetInt32(10) == 1
                     });
                 }
-                
+
                 return registrations;
             }
             catch (Exception ex)
@@ -401,7 +407,10 @@ WHERE UPPER(TEN_DANG_NHAP) = USER";
                     if (!string.IsNullOrWhiteSpace(sessionId))
                     {
                         using var adminConn = await GetAdminConnectionAsync();
-                        using var findCmd = new Oracle.ManagedDataAccess.Client.OracleCommand("SELECT ID_NGUOI_DUNG FROM TAI_KHOAN WHERE SESSION_ID_HIENTAI = :sid", adminConn) { BindByName = true };
+                        var deviceType3 = _httpContextAccessor.HttpContext?.Request?.Headers["X-Device-Type"].FirstOrDefault()?.Trim().ToLowerInvariant() ?? "pc";
+                        if (deviceType3 != "pc" && deviceType3 != "mobile") deviceType3 = "pc";
+                        var columnName3 = deviceType3 == "mobile" ? "SESSION_ID_MOBILE" : "SESSION_ID_PC";
+                        using var findCmd = new Oracle.ManagedDataAccess.Client.OracleCommand($"SELECT ID_NGUOI_DUNG FROM TAI_KHOAN WHERE {columnName3} = :sid", adminConn) { BindByName = true };
                         findCmd.Parameters.Add(":sid", Oracle.ManagedDataAccess.Client.OracleDbType.Varchar2).Value = sessionId;
                         var obj = await findCmd.ExecuteScalarAsync();
                         if (obj != null && obj != DBNull.Value)
@@ -447,7 +456,7 @@ WHERE UPPER(TEN_DANG_NHAP) = USER";
                 if (hvId.HasValue)
                     cmd.Parameters.Add(":hvId", Oracle.ManagedDataAccess.Client.OracleDbType.Int32).Value = hvId.Value;
                 using var reader = await cmd.ExecuteReaderAsync();
-                
+
                 if (await reader.ReadAsync())
                 {
                     return new StudentRegistrationDetailDto
@@ -465,7 +474,7 @@ WHERE UPPER(TEN_DANG_NHAP) = USER";
                         PhoneNumber = reader.IsDBNull(10) ? null : reader.GetString(10)
                     };
                 }
-                
+
                 return null;
             }
             catch (Exception ex)

@@ -99,6 +99,8 @@ namespace QLTTTA_API.Services
 
             var headers = httpContext.Request.Headers;
             var sessionId = headers["X-Session-Id"].FirstOrDefault(); // Header do Web tự gắn từ cookie SessionId
+            var deviceType = headers["X-Device-Type"].FirstOrDefault()?.Trim().ToLowerInvariant() ?? "pc";
+            if (deviceType != "pc" && deviceType != "mobile") deviceType = "pc";
             if (string.IsNullOrWhiteSpace(sessionId))
             {
                 _logger.LogWarning("Missing X-Session-Id header in request to {Path}", httpContext.Request.Path);
@@ -128,12 +130,13 @@ namespace QLTTTA_API.Services
                 {
                     throw new UnauthorizedAccessException("Không tìm thấy tài khoản");
                 }
-                using var checkCmd = new OracleCommand("SELECT COUNT(*) FROM TAI_KHOAN WHERE ID_NGUOI_DUNG = :id AND SESSION_ID_HIENTAI = :sid", adminConn) // xác nhận sessionId còn khớp
-                { BindByName = true };
-                checkCmd.Parameters.Add(":id", OracleDbType.Int32).Value = userId.Value;
-                checkCmd.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sessionId;
-                var cntObj = await checkCmd.ExecuteScalarAsync(ct);
-                var cnt = Convert.ToInt32(cntObj ?? 0);
+                // Kiểm tra theo cột per-device (không fallback legacy)
+                string columnName = deviceType == "mobile" ? "SESSION_ID_MOBILE" : "SESSION_ID_PC";
+                using var checkCmdNew = new OracleCommand($"SELECT COUNT(*) FROM TAI_KHOAN WHERE ID_NGUOI_DUNG = :id AND {columnName} = :sid", adminConn) { BindByName = true };
+                checkCmdNew.Parameters.Add(":id", OracleDbType.Int32).Value = userId.Value;
+                checkCmdNew.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sessionId;
+                var cntObjNew = await checkCmdNew.ExecuteScalarAsync(ct);
+                var cnt = Convert.ToInt32(cntObjNew ?? 0);
                 if (cnt == 0)
                 {
                     _logger.LogWarning("Session mismatch in DB for user {User}", cred.Username);

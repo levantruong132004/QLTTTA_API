@@ -147,7 +147,11 @@ namespace QLTTTA_API.Controllers
             {
                 return BadRequest(new { status = "invalid", reason = "missing" });
             }
-            var valid = await _authService.CheckSessionAsync(username, sessionId);
+            // Lấy loại thiết bị ưu tiên từ header, fallback query, mặc định "pc"
+            var deviceType = Request.Headers["X-Device-Type"].FirstOrDefault()
+                             ?? Request.Query["deviceType"].FirstOrDefault()
+                             ?? "pc";
+            var valid = await _authService.CheckSessionAsync(username, sessionId, deviceType);
             return Ok(new { status = valid ? "valid" : "invalid" });
         }
     }
