@@ -1,0 +1,30 @@
+@{
+    ViewData["Title"] = "Quản lý nhân viên";
+}
+<div class="retro-card corner-decorated">
+    <div class="retro-card-header text-center">
+        <h2 class="retro-card-title"><i class="fas fa-users"></i> Quản lý nhân viên</h2>
+    </div>
+    <div class="retro-card-body">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-success"><div class="retro-alert-content">@TempData["SuccessMessage"]</div></div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-danger"><div class="retro-alert-content">@TempData["ErrorMessage"]</div></div>
+        }
+
+        <div class="retro-alert retro-alert-info">
+            <div class="retro-alert-content">
+                Chức năng đang được xây dựng. Bạn có thể quản lý hóa đơn và tạo chữ ký số trung tâm tại mục bên dưới.
+            </div>
+        </div>
+
+        <div class="mt-3">
+            <a class="btn btn-primary" asp-controller="Manage" asp-action="Invoices">
+                <i class="fas fa-file-invoice-dollar"></i> Đi đến Quản lý hóa đơn
+            </a>
+        </div>
+    </div>
+</div>

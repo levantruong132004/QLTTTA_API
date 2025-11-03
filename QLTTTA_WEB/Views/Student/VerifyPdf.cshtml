@@ -1,0 +1,46 @@
+@{
+    ViewData["Title"] = "Xác thực hóa đơn (PDF)";
+}
+<div class="retro-card corner-decorated">
+    <div class="retro-card-header text-center">
+        <h2 class="retro-card-title"><i class="fas fa-file-pdf"></i> Xác thực hóa đơn (PDF)</h2>
+    </div>
+    <div class="retro-card-body">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-success"><div class="retro-alert-content">@TempData["SuccessMessage"]</div></div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-danger"><div class="retro-alert-content">@TempData["ErrorMessage"]</div></div>
+        }
+
+        <form asp-controller="Student" asp-action="VerifyPdfUpload" method="post" enctype="multipart/form-data" class="retro-card">
+            <div class="retro-card-header"><strong><i class="fas fa-upload"></i> Tải lên file PDF đã nhận qua email</strong></div>
+            <div class="retro-card-body">
+                <div class="mb-3">
+                    <label class="form-label">File PDF hóa đơn</label>
+                    <input type="file" name="pdf" accept="application/pdf,.pdf" class="form-control" required />
+                    <div class="form-text">Chọn đúng file PDF mà kế toán đã gửi qua email.</div>
+                </div>
+                <button class="btn btn-primary"><i class="fas fa-check-circle"></i> Kiểm tra xác thực</button>
+            </div>
+        </form>
+
+        @if (TempData["VerifyDetail"] != null)
+        {
+            <div class="retro-card mt-3">
+                <div class="retro-card-header"><strong><i class="fas fa-info-circle"></i> Dữ liệu đã ký (trích xuất)</strong></div>
+                <div class="retro-card-body">
+                    <pre style="white-space:pre-wrap">@TempData["VerifyDetail"]</pre>
+                </div>
+            </div>
+        }
+
+        <div class="text-center mt-3">
+            <a class="btn btn-outline-secondary" asp-controller="Student" asp-action="MyRegistrations">
+                <i class="fas fa-arrow-left"></i> Quay lại đăng ký của tôi
+            </a>
+        </div>
+    </div>
+</div>

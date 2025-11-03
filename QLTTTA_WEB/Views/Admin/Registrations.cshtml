@@ -1,0 +1,79 @@
+@model IEnumerable<QLTTTA_WEB.Models.AdminRegistrationItem>
+@{
+    ViewData["Title"] = "Duyệt đơn đăng ký";
+    var registrationList = Model?.ToList() ?? new List<QLTTTA_WEB.Models.AdminRegistrationItem>();
+    var registrationCount = registrationList.Count;
+}
+<div class="retro-card">
+    <div class="retro-card-header">
+        <h2 class="retro-title"><i class="fas fa-clipboard-check"></i> Duyệt đơn đăng ký</h2>
+    </div>
+    <div class="retro-card-body">
+        @* CHỈ HIỂN THỊ SUCCESS MESSAGE *@
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle"></i> @TempData["SuccessMessage"]
+            </div>
+        }
+
+        @* ẨN HOÀN TOÀN ERROR MESSAGE - KHÔNG HIỂN THỊ LỖI *@
+
+        @if (registrationCount > 0)
+        {
+            <div class="alert alert-info mb-3">
+                <i class="fas fa-bell"></i> <strong>Bạn có @registrationCount đơn đăng ký đang cần phê duyệt</strong>
+            </div>
+
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Học viên</th>
+                        <th>Lớp</th>
+                        <th>Khóa học</th>
+                        <th>Trạng thái</th>
+                        <th>Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in registrationList)
+                    {
+                        <tr>
+                            <td>@r.RegistrationId</td>
+                            <td>ID: @r.StudentId</td>
+                            <td>@(r.ClassName ?? (r.ClassId > 0 ? ("Lớp #" + r.ClassId) : "-"))</td>
+                            <td>@(r.CourseName ?? "-")</td>
+                            <td><span class="badge bg-warning text-dark">@r.Status</span></td>
+                            <td>
+                                <form asp-action="ApproveRegistration" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@r.RegistrationId" />
+                                    <input type="number" name="classId" placeholder="ID Lớp" value="@r.ClassId" class="form-control d-inline me-1" style="width:100px;" />
+                                    <button type="submit" class="btn btn-sm btn-success">
+                                        <i class="fas fa-check"></i> Duyệt
+                                    </button>
+                                </form>
+                                <form asp-action="RejectRegistration" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@r.RegistrationId" />
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Bạn có chắc muốn từ chối đơn này?');">
+                                        <i class="fas fa-times"></i> Từ chối
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            @* KHÔNG CÓ ĐỚN → KHÔNG HIỂN THỊ GÌ CẢ *@
+            <div class="text-center text-muted py-5">
+                <i class="fas fa-check-circle fa-3x mb-3" style="color: #28a745;"></i>
+                <p class="fs-5">Hiện tại không có đơn đăng ký nào cần phê duyệt</p>
+            </div>
+        }
+    </div>
+</div>
