@@ -62,6 +62,7 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       title: 'QLTTTA',
       theme: RetroTheme.theme,
+      debugShowCheckedModeBanner: false,
       navigatorKey: _navKey,
       home: const LoginScreen(),
     );

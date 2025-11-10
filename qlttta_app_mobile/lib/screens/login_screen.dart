@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:qlttta_app_mobile/screens/home_screen.dart';
 import 'package:qlttta_app_mobile/screens/register_screen.dart';
+import 'package:qlttta_app_mobile/screens/forgot_password_screen.dart';
 import 'package:qlttta_app_mobile/services/auth_service.dart';
 import 'package:qlttta_app_mobile/theme/retro_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -285,40 +286,76 @@ class _LoginScreenState extends State<LoginScreen> {
                               width: 1,
                             ),
                           ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          child: Column(
                             children: [
-                              const Icon(
-                                Icons.info_outline,
-                                size: 18,
-                                color: RetroColors.vintageGray,
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.info_outline,
+                                    size: 18,
+                                    color: RetroColors.vintageGray,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    'Chưa có tài khoản? ',
+                                    style: TextStyle(
+                                      color: RetroColors.vintageGray,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const RegisterScreen(),
+                                        ),
+                                      );
+                                    },
+                                    child: const Text(
+                                      'Đăng ký ngay',
+                                      style: TextStyle(
+                                        color: RetroColors.vintageRust,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 8),
-                              const Text(
-                                'Chưa có tài khoản? ',
-                                style: TextStyle(
-                                  color: RetroColors.vintageGray,
-                                  fontSize: 14,
-                                ),
-                              ),
+                              const SizedBox(height: 12),
                               GestureDetector(
                                 onTap: () {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
                                       builder: (context) =>
-                                          const RegisterScreen(),
+                                          const ForgotPasswordScreen(),
                                     ),
                                   );
                                 },
-                                child: const Text(
-                                  'Đăng ký ngay',
-                                  style: TextStyle(
-                                    color: RetroColors.vintageRust,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    decoration: TextDecoration.underline,
-                                  ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: const [
+                                    Icon(
+                                      Icons.lock_reset_rounded,
+                                      size: 18,
+                                      color: RetroColors.vintageGold,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Quên mật khẩu?',
+                                      style: TextStyle(
+                                        color: RetroColors.vintageGold,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],

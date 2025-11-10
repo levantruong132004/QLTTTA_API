@@ -83,10 +83,13 @@ namespace QLTTTA_WEB.Controllers.Admin
             return RedirectToAction("Courses");
         }
 
-        public async Task<IActionResult> Classes(int? courseId)
+        public async Task<IActionResult> Classes(int? courseId, string? search)
         {
             if (!IsStaff()) return RedirectToAction("Index", "Home");
-            var url = "api/classes" + (courseId.HasValue ? $"?courseId={courseId}" : "");
+            var qs = new List<string>();
+            if (courseId.HasValue) qs.Add($"courseId={courseId}");
+            if (!string.IsNullOrWhiteSpace(search)) qs.Add($"search={Uri.EscapeDataString(search)}");
+            var url = "api/classes" + (qs.Count>0? ("?"+string.Join("&", qs)) : "");
             var res = await _http.GetAsync(url);
             var body = await res.Content.ReadAsStringAsync();
             List<QLTTTA_WEB.Models.AdminClassItem> data;
@@ -110,6 +113,7 @@ namespace QLTTTA_WEB.Controllers.Admin
                 }
             }
             ViewBag.CourseId = courseId;
+            ViewBag.Search = search;
             return View("~/Views/Admin/Classes.cshtml", data);
         }
 

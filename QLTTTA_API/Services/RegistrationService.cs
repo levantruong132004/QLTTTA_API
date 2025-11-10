@@ -28,17 +28,19 @@ namespace QLTTTA_API.Services
             if (!string.IsNullOrWhiteSpace(status)) where.Add("TRANG_THAI = :st");
             if (classId.HasValue) where.Add("ID_LOP_HOC = :cid");
             var whereSql = where.Count > 0 ? (" WHERE " + string.Join(" AND ", where)) : string.Empty;
-            var sql = $@"SELECT dk.ID_DANG_KY AS REGISTRATION_ID,
+          var sql = $@"SELECT dk.ID_DANG_KY AS REGISTRATION_ID,
                                 dk.MA_DANG_KY AS REGISTRATION_CODE,
                                 dk.NGAY_DANG_KY AS REGISTRATION_DATE,
                                 dk.TRANG_THAI   AS STATUS,
                                 NULL            AS STUDY_DATE,
-                                dk.ID_HOC_VIEN  AS STUDENT_ID,
+                          dk.ID_HOC_VIEN  AS STUDENT_ID,
+                          hv.HO_TEN       AS STUDENT_NAME,
                                 dk.ID_LOP_HOC   AS CLASS_ID,
                     NVL(dk.ID_NHAN_VIEN_DUYET,0) AS STAFF_ID,
                     lh.TEN_LOP_HOC  AS TEN_LOP_HOC,
                     kh.TEN_KHOA_HOC AS TEN_KHOA_HOC
                          FROM DON_DANG_KY dk
+                    JOIN HOC_VIEN hv ON hv.ID_HOC_VIEN = dk.ID_HOC_VIEN
                          JOIN LOP_HOC lh ON lh.ID_LOP_HOC = dk.ID_LOP_HOC
                          JOIN KHOA_HOC kh ON kh.ID_KHOA_HOC = lh.ID_KHOA_HOC{whereSql}
                          ORDER BY dk.ID_DANG_KY DESC";
@@ -51,17 +53,19 @@ namespace QLTTTA_API.Services
 
         public async Task<Registration?> GetByIdAsync(int id)
         {
-            var sql = @"SELECT dk.ID_DANG_KY AS REGISTRATION_ID,
+                        var sql = @"SELECT dk.ID_DANG_KY AS REGISTRATION_ID,
              dk.MA_DANG_KY AS REGISTRATION_CODE,
                    dk.NGAY_DANG_KY AS REGISTRATION_DATE,
                    dk.TRANG_THAI   AS STATUS,
                    NULL            AS STUDY_DATE,
-                   dk.ID_HOC_VIEN  AS STUDENT_ID,
+                                     dk.ID_HOC_VIEN  AS STUDENT_ID,
+                                     hv.HO_TEN       AS STUDENT_NAME,
                    dk.ID_LOP_HOC   AS CLASS_ID,
                    NVL(dk.ID_NHAN_VIEN_DUYET,0) AS STAFF_ID,
                    lh.TEN_LOP_HOC  AS TEN_LOP_HOC,
                    kh.TEN_KHOA_HOC AS TEN_KHOA_HOC
                FROM DON_DANG_KY dk
+                            JOIN HOC_VIEN hv ON hv.ID_HOC_VIEN = dk.ID_HOC_VIEN
                JOIN LOP_HOC lh ON lh.ID_LOP_HOC = dk.ID_LOP_HOC
                JOIN KHOA_HOC kh ON kh.ID_KHOA_HOC = lh.ID_KHOA_HOC
                WHERE dk.ID_DANG_KY = :id";
@@ -256,17 +260,19 @@ namespace QLTTTA_API.Services
                 hvId = Convert.ToInt32(scalar);
             }
 
-            var sql = @"SELECT dk.ID_DANG_KY AS REGISTRATION_ID,
+                        var sql = @"SELECT dk.ID_DANG_KY AS REGISTRATION_ID,
              dk.MA_DANG_KY AS REGISTRATION_CODE,
                    dk.NGAY_DANG_KY AS REGISTRATION_DATE,
                    dk.TRANG_THAI   AS STATUS,
                    NULL            AS STUDY_DATE,
-                   dk.ID_HOC_VIEN  AS STUDENT_ID,
+                                     dk.ID_HOC_VIEN  AS STUDENT_ID,
+                                     hv.HO_TEN       AS STUDENT_NAME,
                    dk.ID_LOP_HOC   AS CLASS_ID,
                    NVL(dk.ID_NHAN_VIEN_DUYET,0) AS STAFF_ID,
                    lh.TEN_LOP_HOC  AS TEN_LOP_HOC,
                    kh.TEN_KHOA_HOC AS TEN_KHOA_HOC
                FROM DON_DANG_KY dk
+                            JOIN HOC_VIEN hv ON hv.ID_HOC_VIEN = dk.ID_HOC_VIEN
                JOIN LOP_HOC lh ON lh.ID_LOP_HOC = dk.ID_LOP_HOC
                JOIN KHOA_HOC kh ON kh.ID_KHOA_HOC = lh.ID_KHOA_HOC
                WHERE dk.ID_HOC_VIEN = :id ORDER BY dk.ID_DANG_KY DESC";
@@ -284,6 +290,7 @@ namespace QLTTTA_API.Services
                     Status = reader.IsDBNull(reader.GetOrdinal("STATUS")) ? null : reader.GetString(reader.GetOrdinal("STATUS")),
                     StudyDate = null,
                     StudentId = reader.GetInt32(reader.GetOrdinal("STUDENT_ID")),
+                    StudentName = reader.IsDBNull(reader.GetOrdinal("STUDENT_NAME")) ? null : reader.GetString(reader.GetOrdinal("STUDENT_NAME")),
                     ClassId = reader.GetInt32(reader.GetOrdinal("CLASS_ID")),
                     StaffId = reader.GetInt32(reader.GetOrdinal("STAFF_ID")),
                     ClassName = reader.IsDBNull(reader.GetOrdinal("TEN_LOP_HOC")) ? null : reader.GetString(reader.GetOrdinal("TEN_LOP_HOC")),

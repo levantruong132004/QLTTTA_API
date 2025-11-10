@@ -22,25 +22,38 @@ namespace QLTTTA_API.Services
         public async Task<List<Class>> GetClassesAsync(int? courseId = null, string? search = null)
         {
             var where = new List<string>();
-            if (courseId.HasValue) where.Add("ID_KHOA_HOC = :courseid");
+            if (courseId.HasValue && courseId.Value > 0) where.Add("ID_KHOA_HOC = :courseid");
             if (!string.IsNullOrWhiteSpace(search)) where.Add("(UPPER(TEN_LOP_HOC) LIKE UPPER(:s) OR UPPER(MA_LOP_HOC) LIKE UPPER(:s))");
             var whereSql = where.Count > 0 ? (" WHERE " + string.Join(" AND ", where)) : string.Empty;
             var sql = $@"SELECT 
-                                     ID_LOP_HOC,
-                                     MA_LOP_HOC,
-                                     TEN_LOP_HOC,
-                                     NGAY_BAT_DAU,
-                                     NGAY_KET_THUC,
-                                     SI_SO_TOI_DA,
-                                     ID_KHOA_HOC,
-                                     ID_GIANG_VIEN,
-                                     TRANG_THAI
-                                 FROM LOP_HOC{whereSql} ORDER BY ID_LOP_HOC";
+                            lh.ID_LOP_HOC,
+                            lh.MA_LOP_HOC,
+                            lh.TEN_LOP_HOC,
+                            lh.NGAY_BAT_DAU,
+                            lh.NGAY_KET_THUC,
+                            lh.SI_SO_TOI_DA,
+                            lh.ID_KHOA_HOC,
+                            lh.ID_GIANG_VIEN,
+                            lh.TRANG_THAI,
+                            (SELECT COUNT(*) FROM DON_DANG_KY dk 
+                                JOIN HOA_DON hd ON hd.ID_DANG_KY = dk.ID_DANG_KY AND UPPER(hd.TRANG_THAI) = UPPER(N'Đã thanh toán')
+                                WHERE dk.ID_LOP_HOC = lh.ID_LOP_HOC AND UPPER(dk.TRANG_THAI) = UPPER(N'Đã duyệt')) AS APPROVED_COUNT
+                        FROM LOP_HOC lh{whereSql} ORDER BY lh.ID_LOP_HOC";
             object? parameters = null;
-            if (courseId.HasValue && !string.IsNullOrWhiteSpace(search)) parameters = new { courseid = courseId.Value, s = $"%{search}%" };
-            else if (courseId.HasValue) parameters = new { courseid = courseId.Value };
+            if (courseId.HasValue && courseId.Value > 0 && !string.IsNullOrWhiteSpace(search)) parameters = new { courseid = courseId.Value, s = $"%{search}%" };
+            else if (courseId.HasValue && courseId.Value > 0) parameters = new { courseid = courseId.Value };
             else if (!string.IsNullOrWhiteSpace(search)) parameters = new { s = $"%{search}%" };
-            return await ExecuteQueryAsync<Class>(sql, parameters);
+
+            try
+            {
+                return await ExecuteQueryAsync<Class>(sql, parameters);
+            }
+            catch (Oracle.ManagedDataAccess.Client.OracleException oex) when (oex.Number == 1031 || oex.Number == 942)
+            {
+                // ORA-01031: insufficient privileges, ORA-00942: table or view does not exist
+                _logger.LogWarning(oex, "Falling back to admin query for GetClassesAsync");
+                return await ExecuteQueryAdminAsync<Class>(sql, parameters);
+            }
         }
 
         public async Task<Class?> GetClassByIdAsync(int id)
@@ -185,7 +198,8 @@ namespace QLTTTA_API.Services
                                 hv.DIA_CHI
                          FROM DON_DANG_KY dk
                          JOIN HOC_VIEN hv ON hv.ID_HOC_VIEN = dk.ID_HOC_VIEN
-                         WHERE dk.ID_LOP_HOC = :cid AND dk.TRANG_THAI = N'Đã duyệt'";
+                         JOIN HOA_DON hd ON hd.ID_DANG_KY = dk.ID_DANG_KY AND UPPER(hd.TRANG_THAI)=UPPER(N'Đã thanh toán')
+                         WHERE dk.ID_LOP_HOC = :cid AND UPPER(dk.TRANG_THAI) = UPPER(N'Đã duyệt')";
             return await ExecuteQueryAsync<Student>(sql, new { cid = classId });
         }
     }

@@ -365,6 +365,27 @@ namespace QLTTTA_API.Services
                 }
                 return list;
             }
+            catch (OracleException oex) when (oex.Number == 1031 || oex.Number == 942)
+            {
+                // ORA-01031 insufficient privileges or ORA-00942 table or view does not exist under user connection
+                _logger.LogWarning(oex, "Insufficient privileges or missing object under user connection. Falling back to admin for course list.");
+                using var conn = await GetAdminConnectionAsync();
+                using var cmd = new OracleCommand(sql, conn);
+                using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.Default);
+                var list = new List<Course>();
+                while (await reader.ReadAsync())
+                {
+                    list.Add(new Course
+                    {
+                        CourseId = reader.GetInt32(reader.GetOrdinal("COURSE_ID")),
+                        CourseCode = reader.IsDBNull(reader.GetOrdinal("COURSE_CODE")) ? null : reader.GetString(reader.GetOrdinal("COURSE_CODE")),
+                        CourseName = reader.IsDBNull(reader.GetOrdinal("COURSE_NAME")) ? null : reader.GetString(reader.GetOrdinal("COURSE_NAME")),
+                        Description = reader.IsDBNull(reader.GetOrdinal("DESCRIPTION")) ? string.Empty : reader.GetString(reader.GetOrdinal("DESCRIPTION")),
+                        StandardFee = reader.IsDBNull(reader.GetOrdinal("STANDARD_FEE")) ? 0 : Convert.ToInt32(Math.Round(Convert.ToDecimal(reader["STANDARD_FEE"])))
+                    });
+                }
+                return list;
+            }
         }
     }
 }

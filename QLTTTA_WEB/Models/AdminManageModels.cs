@@ -12,6 +12,7 @@ namespace QLTTTA_WEB.Models
         public int CourseId { get; set; }
         public int TeacherId { get; set; }
         public string? Status { get; set; }
+        public int ApprovedCount { get; set; }
     }
 
     // Dùng cho trang Quản trị - Lịch học (khớp với API /api/schedules/by-class/{id})

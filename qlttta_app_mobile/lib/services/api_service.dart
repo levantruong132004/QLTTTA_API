@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -30,7 +31,7 @@ class ApiService {
     final res = await http.post(
       Uri.parse('$_baseUrl/$endpoint'),
       headers: await _headers(),
-      body: data,
+      body: jsonEncode(data), // Encode to JSON string
     );
     return res;
   }

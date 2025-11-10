@@ -36,6 +36,7 @@ namespace QLTTTA_API.Models
         public int CourseId { get; set; }
         public int TeacherId { get; set; }
         public string? Status { get; set; }
+        public int ApprovedCount { get; set; } // số đơn đã duyệt trong lớp
     }
 
     // Giáo viên
@@ -58,6 +59,7 @@ namespace QLTTTA_API.Models
         public string? Status { get; set; }
         public DateTime? StudyDate { get; set; }
         public int StudentId { get; set; }
+        public string? StudentName { get; set; } // HOC_VIEN.HO_TEN
         public int ClassId { get; set; }
         public int StaffId { get; set; }
         public string? ClassName { get; set; }

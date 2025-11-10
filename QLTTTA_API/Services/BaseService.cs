@@ -144,6 +144,35 @@ namespace QLTTTA_API.Services
         }
 
         /// <summary>
+        /// Thực thi SELECT nhưng luôn dùng kết nối admin (bỏ qua per-user). Dùng cho fallback quyền.
+        /// </summary>
+        protected async Task<List<T>> ExecuteQueryAdminAsync<T>(string sql, object? parameters = null,
+            Func<OracleDataReader, T>? mapper = null) where T : new()
+        {
+            var results = new List<T>();
+            try
+            {
+                using var connection = await GetAdminConnectionAsync();
+                using var command = new OracleCommand(sql, connection);
+                if (parameters != null)
+                {
+                    AddParameters(command, parameters);
+                }
+                using var reader = await command.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    results.Add(mapper != null ? mapper(reader) : MapToObject<T>(reader));
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error executing admin query: {SQL}", sql);
+                throw;
+            }
+            return results;
+        }
+
+        /// <summary>
         /// Thực thi SELECT lấy duy nhất 1 dòng (hoặc null nếu không có). Mapper tùy chọn.
         /// </summary>
         protected async Task<T?> ExecuteQuerySingleAsync<T>(string sql, object? parameters = null,
@@ -317,6 +346,7 @@ namespace QLTTTA_API.Services
                 case "EndDate": return new[] { "END_DATE", "NGAY_KET_THUC", GetColumnName(propertyName) };
                 case "MaxSize": return new[] { "MAX_SIZE", "SI_SO_TOI_DA", GetColumnName(propertyName) };
                 case "TeacherId": return new[] { "TEACHER_ID", "ID_GIANG_VIEN", GetColumnName(propertyName) };
+                case "ApprovedCount": return new[] { "APPROVED_COUNT", GetColumnName(propertyName) };
 
                 // Schedule
                 case "ScheduleId": return new[] { "SCHEDULE_ID", "ID_LICH_HOC", GetColumnName(propertyName) };
@@ -331,6 +361,7 @@ namespace QLTTTA_API.Services
                 case "RegistrationDate": return new[] { "REGISTRATION_DATE", "NGAY_DANG_KY", GetColumnName(propertyName) };
                 case "Status": return new[] { "STATUS", "TRANG_THAI", GetColumnName(propertyName) };
                 case "StudyDate": return new[] { "STUDY_DATE", "NGAY_HOC", GetColumnName(propertyName) };
+                case "StudentName": return new[] { "STUDENT_NAME", "HO_TEN", GetColumnName(propertyName) };
                 case "StaffId": return new[] { "STAFF_ID", "ID_NHAN_VIEN_DUYET", GetColumnName(propertyName) };
 
                 // Account / Role

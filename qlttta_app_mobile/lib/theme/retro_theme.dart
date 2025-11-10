@@ -1,26 +1,46 @@
 import 'package:flutter/material.dart';
 
 class RetroColors {
-  // Primary vintage browns and earth tones
-  static const Color vintageBrown = Color(0xFF7d5a3b);
-  static const Color vintageDarkBrown = Color(0xFF4a3526);
-  static const Color vintageLightBrown = Color(0xFFa67c52);
-  static const Color vintageCream = Color(0xFFf4ead5);
-  static const Color vintageBeige = Color(0xFFe8dcc4);
-  static const Color vintageTan = Color(0xFFd4c4a8);
-
-  // Accent colors
-  static const Color vintageGold = Color(0xFFb8860b);
-  static const Color vintageRust = Color(0xFFa85832);
-  static const Color vintageOlive = Color(0xFF6b8e23);
-  static const Color vintageBurgundy = Color(0xFF7c2d37);
-  static const Color vintageGreen = Color(0xFF4a7c59);
-
-  // Neutral tones
-  static const Color vintageWhite = Color(0xFFfaf8f3);
-  static const Color vintageOffWhite = Color(0xFFf5f1e8);
-  static const Color vintageGray = Color(0xFF8b7d6b);
-  static const Color vintageDarkGray = Color(0xFF5a4a3a);
+  // Modern vintage palette - warmer, more contemporary
+  static const Color primary = Color(0xFF8B4513); // SaddleBrown
+  static const Color primaryDark = Color(0xFF5D2E0E);
+  static const Color primaryLight = Color(0xFFB8734A);
+  
+  // Background & Surface
+  static const Color background = Color(0xFFFAF6F1);
+  static const Color surface = Color(0xFFFFFFFF);
+  static const Color surfaceLight = Color(0xFFF8F4EF);
+  
+  // Accent colors - modernized
+  static const Color accent = Color(0xFFD4A574); // Golden tan
+  static const Color accentDark = Color(0xFFA67C52);
+  static const Color success = Color(0xFF6B8E23); // OliveDrab
+  static const Color warning = Color(0xFFE67E22); // Carrot
+  static const Color error = Color(0xFFB8001F); // Deep red
+  static const Color info = Color(0xFF5A7D9A); // Steel blue
+  
+  // Text colors
+  static const Color textPrimary = Color(0xFF2C1810);
+  static const Color textSecondary = Color(0xFF6B5D52);
+  static const Color textHint = Color(0xFF9B8D82);
+  static const Color textLight = Color(0xFFFAF6F1);
+  
+  // Legacy colors (keep for backwards compatibility)
+  static const Color vintageBrown = primary;
+  static const Color vintageDarkBrown = primaryDark;
+  static const Color vintageLightBrown = primaryLight;
+  static const Color vintageCream = background;
+  static const Color vintageBeige = surfaceLight;
+  static const Color vintageTan = accent;
+  static const Color vintageGold = accentDark;
+  static const Color vintageRust = warning;
+  static const Color vintageOlive = success;
+  static const Color vintageBurgundy = error;
+  static const Color vintageGreen = success;
+  static const Color vintageWhite = surface;
+  static const Color vintageOffWhite = surfaceLight;
+  static const Color vintageGray = textSecondary;
+  static const Color vintageDarkGray = textPrimary;
 }
 
 class RetroTheme {

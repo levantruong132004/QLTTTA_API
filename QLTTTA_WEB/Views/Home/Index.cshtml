@@ -2,7 +2,10 @@
 @{
     ViewData["Title"] = "Trang chủ";
     var roleStr = (string)(ViewBag.Role ?? "");
-    bool isStaff = roleStr.Contains("NhanVienHocVu", StringComparison.OrdinalIgnoreCase) || (Context.Session.GetString("RoleId") == "4");
+    var roleId = Context.Session.GetString("RoleId");
+    bool isStaff = roleStr.Contains("NhanVienHocVu", StringComparison.OrdinalIgnoreCase) ||
+                   roleStr.Contains("QuanTriVien", StringComparison.OrdinalIgnoreCase) ||
+                   (roleId == "4" || roleId == "5");
 }
 
 @* ===================== STYLE (Chung cho desktop & mobile, có media query bên dưới) ===================== *@
@@ -260,6 +263,7 @@
                         <div class="col-md-6">
                             <label class="form-label"><i class="fas fa-filter"></i> Chọn khóa học</label>
                             <select name="courseId" class="form-select" onchange="this.form.submit()">
+                                <option value="0" selected="@(Model != null && Model.SelectedCourseId.HasValue && Model.SelectedCourseId.Value == 0)">Tất cả khóa học</option>
                                 @if (Model?.StaffCourses != null && Model.StaffCourses.Any())
                                 {
                                     foreach (var c in Model.StaffCourses)

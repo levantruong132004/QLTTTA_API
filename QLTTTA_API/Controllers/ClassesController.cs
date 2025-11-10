@@ -40,6 +40,14 @@ namespace QLTTTA_API.Controllers
             return Ok(list);
         }
 
+        // Danh sách học viên đã thanh toán và đã duyệt của một lớp (paid roster)
+        [HttpGet("{id}/paid-roster")]
+        public async Task<IActionResult> GetPaidRoster(int id)
+        {
+            var list = await _service.GetRosterAsync(id); // hiện tại GetRoster đã lọc paid+approved
+            return Ok(list);
+        }
+
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] ClassCreateDto dto)
         {

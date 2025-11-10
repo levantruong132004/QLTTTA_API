@@ -28,8 +28,11 @@ namespace QLTTTA_WEB.Controllers
             ViewBag.Username = HttpContext.Session.GetString("Username");
             ViewBag.Role = HttpContext.Session.GetString("Role") ?? string.Empty;
             var roleStr = (string)ViewBag.Role;
+            var roleId = HttpContext.Session.GetString("RoleId");
+            // Treat Admin (roleId==5) like Staff for the class section
             bool isStaff = roleStr.Contains("NhanVienHocVu", StringComparison.OrdinalIgnoreCase) ||
-                           (HttpContext.Session.GetString("RoleId") == "4");
+                           roleStr.Contains("QuanTriVien", StringComparison.OrdinalIgnoreCase) ||
+                           (roleId == "4" || roleId == "5");
 
             var client = _httpClientFactory.CreateClient("ApiClient");
             var dashboard = new HomeDashboardViewModel();
@@ -55,23 +58,79 @@ namespace QLTTTA_WEB.Controllers
                 // Chọn courseId hiện tại (query) hoặc default là course đầu tiên
                 if (!courseId.HasValue && dashboard.StaffCourses.Any())
                     courseId = dashboard.StaffCourses.First().CourseId;
-                dashboard.SelectedCourseId = courseId;
 
-                if (dashboard.SelectedCourseId.HasValue)
+                // Helpers
+                async Task<List<AdminClassItem>> LoadClassesByCourseAsync(int cid)
                 {
+                    var list = new List<AdminClassItem>();
                     try
                     {
-                        var clsRes = await client.GetAsync($"api/classes?courseId={dashboard.SelectedCourseId.Value}");
+                        var clsRes = await client.GetAsync($"api/classes?courseId={cid}");
                         if (clsRes.IsSuccessStatusCode)
                         {
                             var json = await clsRes.Content.ReadAsStringAsync();
-                            dashboard.StaffClasses = JsonSerializer.Deserialize<List<AdminClassItem>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                            list = JsonSerializer.Deserialize<List<AdminClassItem>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
                         }
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Load staff classes failed for course {CourseId}", dashboard.SelectedCourseId);
-                        dashboard.StaffClasses = new();
+                        _logger.LogError(ex, "Load staff classes failed for course {CourseId}", cid);
+                    }
+                    return list;
+                }
+
+                async Task<List<AdminClassItem>> LoadAllClassesAsync()
+                {
+                    var list = new List<AdminClassItem>();
+                    try
+                    {
+                        var res = await client.GetAsync("api/classes");
+                        if (res.IsSuccessStatusCode)
+                        {
+                            var json = await res.Content.ReadAsStringAsync();
+                            list = JsonSerializer.Deserialize<List<AdminClassItem>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Load all classes failed");
+                    }
+                    return list;
+                }
+
+                if (courseId.HasValue)
+                {
+                    if (courseId.Value == 0)
+                    {
+                        // Tất cả khóa học: không lọc theo courseId
+                        dashboard.SelectedCourseId = 0;
+                        dashboard.StaffClasses = await LoadAllClassesAsync();
+                    }
+                    else
+                    {
+                        // Load classes for selected or first course
+                        var classes = await LoadClassesByCourseAsync(courseId.Value);
+                        if (classes.Count == 0 && dashboard.StaffCourses.Any())
+                        {
+                            // Try to find the first course that actually has classes
+                            foreach (var c in dashboard.StaffCourses.Where(c => c.CourseId != courseId.Value))
+                            {
+                                var tryClasses = await LoadClassesByCourseAsync(c.CourseId);
+                                if (tryClasses.Count > 0)
+                                {
+                                    dashboard.SelectedCourseId = c.CourseId;
+                                    dashboard.StaffClasses = tryClasses;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (dashboard.StaffClasses == null || dashboard.StaffClasses.Count == 0)
+                        {
+                            // Either we didn't find any or selected course had some
+                            dashboard.SelectedCourseId = courseId;
+                            dashboard.StaffClasses = classes;
+                        }
                     }
                 }
 
