@@ -1,3 +1,6 @@
+// Load Oracle client for C# script execution and editor IntelliSense
+#r "nuget: Oracle.ManagedDataAccess.Core, 23.9.1"
+
 using Oracle.ManagedDataAccess.Client;
 
 var connectionString = "User Id=QLTT_ADMIN;Password=123456;Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=100.118.120.99)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=orclpdb)))";
