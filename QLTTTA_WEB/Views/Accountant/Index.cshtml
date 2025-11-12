@@ -102,6 +102,7 @@
                         <th>Ngày ĐK</th>
                         <th>Trạng thái</th>
                         <th style="width:160px">Hóa đơn</th>
+                        <th style="width:140px">In hóa đơn</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -133,12 +134,36 @@
                                     </button>
                                 }
                             </td>
+                            <td>
+                                @if (string.Equals(r.Status, "Đã duyệt", StringComparison.OrdinalIgnoreCase) && r.InvoiceId.HasValue)
+                                {
+                                    <form method="post" asp-controller="Accountant" asp-action="PrintAndEmailInvoice" style="display: inline;">
+                                        <input type="hidden" name="invoiceId" value="@r.InvoiceId" />
+                                        <button type="submit" class="btn btn-sm btn-primary" title="In hóa đơn và gửi PDF qua email cho học viên" 
+                                                onclick="return confirm('Bạn có chắc muốn in hóa đơn và gửi PDF qua email cho học viên @r.StudentName?')">
+                                            <i class="fas fa-print"></i> In hóa đơn
+                                        </button>
+                                    </form>
+                                }
+                                else if (string.Equals(r.Status, "Đã duyệt", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <button class="btn btn-sm btn-warning" disabled title="Chưa có hóa đơn để in">
+                                        <i class="fas fa-exclamation-triangle"></i> Chưa có HD
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-sm btn-secondary" disabled title="Chỉ in khi đơn đã duyệt và có hóa đơn">
+                                        <i class="fas fa-ban"></i> Không khả dụng
+                                    </button>
+                                }
+                            </td>
                         </tr>
                     }
                 }
                 else
                 {
-                    <tr><td colspan="8" class="text-center text-muted">Không có dữ liệu</td></tr>
+                    <tr><td colspan="9" class="text-center text-muted">Không có dữ liệu</td></tr>
                 }
                 </tbody>
             </table>

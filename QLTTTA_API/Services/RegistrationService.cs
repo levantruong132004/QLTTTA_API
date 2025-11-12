@@ -25,47 +25,125 @@ namespace QLTTTA_API.Services
         public async Task<List<Registration>> GetRegistrationsAsync(string? status = null, int? classId = null)
         {
             var where = new List<string>();
-            if (!string.IsNullOrWhiteSpace(status)) where.Add("TRANG_THAI = :st");
-            if (classId.HasValue) where.Add("ID_LOP_HOC = :cid");
+            
+            // DEBUG: Log để kiểm tra status value
+            _logger.LogInformation("GetRegistrationsAsync called with status: '{Status}', classId: {ClassId}", status ?? "NULL", classId);
+            
+            if (!string.IsNullOrWhiteSpace(status)) 
+            {
+                // Sử dụng UPPER và TRIM để tránh vấn đề case sensitivity và khoảng trắng
+                where.Add("UPPER(TRIM(dk.TRANG_THAI)) = UPPER(TRIM(:st))");
+            }
+            if (classId.HasValue) where.Add("dk.ID_LOP_HOC = :cid");
+            
             var whereSql = where.Count > 0 ? (" WHERE " + string.Join(" AND ", where)) : string.Empty;
-            var sql = $@"SELECT dk.ID_DANG_KY AS REGISTRATION_ID,
-                                dk.MA_DANG_KY AS REGISTRATION_CODE,
-                                dk.NGAY_DANG_KY AS REGISTRATION_DATE,
-                                dk.TRANG_THAI   AS STATUS,
-                                NULL            AS STUDY_DATE,
-                                dk.ID_HOC_VIEN  AS STUDENT_ID,
-                                dk.ID_LOP_HOC   AS CLASS_ID,
-                    NVL(dk.ID_NHAN_VIEN_DUYET,0) AS STAFF_ID,
-                    lh.TEN_LOP_HOC  AS TEN_LOP_HOC,
-                    kh.TEN_KHOA_HOC AS TEN_KHOA_HOC
+            
+            var sql = $@"SELECT dk.ID_DANG_KY,
+                                dk.MA_DANG_KY,
+                                dk.NGAY_DANG_KY,
+                                TRIM(dk.TRANG_THAI) AS TRANG_THAI,
+                                NULL AS STUDY_DATE,
+                                dk.ID_HOC_VIEN,
+                                dk.ID_LOP_HOC,
+                                NVL(dk.ID_NHAN_VIEN_DUYET,0) AS ID_NHAN_VIEN_DUYET,
+                                lh.TEN_LOP_HOC,
+                                kh.TEN_KHOA_HOC
                          FROM DON_DANG_KY dk
                          JOIN LOP_HOC lh ON lh.ID_LOP_HOC = dk.ID_LOP_HOC
                          JOIN KHOA_HOC kh ON kh.ID_KHOA_HOC = lh.ID_KHOA_HOC{whereSql}
                          ORDER BY dk.ID_DANG_KY DESC";
+
             object? p = null;
-            if (!string.IsNullOrWhiteSpace(status) && classId.HasValue) p = new { st = status, cid = classId.Value };
-            else if (!string.IsNullOrWhiteSpace(status)) p = new { st = status };
+            if (!string.IsNullOrWhiteSpace(status) && classId.HasValue) p = new { st = status.Trim(), cid = classId.Value };
+            else if (!string.IsNullOrWhiteSpace(status)) p = new { st = status.Trim() };
             else if (classId.HasValue) p = new { cid = classId.Value };
-            return await ExecuteQueryAsync<Registration>(sql, p);
+            
+            _logger.LogInformation("Executing SQL: {SQL} with params: {Params}", sql, p?.ToString() ?? "null");
+            
+            // Sử dụng admin connection để đảm bảo có quyền truy cập
+            var result = new List<Registration>();
+            try
+            {
+                using var conn = await GetAdminConnectionAsync();
+                using var cmd = new OracleCommand(sql, conn) { BindByName = true };
+                
+                if (p != null)
+                {
+                    foreach (var prop in p.GetType().GetProperties())
+                    {
+                        var value = prop.GetValue(p);
+                        cmd.Parameters.Add($":{prop.Name}", value ?? DBNull.Value);
+                    }
+                }
+                
+                using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    result.Add(new Registration
+                    {
+                        RegistrationId = reader.GetInt32(reader.GetOrdinal("ID_DANG_KY")),
+                        RegistrationCode = reader.IsDBNull(reader.GetOrdinal("MA_DANG_KY")) ? null : reader.GetString(reader.GetOrdinal("MA_DANG_KY")),
+                        RegistrationDate = reader.IsDBNull(reader.GetOrdinal("NGAY_DANG_KY")) ? null : reader.GetDateTime(reader.GetOrdinal("NGAY_DANG_KY")),
+                        Status = reader.IsDBNull(reader.GetOrdinal("TRANG_THAI")) ? null : reader.GetString(reader.GetOrdinal("TRANG_THAI")),  
+                        StudyDate = null,
+                        StudentId = reader.GetInt32(reader.GetOrdinal("ID_HOC_VIEN")),
+                        ClassId = reader.GetInt32(reader.GetOrdinal("ID_LOP_HOC")),
+                        StaffId = reader.GetInt32(reader.GetOrdinal("ID_NHAN_VIEN_DUYET")),
+                        ClassName = reader.IsDBNull(reader.GetOrdinal("TEN_LOP_HOC")) ? null : reader.GetString(reader.GetOrdinal("TEN_LOP_HOC")),
+                        CourseName = reader.IsDBNull(reader.GetOrdinal("TEN_KHOA_HOC")) ? null : reader.GetString(reader.GetOrdinal("TEN_KHOA_HOC"))
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error executing GetRegistrationsAsync");
+                throw;
+            }
+            
+            _logger.LogInformation("Query returned {Count} registrations", result.Count);
+            
+            return result;
         }
 
         public async Task<Registration?> GetByIdAsync(int id)
         {
-            var sql = @"SELECT dk.ID_DANG_KY AS REGISTRATION_ID,
-             dk.MA_DANG_KY AS REGISTRATION_CODE,
-                   dk.NGAY_DANG_KY AS REGISTRATION_DATE,
-                   dk.TRANG_THAI   AS STATUS,
-                   NULL            AS STUDY_DATE,
-                   dk.ID_HOC_VIEN  AS STUDENT_ID,
-                   dk.ID_LOP_HOC   AS CLASS_ID,
-                   NVL(dk.ID_NHAN_VIEN_DUYET,0) AS STAFF_ID,
-                   lh.TEN_LOP_HOC  AS TEN_LOP_HOC,
-                   kh.TEN_KHOA_HOC AS TEN_KHOA_HOC
-               FROM DON_DANG_KY dk
-               JOIN LOP_HOC lh ON lh.ID_LOP_HOC = dk.ID_LOP_HOC
-               JOIN KHOA_HOC kh ON kh.ID_KHOA_HOC = lh.ID_KHOA_HOC
-               WHERE dk.ID_DANG_KY = :id";
-            return await ExecuteQuerySingleAsync<Registration>(sql, new { id });
+            var sql = @"SELECT dk.ID_DANG_KY,
+                               dk.MA_DANG_KY,
+                               dk.NGAY_DANG_KY,
+                               dk.TRANG_THAI,
+                               NULL AS STUDY_DATE,
+                               dk.ID_HOC_VIEN,
+                               dk.ID_LOP_HOC,
+                               NVL(dk.ID_NHAN_VIEN_DUYET,0) AS ID_NHAN_VIEN_DUYET,
+                               lh.TEN_LOP_HOC,
+                               kh.TEN_KHOA_HOC
+                        FROM DON_DANG_KY dk
+                        JOIN LOP_HOC lh ON lh.ID_LOP_HOC = dk.ID_LOP_HOC
+                        JOIN KHOA_HOC kh ON kh.ID_KHOA_HOC = lh.ID_KHOA_HOC
+                        WHERE dk.ID_DANG_KY = :id";
+            
+            using var conn = await GetAdminConnectionAsync();
+            using var cmd = new OracleCommand(sql, conn) { BindByName = true };
+            cmd.Parameters.Add(":id", OracleDbType.Int32).Value = id;
+            using var reader = await cmd.ExecuteReaderAsync();
+            
+            if (await reader.ReadAsync())
+            {
+                return new Registration
+                {
+                    RegistrationId = reader.GetInt32(reader.GetOrdinal("ID_DANG_KY")),
+                    RegistrationCode = reader.IsDBNull(reader.GetOrdinal("MA_DANG_KY")) ? null : reader.GetString(reader.GetOrdinal("MA_DANG_KY")),
+                    RegistrationDate = reader.IsDBNull(reader.GetOrdinal("NGAY_DANG_KY")) ? null : reader.GetDateTime(reader.GetOrdinal("NGAY_DANG_KY")),
+                    Status = reader.IsDBNull(reader.GetOrdinal("TRANG_THAI")) ? null : reader.GetString(reader.GetOrdinal("TRANG_THAI")),
+                    StudyDate = null,
+                    StudentId = reader.GetInt32(reader.GetOrdinal("ID_HOC_VIEN")),
+                    ClassId = reader.GetInt32(reader.GetOrdinal("ID_LOP_HOC")),
+                    StaffId = reader.GetInt32(reader.GetOrdinal("ID_NHAN_VIEN_DUYET")),
+                    ClassName = reader.IsDBNull(reader.GetOrdinal("TEN_LOP_HOC")) ? null : reader.GetString(reader.GetOrdinal("TEN_LOP_HOC")),
+                    CourseName = reader.IsDBNull(reader.GetOrdinal("TEN_KHOA_HOC")) ? null : reader.GetString(reader.GetOrdinal("TEN_KHOA_HOC"))
+                };
+            }
+            return null;
         }
 
         public async Task<ApiResponse<bool>> ApproveAsync(int registrationId, int? newClassId = null)
@@ -309,12 +387,14 @@ namespace QLTTTA_API.Services
                                  lh.ID_LOP_HOC,
                                  lh.TEN_LOP_HOC,
                                  kh.TEN_KHOA_HOC,
-                                 NVL(kh.HOC_PHI_TIEU_CHUAN,0) AS HOC_PHI_TIEU_CHUAN
+                                 NVL(kh.HOC_PHI_TIEU_CHUAN,0) AS HOC_PHI_TIEU_CHUAN,
+                                 hd.ID_HOA_DON
                           FROM DON_DANG_KY dk
                           JOIN HOC_VIEN hv ON hv.ID_HOC_VIEN = dk.ID_HOC_VIEN
                           LEFT JOIN TAI_KHOAN tk ON tk.ID_NGUOI_DUNG = hv.ID_HOC_VIEN
                           JOIN LOP_HOC lh ON lh.ID_LOP_HOC = dk.ID_LOP_HOC
-                          JOIN KHOA_HOC kh ON kh.ID_KHOA_HOC = lh.ID_KHOA_HOC{whereSql}
+                          JOIN KHOA_HOC kh ON kh.ID_KHOA_HOC = lh.ID_KHOA_HOC
+                          LEFT JOIN HOA_DON hd ON hd.ID_DANG_KY = dk.ID_DANG_KY{whereSql}
                           ORDER BY dk.ID_DANG_KY DESC";
             object? p = null;
             if (courseId.HasValue && classId.HasValue) p = new { cid = courseId.Value, lid = classId.Value };
@@ -344,7 +424,8 @@ namespace QLTTTA_API.Services
                     ClassId = r.GetInt32(7),
                     ClassName = r.IsDBNull(8) ? null : r.GetString(8),
                     CourseName = r.IsDBNull(9) ? null : r.GetString(9),
-                    StandardFee = r.IsDBNull(10) ? 0 : Convert.ToInt32(r.GetValue(10))
+                    StandardFee = r.IsDBNull(10) ? 0 : Convert.ToInt32(r.GetValue(10)),
+                    InvoiceId = r.IsDBNull(11) ? null : (int?)r.GetInt32(11)
                 });
             }
             return list;

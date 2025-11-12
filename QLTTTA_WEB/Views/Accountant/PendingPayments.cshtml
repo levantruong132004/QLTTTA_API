@@ -3,158 +3,157 @@
     ViewData["Title"] = "Quản lý thanh toán chờ xác nhận";
 }
 
-<div class="retro-card corner-decorated">
-    <div class="retro-card-header text-center">
-        <h2 class="retro-card-title">
-            <i class="fas fa-bell"></i> Thanh toán chờ xác nhận
-            @if (Model.Any())
-            {
-                <span class="badge bg-warning text-dark ms-2">@Model.Count</span>
-            }
-        </h2>
-    </div>
-    <div class="retro-card-body">
-        @if (TempData["SuccessMessage"] != null)
-        {
-            <div class="retro-alert retro-alert-success">
-                <div class="retro-alert-content">
-                    <i class="fas fa-check-circle"></i> @TempData["SuccessMessage"]
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header" style="background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%); color: white;">
+                    <h4 class="mb-0">
+                        <i class="fas fa-credit-card me-2"></i>
+                        Thanh toán chờ xác nhận
+                    </h4>
                 </div>
-            </div>
-        }
-        @if (TempData["ErrorMessage"] != null)
-        {
-            <div class="retro-alert retro-alert-danger">
-                <div class="retro-alert-content">
-                    <i class="fas fa-exclamation-circle"></i> @TempData["ErrorMessage"]
-                </div>
-            </div>
-        }
+                <div class="card-body">
+                    @if (TempData["SuccessMessage"] != null)
+                    {
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            <i class="fas fa-check-circle me-2"></i>
+                            @TempData["SuccessMessage"]
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    }
 
-        @if (!Model.Any())
-        {
-            <div class="retro-alert retro-alert-info">
-                <div class="retro-alert-content">
-                    <i class="fas fa-info-circle"></i> <strong>Không có yêu cầu thanh toán nào đang chờ xác nhận</strong>
-                    <p class="mb-0 mt-2">Tất cả các thanh toán đã được xử lý.</p>
+                    @if (TempData["ErrorMessage"] != null)
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            @TempData["ErrorMessage"]
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    }
+
+                    @if (Model != null && Model.Any())
+                    {
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Có <strong>@Model.Count</strong> thanh toán đang chờ xác nhận từ học viên.
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Mã hóa đơn</th>
+                                        <th>Học viên</th>
+                                        <th>Khóa học</th>
+                                        <th>Số tiền</th>
+                                        <th>Ngày gửi</th>
+                                        <th class="text-center">Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in Model)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <strong class="text-primary">@item.InvoiceCode</strong><br>
+                                                <small class="text-muted">@item.RegistrationCode</small>
+                                            </td>
+                                            <td>
+                                                <strong>@item.StudentName</strong>
+                                            </td>
+                                            <td>@item.CourseName</td>
+                                            <td>
+                                                <span class="badge bg-success fs-6">
+                                                    @item.Amount.ToString("N0") VNĐ
+                                                </span>
+                                            </td>
+                                            <td>
+                                                @item.CreatedDate.ToString("dd/MM/yyyy HH:mm")
+                                            </td>
+                                            <td class="text-center">
+                                                <form method="post" asp-action="ConfirmPayment" style="display: inline;">
+                                                    <input type="hidden" name="invoiceId" value="@item.InvoiceId" />
+                                                    <button type="button" class="btn btn-success btn-sm" 
+                                                            onclick="confirmPayment(@item.InvoiceId, '@item.StudentName', '@item.InvoiceCode')">
+                                                        <i class="fas fa-check me-1"></i>
+                                                        Xác nhận
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-5">
+                            <div class="mb-3">
+                                <i class="fas fa-credit-card fa-4x text-muted"></i>
+                            </div>
+                            <h5 class="text-muted">Không có thanh toán nào đang chờ xác nhận</h5>
+                            <p class="text-muted">Tất cả các thanh toán đã được xử lý.</p>
+                        </div>
+                    }
                 </div>
             </div>
-        }
-        else
-        {
-            <div class="retro-alert retro-alert-warning mb-4">
-                <div class="retro-alert-content">
-                    <i class="fas fa-exclamation-triangle"></i> <strong>Lưu ý:</strong> Vui lòng kiểm tra kỹ thông tin chuyển khoản trước khi xác nhận thanh toán!
-                </div>
-            </div>
-
-            <div class="table-responsive">
-                <table class="retro-table">
-                    <thead>
-                        <tr>
-                            <th><i class="fas fa-hashtag me-2"></i>STT</th>
-                            <th><i class="fas fa-file-invoice me-2"></i>Mã hóa đơn</th>
-                            <th><i class="fas fa-user me-2"></i>Học viên</th>
-                            <th><i class="fas fa-book me-2"></i>Khóa học</th>
-                            <th><i class="fas fa-money-bill-wave me-2"></i>Số tiền</th>
-                            <th><i class="fas fa-calendar me-2"></i>Ngày tạo</th>
-                            <th><i class="fas fa-cogs me-2"></i>Thao tác</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @for (int i = 0; i < Model.Count; i++)
-                        {
-                            var payment = Model[i];
-                            <tr>
-                                <td><strong>@(i + 1)</strong></td>
-                                <td>
-                                    <span class="retro-badge retro-badge-primary">@payment.InvoiceCode</span>
-                                    <br />
-                                    <small class="text-muted">Đăng ký: @payment.RegistrationCode</small>
-                                </td>
-                                <td>
-                                    <strong>@payment.StudentName</strong>
-                                </td>
-                                <td>@payment.CourseName</td>
-                                <td>
-                                    <span class="text-danger fw-bold">@payment.Amount.ToString("N0") đ</span>
-                                </td>
-                                <td>@payment.CreatedDate.ToString("dd/MM/yyyy HH:mm")</td>
-                                <td>
-                                    <form asp-controller="Accountant" asp-action="ConfirmPayment" method="post" 
-                                          style="display: inline;"
-                                          onsubmit="return confirm('⚠️ Bạn đã kiểm tra kỹ thông tin chuyển khoản?\n\nHọc viên: @payment.StudentName\nSố tiền: @payment.Amount.ToString("N0") đ\n\nXác nhận thanh toán?')">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="invoiceId" value="@payment.InvoiceId" />
-                                        <button type="submit" class="btn-retro btn-retro-success btn-retro-sm">
-                                            <i class="fas fa-check-circle"></i> Xác nhận
-                                        </button>
-                                    </form>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="mt-4 text-center">
-                <a class="btn btn-outline-secondary" asp-controller="Accountant" asp-action="Index">
-                    <i class="fas fa-arrow-left"></i> Quay lại trang chủ
-                </a>
-            </div>
-        }
+        </div>
     </div>
 </div>
 
-<style>
-    .retro-badge-primary {
-        background-color: var(--vintage-brown);
-        color: var(--vintage-cream);
-        padding: 4px 8px;
-        border-radius: 3px;
-        font-weight: bold;
-    }
-    
-    .badge {
-        font-size: 0.9rem;
-    }
+<!-- Modal xác nhận -->
+<div class="modal fade" id="confirmModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-question-circle text-warning me-2"></i>
+                    Xác nhận thanh toán
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Bạn có chắc chắn muốn xác nhận thanh toán cho:</p>
+                <div class="alert alert-info">
+                    <strong>Học viên:</strong> <span id="studentName"></span><br>
+                    <strong>Hóa đơn:</strong> <span id="invoiceCode"></span>
+                </div>
+                <p class="text-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Sau khi xác nhận, hóa đơn sẽ chuyển sang trạng thái "Đã thanh toán" và không thể hoàn tác.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i>Hủy
+                </button>
+                <form method="post" asp-action="ConfirmPayment" id="confirmForm" style="display: inline;">
+                    <input type="hidden" name="invoiceId" id="confirmInvoiceId" />
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-check me-1"></i>Xác nhận thanh toán
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 
-    .table-responsive {
-        overflow-x: auto;
-    }
-
-    .retro-table {
-        width: 100%;
-        border-collapse: separate;
-        border-spacing: 0;
-    }
-
-    .retro-table thead th {
-        background-color: var(--vintage-brown);
-        color: var(--vintage-cream);
-        padding: 12px;
-        text-align: left;
-        border: 2px solid var(--vintage-dark-brown);
-    }
-
-    .retro-table tbody td {
-        padding: 10px 12px;
-        border: 1px solid var(--vintage-brown);
-        background-color: var(--vintage-cream);
-    }
-
-    .retro-table tbody tr:hover {
-        background-color: #f5f0e8;
-    }
-
-    @@media (max-width: 768px) {
-        .retro-table {
-            font-size: 0.85rem;
+@section Scripts {
+    <script>
+        function confirmPayment(invoiceId, studentName, invoiceCode) {
+            document.getElementById('studentName').textContent = studentName;
+            document.getElementById('invoiceCode').textContent = invoiceCode;
+            document.getElementById('confirmInvoiceId').value = invoiceId;
+            
+            var modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+            modal.show();
         }
-        
-        .retro-table thead th,
-        .retro-table tbody td {
-            padding: 8px;
-        }
-    }
-</style>
+
+        // Auto-refresh mỗi 30 giây để cập nhật danh sách mới
+        setInterval(function() {
+            location.reload();
+        }, 30000);
+    </script>
+}

@@ -99,6 +99,7 @@ namespace QLTTTA_API.Models
         public string? Algorithm { get; set; } // HOA_DON.THUAT_TOAN e.g. RSA-SHA256
         public int AccountantId { get; set; } // HOA_DON.ID_KE_TOAN_KY
         public DateTime? SignedDate { get; set; } // HOA_DON.NGAY_KY
+        public string? SignatureImageBase64 { get; set; } // HOA_DON.CHU_KY_HINH_BASE64 (ảnh chữ ký tay)
     }
 
     // Thanh toán

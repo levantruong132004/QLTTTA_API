@@ -99,7 +99,58 @@ namespace QLTTTA_API.Controllers
             {
                 var inv = await _invoiceService.GetByRegistrationAsync(registrationId);
                 if (inv == null) return NotFound(new { success = false, message = "Không tìm thấy hóa đơn" });
-                return Ok(new { success = true, data = inv });
+                
+                // Kiểm tra và xác thực chữ ký nếu có (giống như API with-signature)
+                object? signaturePayload = null;
+                var hasStoredSignature = !string.IsNullOrEmpty(inv.SignatureBase64);
+                if (hasStoredSignature)
+                {
+                    try
+                    {
+                        var verifyResult = await _digitalSignatureService.VerifyInvoiceSignatureAsync(inv.InvoiceId);
+                        if (verifyResult.Success)
+                        {
+                            signaturePayload = new
+                            {
+                                isValid = verifyResult.IsValidSignature,
+                                signedBy = verifyResult.SignedBy,
+                                signedDate = verifyResult.SignedDate,
+                                algorithm = string.IsNullOrEmpty(inv.Algorithm) ? "RSA-SHA256" : inv.Algorithm
+                            };
+                        }
+                        else
+                        {
+                            signaturePayload = new
+                            {
+                                isValid = false,
+                                signedBy = (string?)null,
+                                signedDate = (DateTime?)null,
+                                algorithm = string.IsNullOrEmpty(inv.Algorithm) ? "RSA-SHA256" : inv.Algorithm
+                            };
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Verify invoice signature error for registration {RegistrationId}", registrationId);
+                        signaturePayload = new
+                        {
+                            isValid = false,
+                            signedBy = (string?)null,
+                            signedDate = (DateTime?)null,
+                            algorithm = string.IsNullOrEmpty(inv.Algorithm) ? "RSA-SHA256" : inv.Algorithm
+                        };
+                    }
+                }
+
+                return Ok(new 
+                { 
+                    success = true, 
+                    data = new
+                    {
+                        invoice = inv,
+                        signature = signaturePayload
+                    }
+                });
             }
             catch (OracleException oex)
             {
@@ -218,6 +269,55 @@ namespace QLTTTA_API.Controllers
             {
                 _logger.LogError(ex, "StudentPay error for {InvoiceId}", dto.InvoiceId);
                 return StatusCode(500, new { success = false, message = "Có lỗi xảy ra khi xử lý thanh toán" });
+            }
+        }
+
+        public class PrintAndEmailInvoiceRequest
+        {
+            public int InvoiceId { get; set; }
+            public int AccountantId { get; set; }
+        }
+
+        // In hóa đơn và gửi PDF qua email cho học viên
+        [HttpPost("print-and-email")]
+        public async Task<IActionResult> PrintAndEmailInvoice([FromBody] PrintAndEmailInvoiceRequest req)
+        {
+            if (req == null || req.InvoiceId <= 0 || req.AccountantId <= 0)
+                return BadRequest(new { success = false, message = "Dữ liệu không hợp lệ" });
+
+            try
+            {
+                // 1. Lấy thông tin hóa đơn
+                var invoice = await _invoiceService.GetByIdAsync(req.InvoiceId);
+                if (invoice == null)
+                    return NotFound(new { success = false, message = "Không tìm thấy hóa đơn" });
+
+                // 2. Gọi service để tạo PDF và gửi email
+                var result = await _invoiceService.GeneratePdfAndSendEmailAsync(req.InvoiceId, req.AccountantId);
+                
+                if (result.Success)
+                {
+                    return Ok(new 
+                    { 
+                        success = true, 
+                        message = "Đã tạo PDF hóa đơn và gửi email thành công",
+                        data = new 
+                        {
+                            invoiceCode = invoice.InvoiceCode,
+                            emailSent = result.Data?.EmailAddress,
+                            pdfGenerated = true
+                        }
+                    });
+                }
+                else
+                {
+                    return StatusCode(500, new { success = false, message = result.Message });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "PrintAndEmailInvoice error for InvoiceId {InvoiceId}", req.InvoiceId);
+                return StatusCode(500, new { success = false, message = "Có lỗi xảy ra khi in hóa đơn và gửi email" });
             }
         }
     }

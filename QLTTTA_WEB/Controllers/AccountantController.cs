@@ -405,5 +405,57 @@ namespace QLTTTA_WEB.Controllers
 
             return RedirectToAction("PendingPayments");
         }
+
+        // In hóa đơn và gửi PDF qua email cho học viên
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> PrintAndEmailInvoice(int invoiceId)
+        {
+            if (HttpContext.Session.GetString("UserId") == null)
+                return RedirectToAction("Login", "Account");
+
+            try
+            {
+                var userIdStr = HttpContext.Session.GetString("UserId");
+                if (!int.TryParse(userIdStr, out int accountantId))
+                {
+                    TempData["ErrorMessage"] = "Không xác định được kế toán";
+                    return RedirectToAction("Index");
+                }
+
+                // Gọi API để tạo PDF và gửi email
+                var payload = new { InvoiceId = invoiceId, AccountantId = accountantId };
+                var json = JsonSerializer.Serialize(payload);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                
+                var res = await _httpClient.PostAsync("api/invoices/print-and-email", content);
+                var body = await res.Content.ReadAsStringAsync();
+
+                if (res.IsSuccessStatusCode)
+                {
+                    TempData["SuccessMessage"] = "Đã in hóa đơn và gửi PDF qua email cho học viên thành công";
+                }
+                else
+                {
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(body);
+                        var msg = doc.RootElement.TryGetProperty("message", out var m) ? m.GetString() : "In hóa đơn thất bại";
+                        TempData["ErrorMessage"] = msg;
+                    }
+                    catch
+                    {
+                        TempData["ErrorMessage"] = "In hóa đơn thất bại";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "PrintAndEmailInvoice failed for invoice {InvoiceId}", invoiceId);
+                TempData["ErrorMessage"] = "Có lỗi xảy ra khi in hóa đơn";
+            }
+
+            return RedirectToAction("Index");
+        }
     }
 }

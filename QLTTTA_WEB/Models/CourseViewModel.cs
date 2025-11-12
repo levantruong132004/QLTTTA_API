@@ -37,6 +37,8 @@
         public int Amount { get; set; }
         public string Status { get; set; } = "";
         public int RegistrationId { get; set; }
+        public string? SignatureBase64 { get; set; } // Chữ ký số (data ký RSA, không phải ảnh)
+        public string? SignatureImageBase64 { get; set; } // Ảnh chữ ký tay đã scan
     }
 
     public class StudentInvoiceDetailViewModel

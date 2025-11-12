@@ -77,15 +77,21 @@
                                 <i class="fas fa-cog"></i> Quản trị
                             </a>
                             <ul class="dropdown-menu">
+                                <!-- Menu cơ bản cho tất cả nhân viên và admin -->
                                 <li><a class="dropdown-item" asp-controller="Manage" asp-action="Courses"><i
                                             class="fas fa-book"></i> Quản lý khóa học</a></li>
                                 <li><a class="dropdown-item" asp-controller="Manage" asp-action="Classes"><i
                                             class="fas fa-chalkboard"></i> Quản lý lớp</a></li>
                                 <li><a class="dropdown-item" asp-controller="Manage" asp-action="Registrations"><i
                                             class="fas fa-clipboard-check"></i> Duyệt đăng ký</a></li>
-                                <li><hr class="dropdown-divider" /></li>
-                                <li><a class="dropdown-item" asp-controller="Manage" asp-action="Staff"><i class="fas fa-users"></i> Quản lý nhân viên</a></li>
-                                <li><a class="dropdown-item" asp-controller="Manage" asp-action="Invoices"><i class="fas fa-file-invoice-dollar"></i> Quản lý hóa đơn</a></li>
+                                
+                                <!-- Chỉ hiển thị cho admin (roleId == 5) -->
+                                @if (__roleId == 5)
+                                {
+                                    <li><hr class="dropdown-divider" /></li>
+                                    <li><a class="dropdown-item" asp-controller="Manage" asp-action="Staff"><i class="fas fa-users"></i> Quản lý nhân viên</a></li>
+                                    <li><a class="dropdown-item" asp-controller="Manage" asp-action="Invoices"><i class="fas fa-file-invoice-dollar"></i> Quản lý hóa đơn</a></li>
+                                }
                             </ul>
                         </li>
                     }
@@ -148,6 +154,7 @@
                     @if (__mRoleId == 4 || __mRoleName.Contains("NhanVienHocVu", StringComparison.OrdinalIgnoreCase) ||
                                     __mRoleName.Contains("QuanTri", StringComparison.OrdinalIgnoreCase))
                     {
+                        <!-- Menu cơ bản cho tất cả nhân viên và admin -->
                         <li class="mb-2">
                             <a class="retro-nav-link" style="display:block;" asp-controller="Manage" asp-action="Courses"><i
                                     class="fas fa-book"></i> Quản lý khóa học</a>
@@ -160,13 +167,18 @@
                             <a class="retro-nav-link" style="display:block;" asp-controller="Manage"
                                 asp-action="Registrations"><i class="fas fa-clipboard-check"></i> Duyệt đăng ký</a>
                         </li>
-                        <li><hr class="dropdown-divider" style="border-color:#8b6f47" /></li>
-                        <li class="mb-2">
-                            <a class="retro-nav-link" style="display:block;" asp-controller="Manage" asp-action="Staff"><i class="fas fa-users"></i> Quản lý nhân viên</a>
-                        </li>
-                        <li class="mb-2">
-                            <a class="retro-nav-link" style="display:block;" asp-controller="Manage" asp-action="Invoices"><i class="fas fa-file-invoice-dollar"></i> Quản lý hóa đơn</a>
-                        </li>
+                        
+                        <!-- Chỉ hiển thị cho admin (roleId == 5) -->
+                        @if (__mRoleId == 5)
+                        {
+                            <li><hr class="dropdown-divider" style="border-color:#8b6f47" /></li>
+                            <li class="mb-2">
+                                <a class="retro-nav-link" style="display:block;" asp-controller="Manage" asp-action="Staff"><i class="fas fa-users"></i> Quản lý nhân viên</a>
+                            </li>
+                            <li class="mb-2">
+                                <a class="retro-nav-link" style="display:block;" asp-controller="Manage" asp-action="Invoices"><i class="fas fa-file-invoice-dollar"></i> Quản lý hóa đơn</a>
+                            </li>
+                        }
                     }
                     <li class="mb-2">
                         <form asp-controller="Account" asp-action="Logout" method="post">

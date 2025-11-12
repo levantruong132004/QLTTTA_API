@@ -73,15 +73,26 @@ namespace QLTTTA_API.Services
                 var ok = await UpdateAccountantPublicKeyAsync(conn, accountantId, publicKeyPem);
                 if (!ok)
                 {
-                    return new RSAKeyPairResult { Success = false, Message = "Không cập nhật được public key cho kế toán" };
+                    return new RSAKeyPairResult {
+                        Success = false,
+                        Message = "Không cập nhật được public key cho kế toán"
+                    };
                 }
 
-                return new RSAKeyPairResult { Success = true, PublicKeyPem = publicKeyPem, PrivateKeyPem = privateKeyPem, Message = "Đã tạo và lưu public key cho kế toán" };
+                return new RSAKeyPairResult {
+                    Success = true,
+                    PublicKeyPem = publicKeyPem,
+                    PrivateKeyPem = privateKeyPem,
+                    Message = "Đã tạo và lưu public key cho kế toán"
+                };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "GenerateKeyPairAndSaveAsync error");
-                return new RSAKeyPairResult { Success = false, Message = "Lỗi tạo/lưu public key: " + ex.Message };
+                return new RSAKeyPairResult {
+                    Success = false,
+                    Message = "Lỗi tạo/lưu public key: " + ex.Message
+                };
             }
         }
 
@@ -227,14 +238,14 @@ namespace QLTTTA_API.Services
                 var invoiceData = CreateInvoiceDataForSigning(invoice);
                 var dataBytes = Encoding.UTF8.GetBytes(invoiceData);
 
-                // Xác thực chữ ký bằng public key từ bảng TTTA
+                // Xác thực chữ ký bằng public key từ bảng TTTA vào RSA object
                 using var rsa = RSA.Create();
                 rsa.ImportRSAPublicKey(Convert.FromBase64String(
                     centerInfo.PublicKeyPem.Replace("-----BEGIN RSA PUBLIC KEY-----", "")
                                .Replace("-----END RSA PUBLIC KEY-----", "")
                                .Replace("\n", "").Replace("\r", "")
                 ), out _);
-
+                // Xác thực chữ ký                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
                 var signature = Convert.FromBase64String(invoice.SignatureBase64);
                 var isValid = rsa.VerifyData(dataBytes, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
 
@@ -250,7 +261,7 @@ namespace QLTTTA_API.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to verify invoice signature {InvoiceId}", invoiceId);
+                _logger.LogError(ex, "Failed to verify invoice signature {InvoiceId}", invoiceId);                                                                                                                                                                                                                                                                       
                 return new VerifySignatureResult
                 {
                     Success = false,

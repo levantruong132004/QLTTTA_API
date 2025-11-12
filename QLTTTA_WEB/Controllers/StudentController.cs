@@ -283,7 +283,16 @@ namespace QLTTTA_WEB.Controllers
                         JsonElement invData;
                         if (TryGetPropertyCI(invDoc.RootElement, "data", out var tmpData))
                         {
-                            invData = tmpData;
+                            // API trả về { success: true, data: { invoice: {...}, signature: {...} } }
+                            if (TryGetPropertyCI(tmpData, "invoice", out var invoiceData))
+                            {
+                                invData = invoiceData;
+                            }
+                            else
+                            {
+                                // Fallback: data trực tiếp là invoice object
+                                invData = tmpData;
+                            }
                         }
                         else
                         {
@@ -315,75 +324,40 @@ namespace QLTTTA_WEB.Controllers
                             DueDate = GetDateTimeFlexible(invData, "dueDate"),
                             Amount = GetIntFlexible(invData, "amount", 0),
                             Status = TryGetPropertyCI(invData, "status", out var st) ? (st.GetString() ?? string.Empty) : string.Empty,
-                            RegistrationId = registrationId
+                            RegistrationId = registrationId,
+                            SignatureBase64 = TryGetPropertyCI(invData, "signatureBase64", out var sig64) ? sig64.GetString() : null,
+                            SignatureImageBase64 = TryGetPropertyCI(invData, "signatureImageBase64", out var sigImg) ? sigImg.GetString() : null
                         };
 
-                        // Sau khi có invoiceId, lấy thông tin chữ ký số
-                        var invSigRes = await _httpClient.GetAsync($"api/invoices/with-signature/{invoiceId}");
-                        var invSigBody = await invSigRes.Content.ReadAsStringAsync();
-                        if (invSigRes.IsSuccessStatusCode)
+                        // Xử lý signature từ API response mới
+                        if (TryGetPropertyCI(invDoc.RootElement, "data", out var dataRoot) &&
+                            TryGetPropertyCI(dataRoot, "signature", out var sigData) && 
+                            sigData.ValueKind != JsonValueKind.Null)
                         {
-                            using var sigDoc = JsonDocument.Parse(invSigBody);
-                            if (TryGetPropertyCI(sigDoc.RootElement, "data", out var data))
+                            signature = new DigitalSignatureViewModel
                             {
-                                if (TryGetPropertyCI(data, "invoice", out var invFull))
-                                {
-                                    invoice.InvoiceCode = TryGetPropertyCI(invFull, "invoiceCode", out var ic2) ? ic2.GetString() ?? invoice.InvoiceCode : invoice.InvoiceCode;
-                                    invoice.CreatedDate = GetDateTimeFlexible(invFull, "createdDate") ?? invoice.CreatedDate;
-                                    invoice.DueDate = GetDateTimeFlexible(invFull, "dueDate") ?? invoice.DueDate;
-                                    invoice.Amount = GetIntFlexible(invFull, "amount", invoice.Amount);
-                                    invoice.Status = TryGetPropertyCI(invFull, "status", out var stf) ? stf.GetString() ?? invoice.Status : invoice.Status;
-                                }
-
-                                if (TryGetPropertyCI(data, "signature", out var sigData) && sigData.ValueKind != JsonValueKind.Null)
-                                {
-                                    signature = new DigitalSignatureViewModel
-                                    {
-                                        IsSigned = true,
-                                        IsValid = TryGetPropertyCI(sigData, "isValid", out var iv) && (iv.ValueKind == JsonValueKind.True || (iv.ValueKind == JsonValueKind.String && bool.TryParse(iv.GetString(), out var boolVal) && boolVal)),
-                                        SignedBy = TryGetPropertyCI(sigData, "signedBy", out var sb) ? sb.GetString() : null,
-                                        SignedDate = TryGetPropertyCI(sigData, "signedDate", out var sd) && sd.ValueKind != JsonValueKind.Null ? sd.GetDateTime() : (DateTime?)null,
-                                        Algorithm = TryGetPropertyCI(sigData, "algorithm", out var alg) ? alg.GetString() : null
-                                    };
-                                }
-                                else
-                                {
-                                    if (TryGetPropertyCI(data, "invoice", out var invObj) &&
-                                        (TryGetPropertyCI(invObj, "signatureBase64", out var sigBase) && sigBase.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(sigBase.GetString())
-                                         || TryGetPropertyCI(invObj, "signedDate", out var sdt) && sdt.ValueKind != JsonValueKind.Null))
-                                    {
-                                        signature = new DigitalSignatureViewModel
-                                        {
-                                            IsSigned = true,
-                                            IsValid = false,
-                                            SignedBy = null,
-                                            SignedDate = TryGetPropertyCI(invObj, "signedDate", out var sd2) && sd2.ValueKind != JsonValueKind.Null ? sd2.GetDateTime() : (DateTime?)null,
-                                            Algorithm = TryGetPropertyCI(invObj, "algorithm", out var alg2) ? alg2.GetString() : null
-                                        };
-                                    }
-                                    else
-                                    {
-                                        signature = new DigitalSignatureViewModel { IsSigned = false };
-                                    }
-                                }
-                            }
+                                IsSigned = true,
+                                IsValid = TryGetPropertyCI(sigData, "isValid", out var iv) && (iv.ValueKind == JsonValueKind.True || (iv.ValueKind == JsonValueKind.String && bool.TryParse(iv.GetString(), out var boolVal) && boolVal)),
+                                SignedBy = TryGetPropertyCI(sigData, "signedBy", out var sb) ? sb.GetString() : null,
+                                SignedDate = TryGetPropertyCI(sigData, "signedDate", out var sd) && sd.ValueKind != JsonValueKind.Null ? sd.GetDateTime() : (DateTime?)null,
+                                Algorithm = TryGetPropertyCI(sigData, "algorithm", out var alg) ? alg.GetString() : null
+                            };
+                        }
+                        else if (!string.IsNullOrEmpty(invoice.SignatureBase64))
+                        {
+                            // Fallback: có chữ ký trong invoice nhưng không có thông tin signature riêng
+                            signature = new DigitalSignatureViewModel
+                            {
+                                IsSigned = true,
+                                IsValid = false, // Mặc định false nếu không verify được
+                                SignedBy = null,
+                                SignedDate = null,
+                                Algorithm = "RSA-SHA256"
+                            };
                         }
                         else
                         {
-                            string msg = "Không thể tải thông tin chữ ký";
-                            try
-                            {
-                                using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(invSigBody) ? "{}" : invSigBody);
-                                if (doc.RootElement.TryGetProperty("message", out var m) && !string.IsNullOrWhiteSpace(m.GetString()))
-                                    msg = m.GetString()!;
-                            }
-                            catch { msg = string.IsNullOrWhiteSpace(invSigBody) ? msg : invSigBody; }
-                            TempData["ErrorMessage"] = msg;
-
-                            if (TryGetPropertyCI(invData, "signatureBase64", out var sigBase2) && sigBase2.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(sigBase2.GetString()))
-                            {
-                                signature = new DigitalSignatureViewModel { IsSigned = true, IsValid = false };
-                            }
+                            signature = new DigitalSignatureViewModel { IsSigned = false };
                         }
                     }
                     catch (Exception ex)
