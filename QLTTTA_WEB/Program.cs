@@ -33,6 +33,30 @@ if (!app.Environment.IsDevelopment())
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
+// Redirect localhost navigations to PublicBaseUrl (Cloudflare) if provided
+app.Use(async (ctx, next) =>
+{
+    var publicBase = app.Configuration["PublicBaseUrl"];
+    if (!string.IsNullOrWhiteSpace(publicBase))
+    {
+        var accept = ctx.Request.Headers["Accept"].ToString();
+        bool wantsHtml = accept.Contains("text/html", StringComparison.OrdinalIgnoreCase) || string.IsNullOrEmpty(accept);
+        var host = ctx.Request.Host.Host;
+        bool isLocalHost = string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
+                           || string.Equals(host, "127.0.0.1")
+                           || string.Equals(host, "::1");
+        if (wantsHtml && isLocalHost && Uri.TryCreate(publicBase, UriKind.Absolute, out var pu))
+        {
+            if (!string.Equals(host, pu.Host, StringComparison.OrdinalIgnoreCase))
+            {
+                var target = $"{pu.Scheme}://{pu.Authority}{ctx.Request.PathBase}{ctx.Request.Path}{ctx.Request.QueryString}";
+                ctx.Response.Redirect(target, permanent: false);
+                return;
+            }
+        }
+    }
+    await next();
+});
 app.UseStaticFiles();
 
 app.UseRouting();

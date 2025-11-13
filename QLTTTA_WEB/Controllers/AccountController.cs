@@ -17,20 +17,25 @@ namespace QLTTTA_WEB.Controllers
         }
 
         [HttpGet]
-        public IActionResult Login()
+        public IActionResult Login(string? returnUrl)
         {
             // Kiểm tra nếu đã đăng nhập rồi thì redirect về trang chính
             if (HttpContext.Session.GetString("UserId") != null)
             {
+                if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+                {
+                    return Redirect(returnUrl);
+                }
                 return RedirectToAction("Index", "Home");
             }
 
+            ViewBag.ReturnUrl = string.IsNullOrWhiteSpace(returnUrl) ? null : returnUrl;
             return View();
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Login(LoginViewModel model)
+        public async Task<IActionResult> Login(LoginViewModel model, string? returnUrl)
         {
             if (!ModelState.IsValid)
             {
@@ -82,6 +87,10 @@ namespace QLTTTA_WEB.Controllers
                         }
 
                         TempData["SuccessMessage"] = "Đăng nhập thành công!";
+                        if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+                        {
+                            return Redirect(returnUrl);
+                        }
                         return RedirectToAction("Index", "Home");
                     }
                 }
@@ -107,6 +116,7 @@ namespace QLTTTA_WEB.Controllers
                 ModelState.AddModelError("", $"Có lỗi xảy ra trong quá trình đăng nhập: {ex.Message}");
             }
 
+            ViewBag.ReturnUrl = string.IsNullOrWhiteSpace(returnUrl) ? null : returnUrl;
             return View(model);
         }
 

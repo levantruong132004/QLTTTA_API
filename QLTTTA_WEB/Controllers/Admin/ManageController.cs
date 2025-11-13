@@ -30,7 +30,11 @@ namespace QLTTTA_WEB.Controllers.Admin
 
         public async Task<IActionResult> Courses()
         {
-            if (!IsStaff()) return RedirectToAction("Index", "Home");
+            if (!IsStaff())
+            {
+                var ru = Url.Content("~" + Request.Path + Request.QueryString);
+                return RedirectToAction("Login", "Account", new { returnUrl = ru });
+            }
             var res = await _http.GetAsync("api/courses");
             var body = await res.Content.ReadAsStringAsync();
             if (!res.IsSuccessStatusCode)
@@ -86,7 +90,11 @@ namespace QLTTTA_WEB.Controllers.Admin
 
         public async Task<IActionResult> Classes(int? courseId, string? search)
         {
-            if (!IsStaff()) return RedirectToAction("Index", "Home");
+            if (!IsStaff())
+            {
+                var ru = Url.Content("~" + Request.Path + Request.QueryString);
+                return RedirectToAction("Login", "Account", new { returnUrl = ru });
+            }
             var qs = new List<string>();
             if (courseId.HasValue) qs.Add($"courseId={courseId}");
             if (!string.IsNullOrWhiteSpace(search)) qs.Add($"search={Uri.EscapeDataString(search)}");
@@ -179,7 +187,11 @@ namespace QLTTTA_WEB.Controllers.Admin
 
         public async Task<IActionResult> Schedules(int classId)
         {
-            if (!IsStaff()) return RedirectToAction("Index", "Home");
+            if (!IsStaff())
+            {
+                var ru = Url.Content("~" + Request.Path + Request.QueryString);
+                return RedirectToAction("Login", "Account", new { returnUrl = ru });
+            }
             var res = await _http.GetAsync($"api/schedules/by-class/{classId}");
             var body = await res.Content.ReadAsStringAsync();
             List<QLTTTA_WEB.Models.ScheduleItem> data;
@@ -313,7 +325,11 @@ namespace QLTTTA_WEB.Controllers.Admin
         [HttpGet]
         public IActionResult QrLookup(string? returnUrl)
         {
-            if (!IsStaff()) return RedirectToAction("Index", "Home");
+            if (!IsStaff())
+            {
+                var ru = Url.Content("~" + Request.Path + Request.QueryString);
+                return RedirectToAction("Login", "Account", new { returnUrl = ru });
+            }
             ViewBag.ReturnUrl = string.IsNullOrWhiteSpace(returnUrl) ? null : returnUrl;
             return View("~/Views/Admin/QrLookup.cshtml");
         }
@@ -321,7 +337,11 @@ namespace QLTTTA_WEB.Controllers.Admin
         [HttpGet]
         public async Task<IActionResult> QrSearch(string q, string? returnUrl)
         {
-            if (!IsStaff()) return RedirectToAction("Index", "Home");
+            if (!IsStaff())
+            {
+                var ru = Url.Content("~" + Request.Path + Request.QueryString);
+                return RedirectToAction("Login", "Account", new { returnUrl = ru });
+            }
             if (string.IsNullOrWhiteSpace(q))
             {
                 TempData["ErrorMessage"] = "Không có dữ liệu QR hoặc mã để tra cứu.";
@@ -330,6 +350,17 @@ namespace QLTTTA_WEB.Controllers.Admin
 
             try
             {
+                // Nếu q là 1 URL và có tham số q bên trong (từ việc quét QR là link), tách nội tham số ra
+                if (Uri.TryCreate(q.Trim(), UriKind.Absolute, out var maybeUrl))
+                {
+                    var innerQ = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(maybeUrl.Query).TryGetValue("q", out var vals)
+                        ? vals.ToString()
+                        : null;
+                    if (!string.IsNullOrWhiteSpace(innerQ))
+                    {
+                        q = innerQ;
+                    }
+                }
                 // Heuristics: if input looks like CLASS:<code> or plain class code, resolve class and load its pending registrations
                 var text = q.Trim();
                 var upper = text.ToUpperInvariant();
@@ -411,7 +442,11 @@ namespace QLTTTA_WEB.Controllers.Admin
         [HttpGet]
         public IActionResult QrImage(string payload, int size = 400)
         {
-            if (!IsStaff()) return RedirectToAction("Index", "Home");
+            if (!IsStaff())
+            {
+                var ru = Url.Content("~" + Request.Path + Request.QueryString);
+                return RedirectToAction("Login", "Account", new { returnUrl = ru });
+            }
             if (string.IsNullOrWhiteSpace(payload)) return BadRequest("Missing payload");
             try
             {

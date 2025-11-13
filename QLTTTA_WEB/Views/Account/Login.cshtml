@@ -166,6 +166,11 @@
 
             <form asp-action="Login" method="post" id="loginForm" class="login-form">
                 @Html.AntiForgeryToken()
+                @{ var __ru = (string?)ViewBag.ReturnUrl ?? (string?)Context.Request.Query["returnUrl"]; }
+                @if (!string.IsNullOrWhiteSpace(__ru))
+                {
+                    <input type="hidden" name="returnUrl" value="@__ru" />
+                }
 
                 <div class="form-group-retro">
                     <label asp-for="Username" class="form-label-retro">

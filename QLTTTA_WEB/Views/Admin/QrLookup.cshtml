@@ -41,7 +41,12 @@
 
         <hr />
         <h5 class="mb-2"><i class="fas fa-camera"></i> Dùng camera để quét</h5>
-        <p class="text-muted">Cho phép trình duyệt dùng camera, đưa mã QR vào khung. Khi quét thành công sẽ tự chuyển đến trang kết quả.</p>
+        <p class="text-muted">Nhấn "Mở camera" và cho phép quyền truy cập. Đưa mã QR vào khung, quét thành công sẽ tự chuyển đến trang kết quả.</p>
+        <div class="d-flex align-items-center gap-2 mb-2">
+            <select id="cameraSelect" class="form-select" style="max-width: 320px; display: none;"></select>
+            <button id="startCamBtn" type="button" class="btn btn-outline-primary"><i class="fas fa-video"></i> Mở camera</button>
+            <button id="stopCamBtn" type="button" class="btn btn-outline-secondary" disabled><i class="fas fa-stop-circle"></i> Tắt camera</button>
+        </div>
         <div id="reader" style="max-width: 500px;"></div>
         <div id="scanStatus" class="mt-2 text-muted"></div>
 
@@ -72,47 +77,132 @@
         function openQr() {
             const q = document.getElementById('qrInput').value || '';
             if (!q.trim()) { alert('Nhập nội dung trước khi tạo mã QR.'); return; }
-            const url = '@Url.Action("QrImage", "Manage")' + '?payload=' + encodeURIComponent(q) + '&size=480';
+            // Build a full public URL that opens the search results directly on mobile
+            const base = (window.publicBaseUrl && window.publicBaseUrl.trim()) || window.location.origin;
+            const target = new URL('@Url.Action("QrSearch", "Public")', base);
+            target.searchParams.set('q', q);
+            const ru = '@((string?)ViewBag.ReturnUrl ?? "")';
+            if (ru) target.searchParams.set('returnUrl', ru);
+            // Render a QR image that encodes the absolute URL
+            const url = '@Url.Action("QrImage", "Manage")' + '?payload=' + encodeURIComponent(target.toString()) + '&size=480';
             window.open(url, '_blank');
         }
 
         window.addEventListener('load', function() {
             const status = document.getElementById('scanStatus');
+            const startBtn = document.getElementById('startCamBtn');
+            const stopBtn = document.getElementById('stopCamBtn');
+            const selectEl = document.getElementById('cameraSelect');
             if (!window.Html5Qrcode) {
                 status.textContent = 'Không tải được thư viện quét QR.';
+                startBtn.disabled = true;
                 return;
             }
+
             const qrRegionId = 'reader';
             const html5QrCode = new Html5Qrcode(qrRegionId);
-            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-            Html5Qrcode.getCameras().then(devices => {
-                if (!devices || devices.length === 0) {
+            // Tăng vùng quét + dùng detector của trình duyệt nếu hỗ trợ để bắt mã nhạy hơn
+            const config = {
+                fps: 15,
+                qrbox: { width: 360, height: 360 },
+                aspectRatio: 1.0,
+                disableFlip: true,
+                formatsToSupport: [window.Html5QrcodeSupportedFormats?.QR_CODE ?? 0],
+                experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+            };
+            let devicesCache = [];
+            let running = false;
+
+            function onScanSuccess(qrText) {
+                // Stop and navigate to results
+                html5QrCode.stop().then(() => {
+                    running = false;
+                    startBtn.disabled = false;
+                    stopBtn.disabled = true;
+                    const params = new URLSearchParams();
+                    let value = qrText || '';
+                    try {
+                        const u = new URL(value);
+                        const inner = u.searchParams.get('q');
+                        if (inner) value = inner;
+                    } catch {}
+                    params.set('q', value);
+                    const ru = '@((string?)ViewBag.ReturnUrl ?? "")';
+                    if (ru) params.set('returnUrl', ru);
+                    window.location.href = '@Url.Action("QrSearch", "Manage")' + '?' + params.toString();
+                });
+            }
+
+            function onScanFailure(_) {
+                // ignore continuous errors
+            }
+
+            function populateCameras(devices) {
+                devicesCache = devices || [];
+                if (!devicesCache.length) {
                     status.textContent = 'Không tìm thấy camera.';
+                    startBtn.disabled = true;
                     return;
                 }
-                const cameraId = devices[0].id;
-                html5QrCode.start(
-                    cameraId,
-                    config,
-                    qrText => {
-                        // Stop and navigate to results
-                        html5QrCode.stop().then(() => {
-                            const params = new URLSearchParams();
-                            params.set('q', qrText);
-                            const ru = '@((string?)ViewBag.ReturnUrl ?? "")';
-                            if (ru) params.set('returnUrl', ru);
-                            window.location.href = '@Url.Action("QrSearch", "Manage")' + '?' + params.toString();
-                        });
-                    },
-                    qrError => {
-                        // ignore continuous errors
-                    }
-                ).catch(err => {
-                    status.textContent = 'Không thể mở camera: ' + err;
+                // Show selector if multiple
+                if (devicesCache.length > 1) {
+                    selectEl.style.display = '';
+                    selectEl.innerHTML = devicesCache.map(d => `<option value="${d.id}">${d.label || 'Camera'}</option>`).join('');
+                } else {
+                    selectEl.style.display = 'none';
+                }
+                startBtn.disabled = false;
+                status.textContent = 'Sẵn sàng. Nhấn "Mở camera" để bắt đầu.';
+            }
+
+            Html5Qrcode.getCameras()
+                .then(populateCameras)
+                .catch(err => {
+                    status.textContent = 'Lỗi khi truy cập camera: ' + err + '. Hãy cấp quyền camera cho trình duyệt (Site settings).';
+                    startBtn.disabled = false; // cho phép thử lại
                 });
-            }).catch(err => {
-                status.textContent = 'Lỗi khi truy cập camera: ' + err;
-            });
+
+            async function startCamera() {
+                if (running) return;
+                try {
+                    status.textContent = 'Đang mở camera…';
+                    // Prefer selected deviceId; if not available, try facingMode to trigger permission prompt
+                    let chosen = (selectEl.style.display !== 'none' && selectEl.value) ? selectEl.value : (devicesCache[0]?.id);
+                    let source = chosen ? chosen : { facingMode: 'environment' };
+                    await html5QrCode.start(source, config, onScanSuccess, onScanFailure);
+                    running = true;
+                    startBtn.disabled = true;
+                    stopBtn.disabled = false;
+                    status.textContent = 'Đang quét… đưa mã QR vào khung.';
+                } catch (err) {
+                    // Retry with user-facing camera if env fails and no deviceId known
+                    if (!devicesCache.length) {
+                        try {
+                            await html5QrCode.start({ facingMode: 'user' }, config, onScanSuccess, onScanFailure);
+                            running = true;
+                            startBtn.disabled = true;
+                            stopBtn.disabled = false;
+                            status.textContent = 'Đang quét… đưa mã QR vào khung.';
+                            return;
+                        } catch {}
+                    }
+                    status.textContent = 'Không thể mở camera: ' + err + '. Nếu đã chặn, vào quyền trang (Site settings) bật Camera rồi bấm "Mở camera" lại.';
+                }
+            }
+
+            async function stopCamera() {
+                if (!running) return;
+                try {
+                    await html5QrCode.stop();
+                } catch {}
+                running = false;
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                status.textContent = 'Đã tắt camera.';
+            }
+
+            startBtn.addEventListener('click', startCamera);
+            stopBtn.addEventListener('click', stopCamera);
 
             // File scanning
             const fileInput = document.getElementById('qrFile');
@@ -124,7 +214,13 @@
                     fileStatus.textContent = 'Đang đọc ảnh…';
                     const text = await html5QrCode.scanFile(file, true);
                     const params = new URLSearchParams();
-                    params.set('q', text);
+                    let value = text || '';
+                    try {
+                        const u = new URL(value);
+                        const inner = u.searchParams.get('q');
+                        if (inner) value = inner;
+                    } catch {}
+                    params.set('q', value);
                     const ru = '@((string?)ViewBag.ReturnUrl ?? "")';
                     if (ru) params.set('returnUrl', ru);
                     window.location.href = '@Url.Action("QrSearch", "Manage")' + '?' + params.toString();
