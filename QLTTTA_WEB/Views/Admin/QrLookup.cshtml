@@ -1,0 +1,137 @@
+@{
+    ViewData["Title"] = "Quét/Tra cứu QR đơn đăng ký";
+}
+<div class="retro-card">
+    <div class="retro-card-header d-flex justify-content-between align-items-center">
+        <h2 class="retro-title"><i class="fas fa-qrcode"></i> Quét/Tra cứu QR đơn đăng ký</h2>
+        @{
+            var returnUrl = (string?)ViewBag.ReturnUrl;
+        }
+        @if (!string.IsNullOrWhiteSpace(returnUrl))
+        {
+            <a href="@returnUrl" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Quay lại</a>
+        }
+        else
+        {
+            <a asp-controller="Manage" asp-action="Registrations" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Quay lại danh sách
+            </a>
+        }
+    </div>
+    <div class="retro-card-body">
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i> @TempData["ErrorMessage"]
+            </div>
+        }
+
+        <div class="mb-3">
+            <label for="qrInput" class="form-label">Nhập mã/QR nội dung thủ công (REG:, REGID:, CLASS: hoặc mã lớp, JSON):</label>
+            <div class="input-group">
+                <input type="text" class="form-control" id="qrInput" placeholder="VD: REG:DK2025-0001 | REGID:123 | CLASS:LH00001 | LH00001 | {\"registrationCode\":\"...\"}">
+                <button class="btn btn-primary" type="button" onclick="submitQuery()"><i class="fas fa-search"></i> Tra cứu</button>
+                <button class="btn btn-outline-secondary" type="button" onclick="openQr()"><i class="fas fa-qrcode"></i> Tạo QR</button>
+            </div>
+            <small class="text-muted">
+                - REG:<em>MÃ_ĐĂNG_KÝ</em> hoặc REGID:<em>ID</em> để tìm đơn đăng ký cụ thể. <br/>
+                - CLASS:<em>MÃ_LỚP</em> hoặc nhập trực tiếp mã lớp (VD: LH00001) để liệt kê đăng ký. Mặc định ưu tiên trạng thái "Chờ duyệt"; nếu không có sẽ hiện tất cả trạng thái.
+            </small>
+        </div>
+
+        <hr />
+        <h5 class="mb-2"><i class="fas fa-camera"></i> Dùng camera để quét</h5>
+        <p class="text-muted">Cho phép trình duyệt dùng camera, đưa mã QR vào khung. Khi quét thành công sẽ tự chuyển đến trang kết quả.</p>
+        <div id="reader" style="max-width: 500px;"></div>
+        <div id="scanStatus" class="mt-2 text-muted"></div>
+
+        <hr />
+        <h5 class="mb-2"><i class="fas fa-image"></i> Hoặc tải ảnh QR để tra cứu</h5>
+        <p class="text-muted">Kéo thả hoặc chọn ảnh có mã QR, hệ thống sẽ đọc và chuyển trang.</p>
+        <input type="file" id="qrFile" accept="image/*" class="form-control" />
+        <div id="fileStatus" class="mt-2 text-muted"></div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://unpkg.com/html5-qrcode" defer></script>
+    <script>
+        function submitQuery() {
+            const q = document.getElementById('qrInput').value || '';
+            if (!q.trim()) {
+                alert('Vui lòng nhập nội dung để tra cứu.');
+                return;
+            }
+            const params = new URLSearchParams();
+            params.set('q', q);
+            const ru = '@((string?)ViewBag.ReturnUrl ?? "")';
+            if (ru) params.set('returnUrl', ru);
+            window.location.href = '@Url.Action("QrSearch", "Manage")' + '?' + params.toString();
+        }
+
+        function openQr() {
+            const q = document.getElementById('qrInput').value || '';
+            if (!q.trim()) { alert('Nhập nội dung trước khi tạo mã QR.'); return; }
+            const url = '@Url.Action("QrImage", "Manage")' + '?payload=' + encodeURIComponent(q) + '&size=480';
+            window.open(url, '_blank');
+        }
+
+        window.addEventListener('load', function() {
+            const status = document.getElementById('scanStatus');
+            if (!window.Html5Qrcode) {
+                status.textContent = 'Không tải được thư viện quét QR.';
+                return;
+            }
+            const qrRegionId = 'reader';
+            const html5QrCode = new Html5Qrcode(qrRegionId);
+            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+            Html5Qrcode.getCameras().then(devices => {
+                if (!devices || devices.length === 0) {
+                    status.textContent = 'Không tìm thấy camera.';
+                    return;
+                }
+                const cameraId = devices[0].id;
+                html5QrCode.start(
+                    cameraId,
+                    config,
+                    qrText => {
+                        // Stop and navigate to results
+                        html5QrCode.stop().then(() => {
+                            const params = new URLSearchParams();
+                            params.set('q', qrText);
+                            const ru = '@((string?)ViewBag.ReturnUrl ?? "")';
+                            if (ru) params.set('returnUrl', ru);
+                            window.location.href = '@Url.Action("QrSearch", "Manage")' + '?' + params.toString();
+                        });
+                    },
+                    qrError => {
+                        // ignore continuous errors
+                    }
+                ).catch(err => {
+                    status.textContent = 'Không thể mở camera: ' + err;
+                });
+            }).catch(err => {
+                status.textContent = 'Lỗi khi truy cập camera: ' + err;
+            });
+
+            // File scanning
+            const fileInput = document.getElementById('qrFile');
+            const fileStatus = document.getElementById('fileStatus');
+            fileInput?.addEventListener('change', async (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (!file) return;
+                try {
+                    fileStatus.textContent = 'Đang đọc ảnh…';
+                    const text = await html5QrCode.scanFile(file, true);
+                    const params = new URLSearchParams();
+                    params.set('q', text);
+                    const ru = '@((string?)ViewBag.ReturnUrl ?? "")';
+                    if (ru) params.set('returnUrl', ru);
+                    window.location.href = '@Url.Action("QrSearch", "Manage")' + '?' + params.toString();
+                } catch (err) {
+                    fileStatus.textContent = 'Không đọc được mã QR từ ảnh: ' + err;
+                }
+            });
+        });
+    </script>
+}

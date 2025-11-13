@@ -62,13 +62,12 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: RetroColors.vintageCream,
       body: Container(
+        // Removed SVG data-URI background that caused runtime errors on Android.
+        // If a patterned background is desired, consider using an asset image
+        // with AssetImage and declare it in pubspec.yaml, or use flutter_svg
+        // to render an SVG widget behind the content.
         decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: NetworkImage(
-                'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9InBhdHRlcm4iIHBhdHRlcm5Vbml0cz0idXNlclNwYWNlT25Vc2UiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjZjRlYWQ1Ii8+PHBhdGggZD0iTTAgMGgyMHYyMEgweiIgZmlsbD0iI2U4ZGNjNCIgb3BhY2l0eT0iMC4zIi8+PHBhdGggZD0iTTIwIDIwaDIwdjIwSDIweiIgZmlsbD0iI2U4ZGNjNCIgb3BhY2l0eT0iMC4zIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI3BhdHRlcm4pIi8+PC9zdmc+'),
-            repeat: ImageRepeat.repeat,
-            opacity: 0.3,
-          ),
+          color: RetroColors.vintageCream,
         ),
         child: Center(
           child: SingleChildScrollView(

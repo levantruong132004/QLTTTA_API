@@ -70,6 +70,18 @@ flutter build apk --release
 ## 8. Các bước mở rộng kế tiếp
 - Thêm màn hình thanh toán hóa đơn
 - Hiển thị QR / xác thực PDF chứng chỉ
+- Quét QR để tìm đơn đăng ký (đã thêm): Mở màn hình Quản lý đăng ký → icon QR trên AppBar → quét mã chứa mã đăng ký (MA_DANG_KY) hoặc ID đơn.
+
+### Quét QR tìm đăng ký (mới)
+- Backend: GET /api/Registrations/search?q=... hỗ trợ các định dạng:
+	- REG:ABC123 (mã đăng ký)
+	- REGID:1001 (ID đơn)
+	- JSON {"registrationCode":"ABC123"} hoặc {"registrationId":1001}
+	- Chuỗi thuần: ABC123 hoặc 1001
+- Mobile: dùng mobile_scanner, yêu cầu quyền Camera trên Android.
+- AndroidManifest đã khai báo CAMERA. Nếu build lần đầu, nhớ chạy:
+	- flutter pub get
+	- flutter run
 - Push notification (Firebase Cloud Messaging)
 - Theme đồng bộ với giao diện web retro vintage
 

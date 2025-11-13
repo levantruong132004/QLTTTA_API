@@ -13,11 +13,11 @@ namespace QLTTTA_API.Controllers
         public RegistrationsController(IRegistrationService service, ILogger<RegistrationsController> logger)
         { _service = service; _logger = logger; }
 
-        // Danh sách đơn cho NV học vụ (lọc trạng thái/lớp)
+        // Danh sách đơn cho NV học vụ (lọc trạng thái/lớp theo id hoặc mã)
         [HttpGet]
-        public async Task<IActionResult> Get([FromQuery] string? status, [FromQuery] int? classId)
+        public async Task<IActionResult> Get([FromQuery] string? status, [FromQuery] int? classId, [FromQuery] string? classCode)
         {
-            var list = await _service.GetRegistrationsAsync(status, classId);
+            var list = await _service.GetRegistrationsAsync(status, classId, classCode);
             return Ok(list);
         }
 
@@ -26,6 +26,15 @@ namespace QLTTTA_API.Controllers
         public async Task<IActionResult> GetMy()
         {
             var list = await _service.GetMyRegistrationsAsync();
+            return Ok(list);
+        }
+
+        // Tìm kiếm đơn đăng ký theo QR/code/id (cho tính năng quét QR)
+        [HttpGet("search")]
+        public async Task<IActionResult> Search([FromQuery] string q)
+        {
+            if (string.IsNullOrWhiteSpace(q)) return Ok(Array.Empty<object>());
+            var list = await _service.SearchAsync(q);
             return Ok(list);
         }
 

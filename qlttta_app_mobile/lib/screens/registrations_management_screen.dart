@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:qlttta_app_mobile/models/registration.dart';
 import 'package:qlttta_app_mobile/services/registration_service.dart';
 import 'package:qlttta_app_mobile/theme/retro_theme.dart';
+import 'package:qlttta_app_mobile/screens/qr_scan_registration_screen.dart';
 
 class RegistrationsManagementScreen extends StatefulWidget {
   const RegistrationsManagementScreen({super.key});
@@ -139,6 +140,19 @@ class _RegistrationsManagementScreenState
         backgroundColor: RetroColors.primary,
         title: const Text('QUẢN LÝ ĐĂNG KÝ'),
         actions: [
+          IconButton(
+            tooltip: 'Quét QR để tìm',
+            icon: const Icon(Icons.qr_code_scanner_rounded),
+            onPressed: () async {
+              final result = await Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const QrScanRegistrationScreen()),
+              );
+              // Nếu chọn một đơn từ màn QR thì làm tươi danh sách (hoặc điều hướng chi tiết nếu sau này có)
+              if (result != null) {
+                _loadData();
+              }
+            },
+          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.filter_list_rounded),
             tooltip: 'Lọc theo trạng thái',

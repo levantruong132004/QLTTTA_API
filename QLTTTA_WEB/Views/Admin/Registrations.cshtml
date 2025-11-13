@@ -5,11 +5,22 @@
     var registrationCount = registrationList.Count;
 }
 <div class="retro-card">
-    <div class="retro-card-header">
+    <div class="retro-card-header d-flex justify-content-between align-items-center">
         <h2 class="retro-title"><i class="fas fa-clipboard-check"></i> Duyệt đơn đăng ký</h2>
+        <a asp-controller="Manage" asp-action="QrLookup"
+           asp-route-returnUrl="@Url.Action("Registrations","Manage", new { status = (string?)ViewBag.CurrentStatus, classCode = (string?)ViewBag.CurrentClassCode })"
+           class="btn btn-outline-primary">
+            <i class="fas fa-qrcode"></i> Quét/Tra cứu QR
+        </a>
     </div>
     <div class="retro-card-body">
-        @* CHỈ HIỂN THỊ SUCCESS MESSAGE *@
+        @* HIỂN THỊ THÔNG BÁO *@
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i> @TempData["ErrorMessage"]
+            </div>
+        }
         @if (TempData["SuccessMessage"] != null)
         {
             <div class="alert alert-success">
@@ -17,7 +28,25 @@
             </div>
         }
 
-        @* ẨN HOÀN TOÀN ERROR MESSAGE - KHÔNG HIỂN THỊ LỖI *@
+        @* Form lọc nhanh *@
+        <form asp-action="Registrations" method="get" class="row g-2 align-items-end mb-3">
+            <div class="col-auto">
+                <label class="form-label">Trạng thái</label>
+                <select name="status" class="form-select">
+                    <option value="Chờ duyệt" selected>Chờ duyệt</option>
+                    <option value="Đã duyệt">Đã duyệt</option>
+                    <option value="Đã từ chối">Đã từ chối</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <label class="form-label">Mã lớp</label>
+                <input type="text" name="classCode" class="form-control" placeholder="Ví dụ: LH00001" value="@((string?)ViewBag.CurrentClassCode ?? "")" />
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-filter"></i> Lọc</button>
+                <a asp-action="Registrations" class="btn btn-secondary"><i class="fas fa-undo"></i> Mặc định</a>
+            </div>
+        </form>
 
         @if (registrationCount > 0)
         {
@@ -69,10 +98,10 @@
         }
         else
         {
-            @* KHÔNG CÓ ĐỚN → KHÔNG HIỂN THỊ GÌ CẢ *@
             <div class="text-center text-muted py-5">
                 <i class="fas fa-check-circle fa-3x mb-3" style="color: #28a745;"></i>
                 <p class="fs-5">Hiện tại không có đơn đăng ký nào cần phê duyệt</p>
+                <p>Thử nhấn "Quét/Tra cứu QR" để tìm nhanh theo mã đơn hoặc theo mã lớp (nhập <code>CLASS:GT_TEST</code>).</p>
             </div>
         }
     </div>

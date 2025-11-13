@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Text;
 using System.Text.Json;
+using QRCoder;
 
 namespace QLTTTA_WEB.Controllers.Admin
 {
@@ -238,7 +239,7 @@ namespace QLTTTA_WEB.Controllers.Admin
             return RedirectToAction("Schedules", new { classId });
         }
 
-        public async Task<IActionResult> Registrations(string? status, int? classId)
+        public async Task<IActionResult> Registrations(string? status, string? classCode)
         {
             if (!IsStaff()) return RedirectToAction("Index", "Home");
             
@@ -250,7 +251,11 @@ namespace QLTTTA_WEB.Controllers.Admin
             
             try
             {
-                var url = "api/registrations" + (status != null || classId != null ? "?" : "") + (status != null ? $"status={Uri.EscapeDataString(status)}" : "") + (status != null && classId != null ? "&" : "") + (classId != null ? $"classId={classId}" : "");
+                var hasAny = !string.IsNullOrWhiteSpace(status) || !string.IsNullOrWhiteSpace(classCode);
+                var url = "api/registrations" + (hasAny ? "?" : "")
+                          + (!string.IsNullOrWhiteSpace(status) ? $"status={Uri.EscapeDataString(status!)}" : "")
+                          + (!string.IsNullOrWhiteSpace(status) && !string.IsNullOrWhiteSpace(classCode) ? "&" : "")
+                          + (!string.IsNullOrWhiteSpace(classCode) ? $"classCode={Uri.EscapeDataString(classCode!)}" : "");
                 var res = await _http.GetAsync(url);
                 var body = await res.Content.ReadAsStringAsync();
                 
@@ -283,7 +288,7 @@ namespace QLTTTA_WEB.Controllers.Admin
                     
                     TempData["ErrorMessage"] = errorMsg;
                     ViewBag.CurrentStatus = status;
-                    ViewBag.CurrentClassId = classId;
+                    ViewBag.CurrentClassCode = classCode;
                     return View("~/Views/Admin/Registrations.cshtml", new List<QLTTTA_WEB.Models.AdminRegistrationItem>());
                 }
                 
@@ -291,7 +296,7 @@ namespace QLTTTA_WEB.Controllers.Admin
                 
                 // Truyền status hiện tại vào ViewBag để form lọc biết
                 ViewBag.CurrentStatus = status;
-                ViewBag.CurrentClassId = classId;
+                ViewBag.CurrentClassCode = classCode;
                 
                 return View("~/Views/Admin/Registrations.cshtml", data);
             }
@@ -300,8 +305,130 @@ namespace QLTTTA_WEB.Controllers.Admin
                 _logger.LogError(ex, "Registrations page error");
                 TempData["ErrorMessage"] = "Có lỗi xảy ra khi tải danh sách đăng ký. Vui lòng thử lại.";
                 ViewBag.CurrentStatus = status;
-                ViewBag.CurrentClassId = classId;
+                ViewBag.CurrentClassCode = classCode;
                 return View("~/Views/Admin/Registrations.cshtml", new List<QLTTTA_WEB.Models.AdminRegistrationItem>());
+            }
+        }
+
+        [HttpGet]
+        public IActionResult QrLookup(string? returnUrl)
+        {
+            if (!IsStaff()) return RedirectToAction("Index", "Home");
+            ViewBag.ReturnUrl = string.IsNullOrWhiteSpace(returnUrl) ? null : returnUrl;
+            return View("~/Views/Admin/QrLookup.cshtml");
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> QrSearch(string q, string? returnUrl)
+        {
+            if (!IsStaff()) return RedirectToAction("Index", "Home");
+            if (string.IsNullOrWhiteSpace(q))
+            {
+                TempData["ErrorMessage"] = "Không có dữ liệu QR hoặc mã để tra cứu.";
+                return RedirectToAction("QrLookup", new { returnUrl });
+            }
+
+            try
+            {
+                // Heuristics: if input looks like CLASS:<code> or plain class code, resolve class and load its pending registrations
+                var text = q.Trim();
+                var upper = text.ToUpperInvariant();
+                bool tryClass = upper.StartsWith("CLASS:") || upper.StartsWith("LOP:") || (!upper.StartsWith("REG:") && !upper.StartsWith("REGID:") && !text.Contains("{"));
+
+                if (tryClass)
+                {
+                    var classCode = upper.StartsWith("CLASS:") ? text.Substring(6).Trim() : (upper.StartsWith("LOP:") ? text.Substring(4).Trim() : text);
+                    if (!string.IsNullOrWhiteSpace(classCode))
+                    {
+                        var clsRes = await _http.GetAsync($"api/classes?search={Uri.EscapeDataString(classCode)}");
+                        var clsBody = await clsRes.Content.ReadAsStringAsync();
+                        if (clsRes.IsSuccessStatusCode)
+                        {
+                            var classes = JsonSerializer.Deserialize<List<QLTTTA_WEB.Models.AdminClassItem>>(clsBody, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                            var match = classes.FirstOrDefault(c => string.Equals(c.ClassCode, classCode, StringComparison.OrdinalIgnoreCase));
+                            if (match != null)
+                            {
+                                // Try pending first
+                                var regRes = await _http.GetAsync($"api/registrations?status={Uri.EscapeDataString("Chờ duyệt")}&classCode={Uri.EscapeDataString(match.ClassCode)}");
+                                var regBody = await regRes.Content.ReadAsStringAsync();
+                                List<QLTTTA_WEB.Models.AdminRegistrationItem> regData = new();
+                                if (regRes.IsSuccessStatusCode)
+                                {
+                                    regData = JsonSerializer.Deserialize<List<QLTTTA_WEB.Models.AdminRegistrationItem>>(regBody, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                                }
+                                else
+                                {
+                                    _logger.LogWarning("Registrations by class failed: {Status} {Body}", regRes.StatusCode, regBody);
+                                }
+
+                                // Fallback: if pending is empty, try without status (all statuses)
+                                if (regData.Count == 0)
+                                {
+                                    var regResAll = await _http.GetAsync($"api/registrations?classCode={Uri.EscapeDataString(match.ClassCode)}");
+                                    var regBodyAll = await regResAll.Content.ReadAsStringAsync();
+                                    if (regResAll.IsSuccessStatusCode)
+                                    {
+                                        regData = JsonSerializer.Deserialize<List<QLTTTA_WEB.Models.AdminRegistrationItem>>(regBodyAll, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                                    }
+                                    else
+                                    {
+                                        _logger.LogWarning("Registrations by class (all) failed: {Status} {Body}", regResAll.StatusCode, regBodyAll);
+                                    }
+                                }
+
+                                ViewBag.Query = q;
+                                ViewBag.ReturnUrl = returnUrl;
+                                return View("~/Views/Admin/QrSearchResults.cshtml", regData);
+                            }
+                        }
+                    }
+                }
+
+                // Default: search by registration QR/code/id
+                var url = $"api/registrations/search?q={Uri.EscapeDataString(q)}";
+                var res = await _http.GetAsync(url);
+                var body = await res.Content.ReadAsStringAsync();
+                if (!res.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("QR search failed: {Status} {Body}", res.StatusCode, body);
+                    TempData["ErrorMessage"] = string.IsNullOrWhiteSpace(body) ? "Tra cứu thất bại" : body;
+                    return RedirectToAction("QrLookup", new { returnUrl });
+                }
+
+                var data = JsonSerializer.Deserialize<List<QLTTTA_WEB.Models.AdminRegistrationItem>>(body, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                ViewBag.Query = q;
+                ViewBag.ReturnUrl = returnUrl;
+                return View("~/Views/Admin/QrSearchResults.cshtml", data);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "QR search error");
+                TempData["ErrorMessage"] = "Có lỗi xảy ra khi tra cứu. Vui lòng thử lại.";
+                return RedirectToAction("QrLookup", new { returnUrl });
+            }
+        }
+
+        [HttpGet]
+        public IActionResult QrImage(string payload, int size = 400)
+        {
+            if (!IsStaff()) return RedirectToAction("Index", "Home");
+            if (string.IsNullOrWhiteSpace(payload)) return BadRequest("Missing payload");
+            try
+            {
+                // Clamp size for safety
+                if (size < 100) size = 100; if (size > 1024) size = 1024;
+                using var qrGen = new QRCodeGenerator();
+                using var data = qrGen.CreateQrCode(payload, QRCodeGenerator.ECCLevel.Q);
+                var png = new PngByteQRCode(data);
+                // pixelsPerModule approx controls size: size / 21 baseline
+                int ppm = Math.Max(1, size / 21);
+                var bytes = png.GetGraphic(ppm);
+                return File(bytes, "image/png");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "QrImage render failed");
+                return BadRequest("Không thể tạo ảnh QR");
             }
         }
 

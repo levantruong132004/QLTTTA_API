@@ -182,4 +182,20 @@ class RegistrationService {
       return {'success': false, 'message': 'Lỗi kết nối: $e'};
     }
   }
+
+  // Tìm kiếm đăng ký bằng QR/code/id
+  Future<List<Registration>> searchRegistrationsByQr(String query) async {
+    try {
+      final endpoint = 'Registrations/search?q=${Uri.encodeQueryComponent(query)}';
+      final response = await _apiService.get(endpoint);
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((e) => Registration.fromJson(e)).toList();
+      }
+      return [];
+    } catch (e) {
+      print('Error searchRegistrationsByQr: $e');
+      return [];
+    }
+  }
 }

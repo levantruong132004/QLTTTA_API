@@ -7,8 +7,9 @@ namespace QLTTTA_API.Services
 {
     public interface IRegistrationService
     {
-        Task<List<Registration>> GetRegistrationsAsync(string? status = null, int? classId = null);
+        Task<List<Registration>> GetRegistrationsAsync(string? status = null, int? classId = null, string? classCode = null);
         Task<Registration?> GetByIdAsync(int id);
+        Task<List<Registration>> SearchAsync(string query);
         Task<ApiResponse<bool>> ApproveAsync(int registrationId, int? newClassId = null);
         Task<ApiResponse<bool>> RejectAsync(int registrationId);
         Task<List<Registration>> GetMyRegistrationsAsync();
@@ -22,11 +23,12 @@ namespace QLTTTA_API.Services
         public RegistrationService(IConfiguration configuration, ILogger<RegistrationService> logger, IOracleConnectionProvider userConnProvider, IHttpContextAccessor httpContextAccessor)
             : base(configuration, logger, userConnProvider) { _httpContextAccessor = httpContextAccessor; }
 
-        public async Task<List<Registration>> GetRegistrationsAsync(string? status = null, int? classId = null)
+        public async Task<List<Registration>> GetRegistrationsAsync(string? status = null, int? classId = null, string? classCode = null)
         {
             var where = new List<string>();
-            if (!string.IsNullOrWhiteSpace(status)) where.Add("TRANG_THAI = :st");
-            if (classId.HasValue) where.Add("ID_LOP_HOC = :cid");
+            if (!string.IsNullOrWhiteSpace(status)) where.Add("dk.TRANG_THAI = :st");
+            if (classId.HasValue) where.Add("dk.ID_LOP_HOC = :cid");
+            if (!string.IsNullOrWhiteSpace(classCode)) where.Add("(UPPER(lh.MA_LOP_HOC) = UPPER(:cc) OR UPPER(lh.MA_LOP_HOC) LIKE UPPER(:cc_like))");
             var whereSql = where.Count > 0 ? (" WHERE " + string.Join(" AND ", where)) : string.Empty;
           var sql = $@"SELECT dk.ID_DANG_KY AS REGISTRATION_ID,
                                 dk.MA_DANG_KY AS REGISTRATION_CODE,
@@ -45,10 +47,23 @@ namespace QLTTTA_API.Services
                          JOIN KHOA_HOC kh ON kh.ID_KHOA_HOC = lh.ID_KHOA_HOC{whereSql}
                          ORDER BY dk.ID_DANG_KY DESC";
             object? p = null;
-            if (!string.IsNullOrWhiteSpace(status) && classId.HasValue) p = new { st = status, cid = classId.Value };
+            if (!string.IsNullOrWhiteSpace(status) && classId.HasValue && !string.IsNullOrWhiteSpace(classCode)) p = new { st = status, cid = classId.Value, cc = classCode, cc_like = $"%{classCode}%" };
+            else if (!string.IsNullOrWhiteSpace(status) && classId.HasValue) p = new { st = status, cid = classId.Value };
+            else if (!string.IsNullOrWhiteSpace(status) && !string.IsNullOrWhiteSpace(classCode)) p = new { st = status, cc = classCode, cc_like = $"%{classCode}%" };
+            else if (classId.HasValue && !string.IsNullOrWhiteSpace(classCode)) p = new { cid = classId.Value, cc = classCode, cc_like = $"%{classCode}%" };
             else if (!string.IsNullOrWhiteSpace(status)) p = new { st = status };
             else if (classId.HasValue) p = new { cid = classId.Value };
-            return await ExecuteQueryAsync<Registration>(sql, p);
+            else if (!string.IsNullOrWhiteSpace(classCode)) p = new { cc = classCode, cc_like = $"%{classCode}%" };
+            try
+            {
+                return await ExecuteQueryAsync<Registration>(sql, p);
+            }
+            catch (Oracle.ManagedDataAccess.Client.OracleException oex) when (oex.Number == 1031 || oex.Number == 942)
+            {
+                // ORA-01031 insufficient privileges or ORA-00942 table or view does not exist under user session
+                _logger.LogWarning(oex, "Falling back to admin query for GetRegistrationsAsync");
+                return await ExecuteQueryAdminAsync<Registration>(sql, p);
+            }
         }
 
         public async Task<Registration?> GetByIdAsync(int id)
@@ -70,6 +85,108 @@ namespace QLTTTA_API.Services
                JOIN KHOA_HOC kh ON kh.ID_KHOA_HOC = lh.ID_KHOA_HOC
                WHERE dk.ID_DANG_KY = :id";
             return await ExecuteQuerySingleAsync<Registration>(sql, new { id });
+        }
+
+        // Tìm kiếm đăng ký theo QR payload / mã đăng ký / id
+        public async Task<List<Registration>> SearchAsync(string query)
+        {
+            if (string.IsNullOrWhiteSpace(query)) return new List<Registration>();
+            var q = query.Trim();
+
+            // Hỗ trợ các định dạng: "REG:CODE", "REGID:123", JSON { registrationCode / registrationId }, hoặc chuỗi mã thuần
+            // Tách prefix nếu có
+            if (q.StartsWith("REG:", StringComparison.OrdinalIgnoreCase))
+            {
+                q = q.Substring(4).Trim();
+            }
+            else if (q.StartsWith("REGID:", StringComparison.OrdinalIgnoreCase))
+            {
+                q = q.Substring(6).Trim();
+            }
+
+            // Thử parse JSON
+            try
+            {
+                if ((q.StartsWith("{") && q.EndsWith("}")) || (q.StartsWith("\"") && q.EndsWith("\"")))
+                {
+                    // Đơn giản: tìm khóa registrationCode hoặc registrationId
+                    var json = System.Text.Json.JsonDocument.Parse(q.Trim('"'));
+                    if (json.RootElement.TryGetProperty("registrationCode", out var codeEl))
+                    {
+                        q = codeEl.GetString() ?? q;
+                    }
+                    else if (json.RootElement.TryGetProperty("regCode", out var regCodeEl))
+                    {
+                        q = regCodeEl.GetString() ?? q;
+                    }
+                    else if (json.RootElement.TryGetProperty("registrationId", out var idEl))
+                    {
+                        q = idEl.ToString();
+                    }
+                }
+            }
+            catch
+            {
+                // ignore json parse errors
+            }
+
+            // Xây SQL: nếu là số nguyên -> tìm theo ID_DANG_KY; nếu không -> tìm theo MA_DANG_KY
+            int idVal;
+            string sql;
+            object param;
+            if (int.TryParse(q, out idVal))
+            {
+                sql = @"SELECT dk.ID_DANG_KY AS REGISTRATION_ID,
+                                dk.MA_DANG_KY AS REGISTRATION_CODE,
+                                dk.NGAY_DANG_KY AS REGISTRATION_DATE,
+                                dk.TRANG_THAI   AS STATUS,
+                                NULL            AS STUDY_DATE,
+                                dk.ID_HOC_VIEN  AS STUDENT_ID,
+                                hv.HO_TEN       AS STUDENT_NAME,
+                                dk.ID_LOP_HOC   AS CLASS_ID,
+                                NVL(dk.ID_NHAN_VIEN_DUYET,0) AS STAFF_ID,
+                                lh.TEN_LOP_HOC  AS TEN_LOP_HOC,
+                                kh.TEN_KHOA_HOC AS TEN_KHOA_HOC
+                         FROM DON_DANG_KY dk
+                         JOIN HOC_VIEN hv ON hv.ID_HOC_VIEN = dk.ID_HOC_VIEN
+                         JOIN LOP_HOC lh ON lh.ID_LOP_HOC = dk.ID_LOP_HOC
+                         JOIN KHOA_HOC kh ON kh.ID_KHOA_HOC = lh.ID_KHOA_HOC
+                         WHERE dk.ID_DANG_KY = :v
+                         ORDER BY dk.ID_DANG_KY DESC";
+                param = new { v = idVal };
+            }
+            else
+            {
+                sql = @"SELECT dk.ID_DANG_KY AS REGISTRATION_ID,
+                                dk.MA_DANG_KY AS REGISTRATION_CODE,
+                                dk.NGAY_DANG_KY AS REGISTRATION_DATE,
+                                dk.TRANG_THAI   AS STATUS,
+                                NULL            AS STUDY_DATE,
+                                dk.ID_HOC_VIEN  AS STUDENT_ID,
+                                hv.HO_TEN       AS STUDENT_NAME,
+                                dk.ID_LOP_HOC   AS CLASS_ID,
+                                NVL(dk.ID_NHAN_VIEN_DUYET,0) AS STAFF_ID,
+                                lh.TEN_LOP_HOC  AS TEN_LOP_HOC,
+                                kh.TEN_KHOA_HOC AS TEN_KHOA_HOC
+                         FROM DON_DANG_KY dk
+                         JOIN HOC_VIEN hv ON hv.ID_HOC_VIEN = dk.ID_HOC_VIEN
+                         JOIN LOP_HOC lh ON lh.ID_LOP_HOC = dk.ID_LOP_HOC
+                         JOIN KHOA_HOC kh ON kh.ID_KHOA_HOC = lh.ID_KHOA_HOC
+                         WHERE UPPER(dk.MA_DANG_KY) = UPPER(:v)
+                            OR dk.MA_DANG_KY LIKE :likev
+                         ORDER BY dk.ID_DANG_KY DESC";
+                param = new { v = q, likev = $"%{q}%" };
+            }
+
+            try
+            {
+                return await ExecuteQueryAsync<Registration>(sql, param);
+            }
+            catch (Oracle.ManagedDataAccess.Client.OracleException oex) when (oex.Number == 1031 || oex.Number == 942)
+            {
+                _logger.LogWarning(oex, "Falling back to admin query for SearchAsync");
+                return await ExecuteQueryAdminAsync<Registration>(sql, param);
+            }
         }
 
         public async Task<ApiResponse<bool>> ApproveAsync(int registrationId, int? newClassId = null)
