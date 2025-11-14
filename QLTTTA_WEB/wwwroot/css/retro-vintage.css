@@ -1130,7 +1130,7 @@ select.form-control-retro,
     margin-bottom: 1.5rem;
     border: 3px double var(--vintage-brown);
     background: var(--vintage-cream);
-    font-family: 'Merriweather', Georgia, serif;
+    font-family: 'Noto Sans', 'Segoe UI', 'Roboto', Arial, sans-serif;
     position: relative;
 }
 

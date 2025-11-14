@@ -31,10 +31,38 @@ namespace QLTTTA_API.Controllers
 
         // Tìm kiếm đơn đăng ký theo QR/code/id (cho tính năng quét QR)
         [HttpGet("search")]
-        public async Task<IActionResult> Search([FromQuery] string q)
+        public async Task<IActionResult> Search([FromQuery] string q, [FromQuery] bool? mine)
         {
             if (string.IsNullOrWhiteSpace(q)) return Ok(Array.Empty<object>());
             var list = await _service.SearchAsync(q);
+            // Nếu mine=true: lọc theo học viên hiện tại dựa trên X-Session-Id và cột per-device
+            if (mine == true)
+            {
+                try
+                {
+                    using var conn = await (_service as BaseService)!.GetAdminConnectionAsync();
+                    var sid = HttpContext?.Request?.Headers["X-Session-Id"].FirstOrDefault();
+                    var deviceType = HttpContext?.Request?.Headers["X-Device-Type"].FirstOrDefault()?.Trim().ToLowerInvariant() ?? "pc";
+                    if (deviceType != "pc" && deviceType != "mobile") deviceType = "pc";
+                    var columnName = deviceType == "mobile" ? "SESSION_ID_MOBILE" : "SESSION_ID_PC";
+                    using var cmd = new OracleCommand($"SELECT ID_NGUOI_DUNG FROM TAI_KHOAN WHERE {columnName} = :sid", conn) { BindByName = true };
+                    cmd.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sid ?? string.Empty;
+                    var obj = await cmd.ExecuteScalarAsync();
+                    if (obj != null && obj != DBNull.Value)
+                    {
+                        var hvId = Convert.ToInt32(obj);
+                        list = list.Where(x => x.StudentId == hvId).ToList();
+                    }
+                    else
+                    {
+                        list = new List<QLTTTA_API.Models.Registration>();
+                    }
+                }
+                catch
+                {
+                    list = new List<QLTTTA_API.Models.Registration>();
+                }
+            }
             return Ok(list);
         }
 

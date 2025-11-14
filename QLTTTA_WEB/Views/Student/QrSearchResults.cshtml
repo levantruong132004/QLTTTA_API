@@ -1,0 +1,71 @@
+@model IEnumerable<QLTTTA_WEB.Models.AdminRegistrationItem>
+@{
+    ViewData["Title"] = "Kết quả tra cứu";
+    var items = Model?.ToList() ?? new List<QLTTTA_WEB.Models.AdminRegistrationItem>();
+    var q = (string?)ViewBag.Query ?? string.Empty;
+}
+<div class="retro-card">
+    <div class="retro-card-header d-flex justify-content-between align-items-center">
+        <h2 class="retro-title"><i class="fas fa-search"></i> Kết quả tra cứu</h2>
+        <div>
+            @{
+                var ru = (string?)ViewBag.ReturnUrl ?? Url.Action("MyRegistrations","Student");
+                var ruVal = ru ?? string.Empty;
+            }
+            <a href="@Url.Action("QrLookupRegistrations", "Student")?returnUrl=@Uri.EscapeDataString(ruVal)" class="btn btn-outline-secondary me-2"><i class="fas fa-qrcode"></i> Quét lại</a>
+            <a href="@ruVal" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Quay lại</a>
+        </div>
+    </div>
+    <div class="retro-card-body">
+        <div class="alert alert-info">Nội dung tra cứu: <code>@q</code></div>
+        @if (items.Count == 0)
+        {
+            <div class="alert alert-warning"><i class="fas fa-info-circle"></i> Không tìm thấy đăng ký phù hợp.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Mã đăng ký</th>
+                            <th>Lớp</th>
+                            <th>Khóa học</th>
+                            <th>Trạng thái</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in items)
+                        {
+                            <tr>
+                                <td>@r.RegistrationId</td>
+                                <td>@(string.IsNullOrWhiteSpace(r.RegistrationCode) ? "-" : r.RegistrationCode)</td>
+                                <td>@(r.ClassName ?? (r.ClassId > 0 ? ("Lớp #" + r.ClassId) : "-"))</td>
+                                <td>@(r.CourseName ?? "-")</td>
+                                <td>
+                                    @if (string.Equals(r.Status, "Chờ duyệt", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <span class="badge bg-warning text-dark">@r.Status</span>
+                                    }
+                                    else if (string.Equals(r.Status, "Đã duyệt", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <span class="badge bg-success">@r.Status</span>
+                                    }
+                                    else if (string.Equals(r.Status, "Từ chối", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <span class="badge bg-danger">@r.Status</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">@r.Status</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

@@ -3,8 +3,11 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  // For Android emulator. Replace with your actual API URL when needed
-  static const String _baseUrl = 'http://10.0.2.2:7158/api';
+  // Read API base URL from --dart-define when provided; fallback to emulator host
+  static const String _baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://10.0.2.2:7158/api',
+  );
 
   Future<Map<String, String>> _headers() async {
     final prefs = await SharedPreferences.getInstance();

@@ -16,6 +16,101 @@ namespace QLTTTA_WEB.Controllers
             _logger = logger;
         }
 
+        // ===== QR Login (Web as requester) =====
+        [HttpPost]
+        public async Task<IActionResult> QrCreateForWebLogin()
+        {
+            try
+            {
+                var payload = new { requesterDevice = "pc", requesterInfo = "web-login" };
+                var json = JsonSerializer.Serialize(payload);
+                var res = await _httpClient.PostAsync("api/auth/qr/challenge", new StringContent(json, Encoding.UTF8, "application/json"));
+                var body = await res.Content.ReadAsStringAsync();
+                return Content(body, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "QrCreateForWebLogin error");
+                return StatusCode(500, new { Success = false, Message = "Không tạo được QR" });
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> QrStatus(string id)
+        {
+            try
+            {
+                var res = await _httpClient.GetAsync($"api/auth/qr/status?id={Uri.EscapeDataString(id ?? string.Empty)}");
+                var body = await res.Content.ReadAsStringAsync();
+                return Content(body, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "QrStatus error");
+                return StatusCode(500, new { Success = false });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> QrConsume([FromBody] JsonElement req)
+        {
+            try
+            {
+                // forward
+                var body = req.GetRawText();
+                var res = await _httpClient.PostAsync("api/auth/qr/consume", new StringContent(body, Encoding.UTF8, "application/json"));
+                var text = await res.Content.ReadAsStringAsync();
+                return Content(text, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "QrConsume error");
+                return StatusCode(500, new { Success = false });
+            }
+        }
+
+        // ===== QR Approve (Web as approver, requires current session) =====
+        [HttpGet]
+        public IActionResult QrApprove()
+        {
+            // a simple page with camera scanning, will POST to QrScan then QrApproveDecision
+            return View();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> QrScan([FromBody] JsonElement req)
+        {
+            try
+            {
+                var body = req.GetRawText();
+                var res = await _httpClient.PostAsync("api/auth/qr/scan", new StringContent(body, Encoding.UTF8, "application/json"));
+                var text = await res.Content.ReadAsStringAsync();
+                return Content(text, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "QrScan error");
+                return StatusCode(500, new { Success = false });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> QrApproveDecision([FromBody] JsonElement req)
+        {
+            try
+            {
+                var body = req.GetRawText();
+                var res = await _httpClient.PostAsync("api/auth/qr/approve", new StringContent(body, Encoding.UTF8, "application/json"));
+                var text = await res.Content.ReadAsStringAsync();
+                return Content(text, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "QrApproveDecision error");
+                return StatusCode(500, new { Success = false });
+            }
+        }
+
         [HttpGet]
         public IActionResult Login(string? returnUrl)
         {
@@ -147,6 +242,71 @@ namespace QLTTTA_WEB.Controllers
             Response.Cookies.Delete("SessionId");
 
             TempData["InfoMessage"] = "Bạn đã đăng xuất thành công!";
+            return RedirectToAction("Login");
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> FinalizeQrLogin(string sid, string? returnUrl)
+        {
+            if (string.IsNullOrWhiteSpace(sid))
+            {
+                TempData["ErrorMessage"] = "Thiếu mã phiên đăng nhập";
+                return RedirectToAction("Login");
+            }
+
+            // Set cookie so outgoing ApiClient requests include X-Session-Id via SessionHeaderHandler
+            Response.Cookies.Append("SessionId", sid, new CookieOptions
+            {
+                HttpOnly = false,
+                SameSite = SameSiteMode.Lax,
+                Secure = false,
+                Expires = DateTimeOffset.UtcNow.AddHours(1)
+            });
+
+            try
+            {
+                // Fetch user info via /api/auth/me to populate session
+                // IMPORTANT: The cookie we just set isn't available to this same request.
+                // So explicitly forward the session id header here.
+                var req = new HttpRequestMessage(HttpMethod.Get, "api/auth/me");
+                req.Headers.Add("X-Session-Id", sid);
+                req.Headers.Add("X-Device-Type", "pc");
+                var res = await _httpClient.SendAsync(req);
+                var body = await res.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(body);
+                var root = doc.RootElement;
+                if (res.IsSuccessStatusCode && root.TryGetProperty("success", out var s) && s.GetBoolean())
+                {
+                    if (root.TryGetProperty("user", out var u))
+                    {
+                        var userId = u.TryGetProperty("userId", out var p0) ? p0.GetInt32() : 0;
+                        var username = u.TryGetProperty("username", out var p1) ? p1.GetString() ?? string.Empty : string.Empty;
+                        var email = u.TryGetProperty("email", out var p2) ? p2.GetString() ?? string.Empty : string.Empty;
+                        var role = u.TryGetProperty("role", out var p3) ? p3.GetString() ?? string.Empty : string.Empty;
+                        var roleId = u.TryGetProperty("roleId", out var p4) ? p4.GetInt32() : 0;
+                        HttpContext.Session.SetString("UserId", userId.ToString());
+                        HttpContext.Session.SetString("Username", username);
+                        HttpContext.Session.SetString("Email", email);
+                        HttpContext.Session.SetString("Role", role);
+                        HttpContext.Session.SetString("RoleId", roleId.ToString());
+                        HttpContext.Session.SetString("Token", Convert.ToBase64String(Encoding.UTF8.GetBytes($"{userId}:{username}:{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}")));
+
+                        TempData["SuccessMessage"] = "Đăng nhập bằng QR thành công!";
+                        if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+                        {
+                            return Redirect(returnUrl);
+                        }
+                        return RedirectToAction("Index", "Home");
+                    }
+                }
+                _logger.LogWarning("FinalizeQrLogin cannot load user. Status={Status} Body={Body}", res.StatusCode, body);
+                TempData["ErrorMessage"] = "Không thể tải thông tin người dùng";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "FinalizeQrLogin error");
+                TempData["ErrorMessage"] = "Có lỗi xảy ra khi hoàn tất đăng nhập QR";
+            }
             return RedirectToAction("Login");
         }
 

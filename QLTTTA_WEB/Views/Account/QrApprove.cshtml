@@ -1,0 +1,67 @@
+@{
+    ViewData["Title"] = "Quét QR xác thực";
+}
+<div class="container" style="max-width: 720px; margin-top: 24px;">
+    <h2>Quét QR để xác thực đăng nhập</h2>
+    <p>Hướng camera vào mã QR hiển thị trên thiết bị kia.</p>
+    <div id="reader" style="width:100%; max-width: 480px;"></div>
+    <div id="result" style="margin-top:12px; font-weight:600;"></div>
+    <div id="actions" style="display:none; gap:8px; margin-top:12px;">
+        <button id="approveBtn" class="btn btn-primary">Phê duyệt</button>
+        <button id="denyBtn" class="btn btn-secondary">Từ chối</button>
+    </div>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode" defer></script>
+<script>
+    let scannedId = null;
+    function parseQrPayload(text) {
+        try {
+            // Expect format: qlttta://qr-login?id=xxxxx
+            const url = new URL(text.replace('qlttta://', 'https://'));
+            return url.searchParams.get('id');
+        } catch { return null; }
+    }
+    window.addEventListener('load', () => {
+        const readerElemId = 'reader';
+        const html5QrCode = new Html5Qrcode(readerElemId);
+        const config = { fps: 10, qrbox: 250 };
+        Html5Qrcode.getCameras().then(devices => {
+            const camId = devices && devices.length ? devices[0].id : null;
+            html5QrCode.start({ facingMode: 'environment' }, config, onScan).catch(err => {
+                document.getElementById('result').innerText = 'Không mở được camera: ' + err;
+            });
+        });
+
+        async function onScan(decodedText, decodedResult) {
+            if (scannedId) return; // ignore more scans
+            const id = parseQrPayload(decodedText) || decodedText;
+            scannedId = id;
+            document.getElementById('result').innerText = 'Đã quét mã: ' + id + '. Đang thông báo cho máy kia...';
+            try {
+                const res = await fetch('@Url.Action("QrScan","Account")', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+                const data = await res.json();
+                document.getElementById('actions').style.display = 'flex';
+                document.getElementById('result').innerText = 'Đã quét. Vui lòng xác nhận.';
+            } catch (e) {
+                document.getElementById('result').innerText = 'Lỗi khi gửi thông tin quét: ' + e;
+            }
+        }
+
+        document.getElementById('approveBtn').addEventListener('click', async () => {
+            if (!scannedId) return;
+            const res = await fetch('@Url.Action("QrApproveDecision","Account")', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: scannedId, approve: true }) });
+            const data = await res.json();
+            if (data && data.success && data.status === 'approved') {
+                document.getElementById('result').innerText = 'Đã phê duyệt. Bạn có thể đóng trang này.';
+            } else {
+                document.getElementById('result').innerText = 'Phê duyệt thất bại';
+            }
+        });
+        document.getElementById('denyBtn').addEventListener('click', async () => {
+            if (!scannedId) return;
+            const res = await fetch('@Url.Action("QrApproveDecision","Account")', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: scannedId, approve: false }) });
+            document.getElementById('result').innerText = 'Đã từ chối yêu cầu này.';
+        });
+    });
+</script>

@@ -48,6 +48,7 @@ namespace QLTTTA_API.Services
         private readonly IUserCredentialCache _credCache; // Cache tạm giữ username/password theo SessionId.
         private readonly IOtpStore _otpStore;
         private readonly IEmailService _emailService;
+        private readonly bool _useSpRegister;
 
         /// <summary>
         /// Khởi tạo service với cấu hình DB, logger và cache phiên.
@@ -59,6 +60,9 @@ namespace QLTTTA_API.Services
             _credCache = credCache;
             _otpStore = otpStore;
             _emailService = emailService;
+            // Allow bypassing stored procedure for registration if environment has issues
+            var useSp = configuration["Registration:UseStoredProcedure"];
+            _useSpRegister = string.IsNullOrWhiteSpace(useSp) ? false : useSp.Equals("true", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -295,32 +299,55 @@ namespace QLTTTA_API.Services
         {
             try
             {
-                _logger.LogInformation("Bắt đầu đăng ký (SP_DANG_KY_HOC_VIEN) user: {Username}", request.Username);
+                _logger.LogInformation("Bắt đầu đăng ký user: {Username} (UseSP={UseSp})", request.Username, _useSpRegister);
                 using var connection = new OracleConnection(_connectionString);
                 await connection.OpenAsync();
-
-                using (var cmd = new OracleCommand("SP_DANG_KY_HOC_VIEN", connection))
+                bool spSucceeded = false;
+                if (_useSpRegister)
                 {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.BindByName = true;
-                    cmd.Parameters.Add("p_ten_dang_nhap", OracleDbType.Varchar2).Value = request.Username;
-                    cmd.Parameters.Add("p_mat_khau", OracleDbType.Varchar2).Value = request.Password;
-                    cmd.Parameters.Add("p_email", OracleDbType.Varchar2).Value = request.Email;
-                    cmd.Parameters.Add("p_ho_ten", OracleDbType.NVarchar2).Value = request.FullName;
-                    cmd.Parameters.Add("p_gioi_tinh", OracleDbType.NVarchar2).Value = request.Sex;
-                    cmd.Parameters.Add("p_ngay_sinh", OracleDbType.Date).Value = (object?)request.DateOfBirth ?? DBNull.Value;
-                    cmd.Parameters.Add("p_sdt", OracleDbType.Varchar2).Value = request.PhoneNumber;
-                    cmd.Parameters.Add("p_dia_chi", OracleDbType.NVarchar2).Value = (object?)request.Address ?? DBNull.Value;
-                    var outMsg = new OracleParameter("p_ket_qua", OracleDbType.NVarchar2, 4000) { Direction = ParameterDirection.Output };
-                    cmd.Parameters.Add(outMsg);
-
-                    await cmd.ExecuteNonQueryAsync();
-                    var resultMsg = outMsg.Value?.ToString() ?? string.Empty;
-                    _logger.LogInformation("SP_DANG_KY_HOC_VIEN result: {Msg}", resultMsg);
-                    if (!resultMsg.Contains("thành công", StringComparison.OrdinalIgnoreCase))
+                    try
                     {
-                        return new RegisterResponse { Success = false, Message = resultMsg };
+                        using var cmd = new OracleCommand("SP_DANG_KY_HOC_VIEN", connection);
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.BindByName = true;
+                        cmd.Parameters.Add("p_ten_dang_nhap", OracleDbType.Varchar2).Value = request.Username;
+                        cmd.Parameters.Add("p_mat_khau", OracleDbType.Varchar2).Value = request.Password;
+                        cmd.Parameters.Add("p_email", OracleDbType.Varchar2).Value = request.Email;
+                        cmd.Parameters.Add("p_ho_ten", OracleDbType.NVarchar2).Value = request.FullName;
+                        cmd.Parameters.Add("p_gioi_tinh", OracleDbType.NVarchar2).Value = request.Sex;
+                        cmd.Parameters.Add("p_ngay_sinh", OracleDbType.Date).Value = (object?)request.DateOfBirth ?? DBNull.Value;
+                        cmd.Parameters.Add("p_sdt", OracleDbType.Varchar2).Value = request.PhoneNumber;
+                        cmd.Parameters.Add("p_dia_chi", OracleDbType.NVarchar2).Value = (object?)request.Address ?? DBNull.Value;
+                        var outMsg = new OracleParameter("p_ket_qua", OracleDbType.NVarchar2, 4000) { Direction = ParameterDirection.Output };
+                        cmd.Parameters.Add(outMsg);
+
+                        await cmd.ExecuteNonQueryAsync();
+                        var resultMsg = outMsg.Value?.ToString() ?? string.Empty;
+                        _logger.LogInformation("SP_DANG_KY_HOC_VIEN result: {Msg}", resultMsg);
+                        if (resultMsg.Contains("thành công", StringComparison.OrdinalIgnoreCase))
+                        {
+                            spSucceeded = true;
+                        }
+                        else
+                        {
+                            // SP chạy nhưng trả thông báo lỗi nghiệp vụ
+                            return new RegisterResponse { Success = false, Message = resultMsg };
+                        }
                     }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "SP_DANG_KY_HOC_VIEN failed, falling back to inline registration for {Username}", request.Username);
+                        var inlineRes = await RegisterInlineFallbackAsync(connection, request);
+                        if (!inlineRes.Success) return inlineRes;
+                        spSucceeded = true;
+                    }
+                }
+                else
+                {
+                    // Direct inline path (recommended for dev): skip SP entirely
+                    var inlineRes = await RegisterInlineFallbackAsync(connection, request);
+                    if (!inlineRes.Success) return inlineRes;
+                    spSucceeded = true;
                 }
 
                 // TẠO ORACLE USER sau khi đăng ký thành công
@@ -386,6 +413,180 @@ namespace QLTTTA_API.Services
                     Message = errorMessage
                 };
             }
+        }
+
+        private async Task<RegisterResponse> RegisterInlineFallbackAsync(OracleConnection connection, RegisterRequest request)
+        {
+            // Ensure CLIENT_IDENTIFIER is set for this session (helps VPD/policies relying on it)
+            try
+            {
+                using var setId = new OracleCommand("BEGIN DBMS_SESSION.SET_IDENTIFIER(:u); END;", connection) { BindByName = true };
+                setId.Parameters.Add(":u", OracleDbType.Varchar2).Value = request.Username?.Trim();
+                await setId.ExecuteNonQueryAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not set CLIENT_IDENTIFIER for registration session of {Username}", request.Username);
+            }
+
+            // Duplicate checks
+            using (var dup = new OracleCommand("SELECT (SELECT COUNT(*) FROM TAI_KHOAN WHERE UPPER(TEN_DANG_NHAP)=UPPER(:u)) C1, (SELECT COUNT(*) FROM TAI_KHOAN WHERE UPPER(EMAIL)=UPPER(:e)) C2 FROM DUAL", connection) { BindByName = true })
+            {
+                dup.Parameters.Add(":u", OracleDbType.Varchar2).Value = request.Username;
+                dup.Parameters.Add(":e", OracleDbType.Varchar2).Value = request.Email;
+                using var rdr = await dup.ExecuteReaderAsync(CommandBehavior.SingleRow);
+                if (await rdr.ReadAsync())
+                {
+                    var c1 = Convert.ToInt32(rdr[0]);
+                    var c2 = Convert.ToInt32(rdr[1]);
+                    if (c1 > 0) return new RegisterResponse { Success = false, Message = "Tên đăng nhập đã tồn tại" };
+                    if (c2 > 0) return new RegisterResponse { Success = false, Message = "Email đã được sử dụng" };
+                }
+            }
+
+            // Resolve role id for HocVien
+            int roleId = 0;
+            using (var roleCmd = new OracleCommand("SELECT ID_VAI_TRO FROM VAI_TRO WHERE TEN_VAI_TRO = 'HocVien'", connection))
+            {
+                var obj = await roleCmd.ExecuteScalarAsync();
+                roleId = Convert.ToInt32(obj ?? 0);
+                if (roleId == 0) return new RegisterResponse { Success = false, Message = "Không tìm thấy vai trò HocVien" };
+            }
+
+            using var tx = connection.BeginTransaction();
+            try
+            {
+                // Insert TAI_KHOAN
+                var hashed = HashPasswordSha256(request.Password);
+                int newUserId = 0;
+                try
+                {
+                    using var ins = new OracleCommand("INSERT INTO TAI_KHOAN (TEN_DANG_NHAP, MAT_KHAU, EMAIL, ID_VAI_TRO, TRANG_THAI_KICH_HOAT) VALUES (:u,:p,:e,:r,1) RETURNING ID_NGUOI_DUNG INTO :id", connection) { BindByName = true, Transaction = tx };
+                    ins.Parameters.Add(":u", OracleDbType.Varchar2).Value = request.Username;
+                    ins.Parameters.Add(":p", OracleDbType.Varchar2).Value = hashed;
+                    ins.Parameters.Add(":e", OracleDbType.Varchar2).Value = request.Email;
+                    ins.Parameters.Add(":r", OracleDbType.Int32).Value = roleId;
+                    var idParam = new OracleParameter(":id", OracleDbType.Int32) { Direction = ParameterDirection.Output };
+                    ins.Parameters.Add(idParam);
+                    await ins.ExecuteNonQueryAsync();
+                    newUserId = Convert.ToInt32(idParam.Value?.ToString() ?? "0");
+                    if (newUserId <= 0) throw new Exception("Không nhận được ID người dùng mới");
+                }
+                catch (OracleException oex)
+                {
+                    await tx.RollbackAsync();
+                    _logger.LogError(oex, "Insert into TAI_KHOAN failed for {Username} (ORA-{Code})", request.Username, oex.Number);
+                    return new RegisterResponse { Success = false, Message = $"Lỗi khi tạo bản ghi TAI_KHOAN (ORA-{oex.Number})" };
+                }
+
+                // Insert HOC_VIEN
+                try
+                {
+                    using var insHv = new OracleCommand("INSERT INTO HOC_VIEN (ID_HOC_VIEN, HO_TEN, MA_HOC_VIEN, GIOI_TINH, NGAY_SINH, SO_DIEN_THOAI, DIA_CHI) VALUES (:id,:hoten,NULL,:sex,:dob,:phone,:addr)", connection) { BindByName = true, Transaction = tx };
+                    insHv.Parameters.Add(":id", OracleDbType.Int32).Value = newUserId;
+                    insHv.Parameters.Add(":hoten", OracleDbType.NVarchar2).Value = request.FullName;
+                    insHv.Parameters.Add(":sex", OracleDbType.NVarchar2).Value = request.Sex;
+                    insHv.Parameters.Add(":dob", OracleDbType.Date).Value = (object?)request.DateOfBirth ?? DBNull.Value;
+                    insHv.Parameters.Add(":phone", OracleDbType.Varchar2).Value = request.PhoneNumber;
+                    insHv.Parameters.Add(":addr", OracleDbType.NVarchar2).Value = (object?)request.Address ?? DBNull.Value;
+                    await insHv.ExecuteNonQueryAsync();
+                }
+                catch (OracleException oex)
+                {
+                    await tx.RollbackAsync();
+                    _logger.LogError(oex, "Insert into HOC_VIEN failed for {Username} (ORA-{Code})", request.Username, oex.Number);
+                    // Deep diagnostic: collect triggers & source lines referencing SYS_CONTEXT on HOC_VIEN
+                    try
+                    {
+                        var triggers = new List<string>();
+                        using (var trgCmd = new OracleCommand("SELECT TRIGGER_NAME FROM USER_TRIGGERS WHERE TABLE_NAME = 'HOC_VIEN'", connection))
+                        using (var trgRdr = await trgCmd.ExecuteReaderAsync())
+                        {
+                            while (await trgRdr.ReadAsync()) triggers.Add(trgRdr.GetString(0));
+                        }
+                        if (triggers.Count == 0)
+                        {
+                            _logger.LogInformation("[Diag] Không có trigger nào trên bảng HOC_VIEN.");
+                        }
+                        else
+                        {
+                            _logger.LogInformation("[Diag] Trigger trên HOC_VIEN: {Triggers}", string.Join(",", triggers));
+                            foreach (var trg in triggers)
+                            {
+                                using var srcCmd = new OracleCommand("SELECT LINE, TEXT FROM USER_SOURCE WHERE NAME = :n AND TYPE='TRIGGER' ORDER BY LINE", connection) { BindByName = true };
+                                srcCmd.Parameters.Add(":n", OracleDbType.Varchar2).Value = trg;
+                                using var srcRdr = await srcCmd.ExecuteReaderAsync();
+                                var sb = new System.Text.StringBuilder();
+                                while (await srcRdr.ReadAsync())
+                                {
+                                    var line = srcRdr.GetInt32(0);
+                                    var text = srcRdr.IsDBNull(1) ? string.Empty : srcRdr.GetString(1);
+                                    if (text.ToUpperInvariant().Contains("SYS_CONTEXT('USERENV"))
+                                    {
+                                        sb.AppendLine($"[DiagTrigger {trg}] LINE {line}: {text.Trim()}");
+                                    }
+                                    if (text.ToUpperInvariant().Contains("SYS_CONTEXT('ISERENV"))
+                                    {
+                                        sb.AppendLine($"[DiagTrigger {trg}] POSSIBLE TYPO LINE {line}: {text.Trim()}");
+                                    }
+                                }
+                                if (sb.Length > 0)
+                                {
+                                    _logger.LogInformation(sb.ToString());
+                                }
+                            }
+                        }
+                        // Also check any policies that might include INSERT unexpectedly
+                        using (var polCmd = new OracleCommand("SELECT POLICY_NAME, FUNCTION_SCHEMA, POLICY_FUNCTION, STATEMENT_TYPES FROM USER_POLICIES WHERE OBJECT_NAME='HOC_VIEN'", connection))
+                        using (var polRdr = await polCmd.ExecuteReaderAsync())
+                        {
+                            while (await polRdr.ReadAsync())
+                            {
+                                var pName = polRdr.GetString(0);
+                                var stmtTypes = polRdr.IsDBNull(3) ? string.Empty : polRdr.GetString(3);
+                                _logger.LogInformation("[DiagPolicy] {Policy} STATEMENT_TYPES={Types}", pName, stmtTypes);
+                            }
+                        }
+                    }
+                    catch (Exception diagEx)
+                    {
+                        _logger.LogWarning(diagEx, "[Diag] Không thể thu thập thông tin trigger/policy HOC_VIEN");
+                    }
+                    return new RegisterResponse { Success = false, Message = $"Lỗi khi tạo bản ghi HOC_VIEN (ORA-{oex.Number})" };
+                }
+
+                await tx.CommitAsync();
+                return new RegisterResponse { Success = true, Message = "Đăng ký học viên thành công" };
+            }
+            catch (OracleException oex)
+            {
+                await tx.RollbackAsync();
+                _logger.LogError(oex, "Inline registration failed for {Username} (ORA-{Code})", request.Username, oex.Number);
+                // Map some common Oracle errors to user-friendly messages
+                string msg = oex.Number switch
+                {
+                    1      => "Tên đăng nhập hoặc email đã tồn tại (trùng UNIQUE)",
+                    1400   => "Thiếu dữ liệu bắt buộc (không được để trống)",
+                    12899  => "Giá trị quá dài so với cột (vui lòng rút gọn)",
+                    2291   => "Không tìm thấy tham chiếu khoá ngoại phù hợp",
+                    _      => $"Không thể tạo tài khoản (DB ORA-{oex.Number})"
+                };
+                return new RegisterResponse { Success = false, Message = msg };
+            }
+            catch (Exception ex)
+            {
+                await tx.RollbackAsync();
+                _logger.LogError(ex, "Inline registration failed for {Username}", request.Username);
+                return new RegisterResponse { Success = false, Message = $"Không thể tạo tài khoản: {ex.Message}" };
+            }
+        }
+
+        private static string HashPasswordSha256(string password)
+        {
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            var bytes = System.Text.Encoding.UTF8.GetBytes(password);
+            var hash = sha.ComputeHash(bytes);
+            return "SHA256:" + BitConverter.ToString(hash).Replace("-", string.Empty);
         }
 
         /// <summary>

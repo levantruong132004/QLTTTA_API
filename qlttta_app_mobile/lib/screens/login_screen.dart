@@ -18,6 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   final AuthService _authService = AuthService();
   bool _isLoading = false;
+  // QR-login flow removed from login screen; scanner remains accessible in Home.
 
   void _login() async {
     setState(() {
@@ -58,6 +59,11 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   @override
+  void dispose() {
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: RetroColors.vintageCream,
@@ -71,7 +77,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
+            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 32.0),
             child: Container(
               constraints: const BoxConstraints(maxWidth: 400),
               decoration: BoxDecoration(
@@ -110,14 +116,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       children: [
                         Icon(
                           Icons.school,
-                          size: 60,
+                          size: 48,
                           color: RetroColors.vintageCream,
                         ),
                         SizedBox(height: 12),
                         Text(
                           'HỆ THỐNG QUẢN LÝ',
                           style: TextStyle(
-                            fontSize: 20,
+                            fontSize: 18,
                             fontWeight: FontWeight.bold,
                             color: RetroColors.vintageCream,
                             letterSpacing: 2,
@@ -128,7 +134,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         Text(
                           '~ TIẾNG ANH ~',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 14,
                             fontStyle: FontStyle.italic,
                             color: RetroColors.vintageGold,
                           ),
@@ -139,7 +145,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   // Form Body
                   Container(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(20),
                     decoration: const BoxDecoration(
                       color: RetroColors.vintageOffWhite,
                     ),
@@ -149,14 +155,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         const Text(
                           'ĐĂNG NHẬP',
                           style: TextStyle(
-                            fontSize: 18,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: RetroColors.vintageDarkBrown,
                             letterSpacing: 2,
                           ),
                           textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 20),
                         // Username field
                         const Text(
                           'TÊN ĐĂNG NHẬP',
@@ -193,7 +199,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 16),
                         // Password field
                         const Text(
                           'MẬT KHẨU',
@@ -276,6 +282,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ),
                         const SizedBox(height: 24),
+                        // Removed QR-login helper button from login screen to keep UI minimal.
+                        const SizedBox(height: 16),
                         // Register link
                         Container(
                           padding: const EdgeInsets.all(16),

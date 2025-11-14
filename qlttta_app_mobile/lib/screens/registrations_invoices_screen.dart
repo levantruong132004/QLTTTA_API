@@ -5,6 +5,7 @@ import 'package:qlttta_app_mobile/models/invoice.dart';
 import 'package:qlttta_app_mobile/services/registration_service.dart';
 import 'package:qlttta_app_mobile/services/invoice_service.dart';
 import 'package:qlttta_app_mobile/theme/retro_theme.dart';
+import 'package:qlttta_app_mobile/screens/qr_scan_registration_screen.dart';
 
 class RegistrationsInvoicesScreen extends StatefulWidget {
   const RegistrationsInvoicesScreen({super.key});
@@ -133,6 +134,17 @@ class _RegistrationsInvoicesScreenState
         elevation: 0,
         backgroundColor: RetroColors.primary,
         title: const Text('ĐƠN & HÓA ĐƠN'),
+        actions: [
+          IconButton(
+            tooltip: 'Quét/Tra cứu QR',
+            icon: const Icon(Icons.qr_code_scanner_rounded),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const QrScanRegistrationScreen()),
+              );
+            },
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: RetroColors.accent,

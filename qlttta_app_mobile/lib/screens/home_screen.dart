@@ -11,6 +11,7 @@ import 'package:qlttta_app_mobile/services/auth_service.dart';
 import 'package:qlttta_app_mobile/services/dashboard_service.dart';
 import 'package:qlttta_app_mobile/theme/retro_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -372,6 +373,18 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: 12),
         _QuickActionTile(
+          icon: Icons.qr_code_scanner,
+          title: 'Scan QR đăng nhập web',
+          subtitle: 'Phê duyệt đăng nhập trên PC',
+          color: RetroColors.accent,
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const QrScanApproveScreen()),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        _QuickActionTile(
           icon: Icons.settings_rounded,
           title: 'Cài đặt',
           subtitle: 'Quản lý tài khoản',
@@ -405,6 +418,18 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: 12),
         _QuickActionTile(
+          icon: Icons.qr_code_scanner,
+          title: 'Scan QR đăng nhập web',
+          subtitle: 'Phê duyệt đăng nhập trên PC',
+          color: RetroColors.accent,
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const QrScanApproveScreen()),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        _QuickActionTile(
           icon: Icons.settings_rounded,
           title: 'Cài đặt',
           subtitle: 'Quản lý tài khoản',
@@ -425,6 +450,18 @@ class _HomeScreenState extends State<HomeScreen> {
     // Role 3: KeToan - Only settings (invoices are in dashboard)
     if (_roleId == 3) {
       actions.addAll([
+        _QuickActionTile(
+          icon: Icons.qr_code_scanner,
+          title: 'Scan QR đăng nhập web',
+          subtitle: 'Phê duyệt đăng nhập trên PC',
+          color: RetroColors.accent,
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const QrScanApproveScreen()),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
         _QuickActionTile(
           icon: Icons.settings_rounded,
           title: 'Cài đặt',
@@ -453,6 +490,18 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const StudentsScreen()),
+          );
+        },
+      ),
+      const SizedBox(height: 12),
+      _QuickActionTile(
+        icon: Icons.qr_code_scanner,
+        title: 'Scan QR đăng nhập web',
+        subtitle: 'Phê duyệt đăng nhập trên PC',
+        color: RetroColors.accent,
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const QrScanApproveScreen()),
           );
         },
       ),
@@ -619,6 +668,105 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+// ===== QR Scan & Approve Screen =====
+class QrScanApproveScreen extends StatefulWidget {
+  const QrScanApproveScreen({super.key});
+  @override
+  State<QrScanApproveScreen> createState() => _QrScanApproveScreenState();
+}
+
+class _QrScanApproveScreenState extends State<QrScanApproveScreen> {
+  String? _challengeId;
+  String _status = 'Đang chờ quét...';
+  bool _scanned = false;
+  bool _decisionMade = false;
+  final AuthService _auth = AuthService();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Quét QR đăng nhập web')),
+      body: Column(
+        children: [
+          Expanded(
+            child: MobileScanner(
+              onDetect: (capture) async {
+                if (_scanned) return;
+                final barcodes = capture.barcodes;
+                for (final bc in barcodes) {
+                  final raw = bc.rawValue;
+                  if (raw == null) continue;
+                  final id = _parseQr(raw);
+                  if (id != null) {
+                    setState(() { _scanned = true; _challengeId = id; _status = 'Đã quét, gửi lên để xác nhận...'; });
+                    await _auth.qrScan(id);
+                    if (mounted) {
+                      setState(() { _status = 'Đã quét. Chờ bạn phê duyệt.'; });
+                    }
+                    break;
+                  }
+                }
+              },
+            ),
+          ),
+          if (_challengeId != null && !_decisionMade)
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      if (_challengeId == null) return;
+                      final r = await _auth.qrApprove(_challengeId!, true);
+                      if (mounted) {
+                        setState(() { _decisionMade = true; _status = r['success'] == true && r['status'] == 'approved' ? 'ĐÃ PHÊ DUYỆT' : 'Phê duyệt thất bại'; });
+                      }
+                    },
+                    icon: const Icon(Icons.check),
+                    label: const Text('Phê duyệt'),
+                  ),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                    onPressed: () async {
+                      if (_challengeId == null) return;
+                      await _auth.qrApprove(_challengeId!, false);
+                      if (mounted) {
+                        setState(() { _decisionMade = true; _status = 'ĐÃ TỪ CHỐI'; });
+                      }
+                    },
+                    icon: const Icon(Icons.close),
+                    label: const Text('Từ chối'),
+                  ),
+                ],
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Text(_status, style: const TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String? _parseQr(String raw) {
+    try {
+      if (raw.startsWith('qlttta://')) {
+        final converted = raw.replaceFirst('qlttta://', 'https://');
+        final uri = Uri.parse(converted);
+        return uri.queryParameters['id'];
+      }
+      if (raw.contains('qr-login') && raw.contains('id=')) {
+        final uri = Uri.parse(raw.startsWith('http') ? raw : 'https://' + raw);
+        return uri.queryParameters['id'];
+      }
+    } catch (_) {}
+    return null;
+  }
+}
+
+
 // Stat card widget for dashboard metrics
 class _StatCard extends StatelessWidget {
   final IconData icon;
@@ -729,18 +877,18 @@ class _QuickActionTile extends StatelessWidget {
               ),
             ],
           ),
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, size: 24, color: color),
+                child: Icon(icon, size: 22, color: color),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -748,7 +896,7 @@ class _QuickActionTile extends StatelessWidget {
                     Text(
                       title,
                       style: const TextStyle(
-                        fontSize: 15,
+                        fontSize: 14,
                         fontWeight: FontWeight.bold,
                         color: RetroColors.textPrimary,
                       ),

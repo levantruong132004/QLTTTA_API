@@ -184,9 +184,9 @@ class RegistrationService {
   }
 
   // Tìm kiếm đăng ký bằng QR/code/id
-  Future<List<Registration>> searchRegistrationsByQr(String query) async {
+  Future<List<Registration>> searchRegistrationsByQr(String query, {bool mine = false}) async {
     try {
-      final endpoint = 'Registrations/search?q=${Uri.encodeQueryComponent(query)}';
+      final endpoint = 'Registrations/search?q=${Uri.encodeQueryComponent(query)}${mine ? '&mine=true' : ''}';
       final response = await _apiService.get(endpoint);
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);

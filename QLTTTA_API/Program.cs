@@ -32,6 +32,7 @@ try
     builder.Services.AddScoped<IInvoiceService, InvoiceService>();
     builder.Services.AddScoped<IPaymentService, PaymentService>();
     builder.Services.AddScoped<IDigitalSignatureService, DigitalSignatureService>(); // Thêm service chữ ký số
+    builder.Services.AddSingleton<IQrLoginService, InMemoryQrLoginService>();
 
     // Add CORS
     builder.Services.AddCors(options =>

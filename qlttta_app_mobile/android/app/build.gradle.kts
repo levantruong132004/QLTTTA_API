@@ -7,7 +7,8 @@ plugins {
 
 android {
     namespace = "com.example.qlttta_app_mobile"
-    compileSdk = flutter.compileSdkVersion
+    // Override to satisfy plugins requiring newer SDKs (e.g., mobile_scanner)
+    compileSdk = 36
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -23,8 +24,8 @@ android {
         applicationId = "com.example.qlttta_app_mobile"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        minSdk = 23
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

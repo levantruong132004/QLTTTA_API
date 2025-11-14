@@ -14,42 +14,166 @@
 
     <!-- Retro Vintage CSS -->
     <link rel="stylesheet" href="~/css/retro-vintage.css" asp-append-version="true" />
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
     <!-- Font Awesome -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 
     <style>
         body {
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             min-height: 100vh;
-            padding: 20px;
+            padding: 40px 20px;
+            gap: 2rem;
         }
 
-        .login-container {
-            max-width: 500px;
-            width: 100%;
-        }
-
-        .login-header {
+        .main-header {
             text-align: center;
-            margin-bottom: 2rem;
         }
 
-        .login-header h1 {
-            font-size: 3rem;
+        .main-header h1 {
+            font-size: 3.5rem;
             color: var(--vintage-brown);
             text-shadow: var(--text-shadow-vintage);
             margin-bottom: 0.5rem;
+            line-height: 1.2;
         }
 
-        .login-header .subtitle {
+        .main-header .subtitle {
             font-family: 'Times New Roman', 'Georgia', serif !important;
-            font-size: 1.1rem;
+            font-size: 1.2rem;
             color: var(--vintage-rust);
             font-style: italic;
             letter-spacing: 0px !important;
             text-transform: none !important;
+            margin-bottom: 0;
+        }
+
+        .login-wrapper {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(101, 67, 33, 0.15);
+            max-width: 1100px;
+            width: 100%;
+            border: 3px solid var(--vintage-brown);
+            outline: 1px solid var(--vintage-rust);
+            outline-offset: -6px;
+            position: relative;
+        }
+
+        /* 4 góc decoration */
+        .login-wrapper::before {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--vintage-rust);
+            top: 8px;
+            left: 8px;
+            border-right: none;
+            border-bottom: none;
+            z-index: 10;
+        }
+
+        .login-wrapper::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--vintage-rust);
+            top: 8px;
+            right: 8px;
+            border-left: none;
+            border-bottom: none;
+            z-index: 10;
+        }
+
+        .login-content {
+            display: flex;
+            flex-direction: row;
+            gap: 0;
+            position: relative;
+        }
+
+        .login-content::before {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--vintage-rust);
+            bottom: 8px;
+            left: 8px;
+            border-right: none;
+            border-top: none;
+            z-index: 10;
+        }
+
+        .login-content::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--vintage-rust);
+            bottom: 8px;
+            right: 8px;
+            border-left: none;
+            border-top: none;
+            z-index: 10;
+        }
+
+        .login-section {
+            flex: 1;
+            padding: 3rem;
+            border-right: 2px solid rgba(139, 69, 19, 0.1);
+        }
+
+        .qr-section {
+            flex: 1;
+            padding: 3rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-footer {
+            width: 100%;
+            text-align: center;
+            padding: 1.5rem;
+            background: rgba(139, 69, 19, 0.03);
+            border-top: 2px solid rgba(139, 69, 19, 0.1);
+        }
+
+        @@media (max-width: 1024px) {
+            .login-content {
+                flex-direction: column;
+            }
+
+            .login-section {
+                border-right: none;
+                border-bottom: 2px solid rgba(139, 69, 19, 0.1);
+                padding: 2rem;
+            }
+
+            .qr-section {
+                padding: 2rem;
+            }
+        }
+        }
+
+        .login-header .subtitle {
+            font-family: 'Times New Roman', 'Georgia', serif !important;
+            font-size: 1rem;
+            color: var(--vintage-rust);
+            font-style: italic;
+            letter-spacing: 0px !important;
+            text-transform: none !important;
+            margin-bottom: 0;
         }
 
         .login-form {
@@ -129,14 +253,15 @@
 </head>
 
 <body>
-    <div class="login-container">
-        <div class="login-header">
-            <i class="fas fa-graduation-cap" style="font-size: 3rem; color: var(--vintage-rust);"></i>
-            <h1>TRUNG TÂM LDA</h1>
-            <p class="subtitle">~ Hệ thống quản lý tiếng Anh ~</p>
-        </div>
+    <div class="main-header">
+        <i class="fas fa-graduation-cap" style="font-size: 4rem; color: var(--vintage-rust);"></i>
+        <h1>TRUNG TÂM LDA</h1>
+        <p class="subtitle">~ Hệ thống quản lý tiếng Anh ~</p>
+    </div>
 
-        <div class="retro-form corner-decorated">
+    <div class="login-wrapper">
+        <div class="login-content">
+        <div class="login-section">
             @if (!ViewData.ModelState.IsValid)
             {
                 <div class="retro-alert retro-alert-danger">
@@ -208,23 +333,97 @@
             </form>
 
             <div class="login-link" style="margin-top: 1.5rem; text-align: center; padding: 1rem; background: rgba(139, 69, 19, 0.05); border-radius: 8px; border: 1px solid rgba(139, 69, 19, 0.2);">
-                <p><i class="fas fa-user-plus"></i> Chưa có tài khoản? 
-                    <a asp-action="Register" style="color: var(--vintage-rust); text-decoration: none; font-weight: 600; transition: all 0.3s ease;"><i class="fas fa-user-plus"></i> Đăng ký ngay</a>
+                <p style="font-family: 'Noto Sans', 'Segoe UI', sans-serif; font-size: 0.95rem; margin-bottom: 0;">
+                    Chưa có tài khoản? 
+                    <a asp-action="Register" style="color: var(--vintage-rust); text-decoration: none; font-weight: 600; transition: all 0.3s ease;">
+                        <i class="fas fa-user-plus"></i> Đăng ký ngay
+                    </a>
                 </p>
             </div>
         </div>
 
-        <div class="login-footer">
-            <div class="vintage-divider"></div>
-            <p>&copy; 2025 Trung tâm Tiếng Anh LDA. Bảo lưu mọi quyền.</p>
+        <div class="qr-section">
+            <h3 style="margin-bottom: 1.5rem; color: var(--vintage-rust); font-size: 1.8rem; font-weight: 600; text-align: center; font-family: 'Noto Serif', 'Georgia', serif;">
+                <i class="fas fa-qrcode"></i> Đăng nhập bằng Mã QR
+            </h3>
+            <p style="margin-bottom: 2rem; color: var(--vintage-text); font-size: 1rem; line-height: 1.6; text-align: center; max-width: 350px; font-family: 'Noto Serif', 'Georgia', serif;">
+                Quét bằng ứng dụng di động để đăng nhập tức thì
+            </p>
+            <div id="qrBox" style="display:flex; justify-content:center; align-items:center; padding:24px; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); min-height: 260px; width: 280px;"></div>
+            <div id="qrStatus" style="text-align:center; margin-top:16px; font-weight:600; color: var(--vintage-rust); font-size: 1.05rem; font-family: 'Noto Serif', 'Georgia', serif;"></div>
         </div>
-    </div>
+        </div>
 
-    <script>
+        <div class="login-footer">
+            <p style="margin: 0; color: var(--vintage-text); font-size: 0.95rem; font-family: 'Noto Serif', 'Georgia', serif;">&copy; 2025 Trung tâm Tiếng Anh LDA. Bảo lưu mọi quyền.</p>
+        </div>
+    </div>    <script>
         // Tự động focus vào username khi trang load
         window.addEventListener('load', function () {
             document.getElementById('Username')?.focus();
         });
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script>
+        (function () {
+            const statusEl = document.getElementById('qrStatus');
+            let currentId = null;
+            let pollTimer = null;
+
+            async function createChallenge() {
+                try {
+                    const res = await fetch('@Url.Action("QrCreateForWebLogin","Account")', { method: 'POST' });
+                    const data = await res.json();
+                    if (data && data.success && data.payload) {
+                        currentId = data.id;
+                        const box = document.getElementById('qrBox');
+                        box.innerHTML = '';
+                        new QRCode(box, { text: data.payload, width: 220, height: 220 });
+                        statusEl.innerText = 'Chờ xác nhận từ điện thoại...';
+                        startPolling();
+                    } else {
+                        statusEl.innerText = 'Không thể tạo QR';
+                    }
+                } catch (e) {
+                    statusEl.innerText = 'Lỗi tạo QR: ' + e;
+                }
+            }
+
+            async function startPolling() {
+                stopPolling();
+                pollTimer = setInterval(async () => {
+                    if (!currentId) return;
+                    try {
+                        const res = await fetch('@Url.Action("QrStatus","Account")?id=' + encodeURIComponent(currentId));
+                        const data = await res.json();
+                        if (!data || !data.success) return;
+                        if (data.status === 'scanned') {
+                            statusEl.innerText = 'Đã quét trên điện thoại. Chờ phê duyệt...';
+                        }
+                        if (data.status === 'approved' && data.grantToken) {
+                            // Exchange for session on PC
+                            const res2 = await fetch('@Url.Action("QrConsume","Account")', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: currentId, grantToken: data.grantToken, deviceType: 'pc' }) });
+                            const loginRes = await res2.json();
+                            if (loginRes && loginRes.success && loginRes.sessionId) {
+                                stopPolling();
+                                window.location.href = '@Url.Action("FinalizeQrLogin","Account")' + '?sid=' + encodeURIComponent(loginRes.sessionId);
+                            } else {
+                                statusEl.innerText = 'Không thể hoàn tất đăng nhập';
+                            }
+                        }
+                        if (data.status === 'denied' || data.status === 'expired') {
+                            stopPolling();
+                            statusEl.innerText = 'Yêu cầu bị từ chối hoặc hết hạn. Tạo mã mới...';
+                            setTimeout(createChallenge, 1500);
+                        }
+                    } catch { }
+                }, 1500);
+            }
+            function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+
+            createChallenge();
+        })();
     </script>
 
     @section Scripts {

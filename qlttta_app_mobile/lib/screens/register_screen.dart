@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:qlttta_app_mobile/services/auth_service.dart';
+import 'package:qlttta_app_mobile/screens/register_verify_screen.dart';
 import 'package:qlttta_app_mobile/theme/retro_theme.dart';
 import 'package:intl/intl.dart';
 
@@ -93,7 +94,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      final success = await _authService.register(
+      // Use OTP registration flow
+      final res = await _authService.initiateRegisterOtp(
         fullName: _hoTenController.text,
         sex: _gioiTinh,
         dateOfBirth: _ngaySinh!,
@@ -105,8 +107,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
         confirmPassword: _confirmPasswordController.text,
       );
 
-      if (success && mounted) {
-        _showSuccessDialog();
+      if (!mounted) return;
+
+      if (res['success'] == true && res['correlationId'] != null) {
+        // Navigate to OTP verification screen
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => RegisterVerifyScreen(
+              correlationId: res['correlationId'],
+              email: _emailController.text,
+            ),
+          ),
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res['message'] ?? 'Đã gửi OTP đến email'),
+            backgroundColor: RetroColors.vintageGreen,
+          ),
+        );
+      } else {
+        _showErrorDialog(res['message'] ?? 'Không thể gửi OTP');
       }
     } catch (e) {
       if (mounted) {
@@ -160,48 +180,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  void _showSuccessDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: RetroColors.vintageWhite,
-        shape: const RoundedRectangleBorder(
-          side: BorderSide(color: RetroColors.vintageBrown, width: 3),
-        ),
-        title: Row(
-          children: const [
-            Icon(Icons.check_circle_outline, color: RetroColors.vintageGreen),
-            SizedBox(width: 8),
-            Text(
-              'THÀNH CÔNG',
-              style: TextStyle(
-                color: RetroColors.vintageGreen,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        content: const Text(
-          'Đăng ký tài khoản thành công!\nVui lòng đăng nhập.',
-          style: TextStyle(color: RetroColors.vintageDarkBrown),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Back to login
-            },
-            style: TextButton.styleFrom(
-              backgroundColor: RetroColors.vintageBrown,
-              foregroundColor: RetroColors.vintageCream,
-            ),
-            child: const Text('ĐĂNG NHẬP NGAY'),
-          ),
-        ],
-      ),
-    );
-  }
+  // Success dialog removed; OTP flow navigates to verify screen instead.
 
   @override
   Widget build(BuildContext context) {

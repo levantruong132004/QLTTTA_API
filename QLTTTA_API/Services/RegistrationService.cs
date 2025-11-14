@@ -104,6 +104,28 @@ namespace QLTTTA_API.Services
                 q = q.Substring(6).Trim();
             }
 
+            // Nếu là URL dạng .../QrSearch?q=..., bóc tách tham số q
+            try
+            {
+                if (q.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || q.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                {
+                    var uri = new Uri(q);
+                    var parsed = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+                    if (parsed.TryGetValue("q", out var inner) && !string.IsNullOrWhiteSpace(inner.ToString()))
+                    {
+                        q = inner.ToString().Trim();
+                    }
+                }
+            }
+            catch { }
+
+            // Tra cứu theo lớp khi payload có tiền tố CLASS:/LOP:
+            if (q.StartsWith("CLASS:", StringComparison.OrdinalIgnoreCase) || q.StartsWith("LOP:", StringComparison.OrdinalIgnoreCase))
+            {
+                var part = q.Substring(q.IndexOf(':') + 1).Trim();
+                return await SearchByClassAsync(part);
+            }
+
             // Thử parse JSON
             try
             {
@@ -122,6 +144,11 @@ namespace QLTTTA_API.Services
                     else if (json.RootElement.TryGetProperty("registrationId", out var idEl))
                     {
                         q = idEl.ToString();
+                    }
+                    else if (json.RootElement.TryGetProperty("classCode", out var classCodeEl))
+                    {
+                        var cc = classCodeEl.GetString();
+                        if (!string.IsNullOrWhiteSpace(cc)) return await SearchByClassAsync(cc!);
                     }
                 }
             }
@@ -180,12 +207,106 @@ namespace QLTTTA_API.Services
 
             try
             {
-                return await ExecuteQueryAsync<Registration>(sql, param);
+                var list = await ExecuteQueryAsync<Registration>(sql, param);
+                // Nếu không thấy gì và q có vẻ là mã lớp (ví dụ LH00001), thử tra theo lớp
+                if (list.Count == 0 && LooksLikeClassCode(q))
+                {
+                    return await SearchByClassAsync(q);
+                }
+                return list;
             }
             catch (Oracle.ManagedDataAccess.Client.OracleException oex) when (oex.Number == 1031 || oex.Number == 942)
             {
                 _logger.LogWarning(oex, "Falling back to admin query for SearchAsync");
-                return await ExecuteQueryAdminAsync<Registration>(sql, param);
+                // thử truy vấn lại bằng admin
+                var list = await ExecuteQueryAdminAsync<Registration>(sql, param);
+                if (list.Count == 0 && LooksLikeClassCode(q))
+                {
+                    return await SearchByClassAsync(q, useAdmin: true);
+                }
+                return list;
+            }
+        }
+
+        private static bool LooksLikeClassCode(string s)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return false;
+            s = s.Trim();
+            // Heuristic: bắt đầu bằng 2-3 chữ cái + vài chữ số, ví dụ LH00005
+            if (s.Length < 3) return false;
+            int letterPrefix = 0;
+            while (letterPrefix < s.Length && char.IsLetter(s[letterPrefix]) && letterPrefix < 3) letterPrefix++;
+            if (letterPrefix == 0) return false;
+            bool hasDigit = false;
+            for (int i = letterPrefix; i < s.Length; i++) if (char.IsDigit(s[i])) { hasDigit = true; break; }
+            return hasDigit;
+        }
+
+        private async Task<List<Registration>> SearchByClassAsync(string classPart, bool useAdmin = false)
+        {
+            if (string.IsNullOrWhiteSpace(classPart)) return new List<Registration>();
+            var v = classPart.Trim();
+            string sqlById = @"SELECT dk.ID_DANG_KY AS REGISTRATION_ID,
+                                dk.MA_DANG_KY AS REGISTRATION_CODE,
+                                dk.NGAY_DANG_KY AS REGISTRATION_DATE,
+                                dk.TRANG_THAI   AS STATUS,
+                                NULL            AS STUDY_DATE,
+                                dk.ID_HOC_VIEN  AS STUDENT_ID,
+                                hv.HO_TEN       AS STUDENT_NAME,
+                                dk.ID_LOP_HOC   AS CLASS_ID,
+                                NVL(dk.ID_NHAN_VIEN_DUYET,0) AS STAFF_ID,
+                                lh.TEN_LOP_HOC  AS TEN_LOP_HOC,
+                                kh.TEN_KHOA_HOC AS TEN_KHOA_HOC
+                         FROM DON_DANG_KY dk
+                         JOIN HOC_VIEN hv ON hv.ID_HOC_VIEN = dk.ID_HOC_VIEN
+                         JOIN LOP_HOC lh ON lh.ID_LOP_HOC = dk.ID_LOP_HOC
+                         JOIN KHOA_HOC kh ON kh.ID_KHOA_HOC = lh.ID_KHOA_HOC
+                         WHERE dk.ID_LOP_HOC = :id
+                         ORDER BY dk.ID_DANG_KY DESC";
+
+            string sqlByCode = @"SELECT dk.ID_DANG_KY AS REGISTRATION_ID,
+                                dk.MA_DANG_KY AS REGISTRATION_CODE,
+                                dk.NGAY_DANG_KY AS REGISTRATION_DATE,
+                                dk.TRANG_THAI   AS STATUS,
+                                NULL            AS STUDY_DATE,
+                                dk.ID_HOC_VIEN  AS STUDENT_ID,
+                                hv.HO_TEN       AS STUDENT_NAME,
+                                dk.ID_LOP_HOC   AS CLASS_ID,
+                                NVL(dk.ID_NHAN_VIEN_DUYET,0) AS STAFF_ID,
+                                lh.TEN_LOP_HOC  AS TEN_LOP_HOC,
+                                kh.TEN_KHOA_HOC AS TEN_KHOA_HOC
+                         FROM DON_DANG_KY dk
+                         JOIN HOC_VIEN hv ON hv.ID_HOC_VIEN = dk.ID_HOC_VIEN
+                         JOIN LOP_HOC lh ON lh.ID_LOP_HOC = dk.ID_LOP_HOC
+                         JOIN KHOA_HOC kh ON kh.ID_KHOA_HOC = lh.ID_KHOA_HOC
+                         WHERE UPPER(lh.MA_LOP_HOC) = UPPER(:cc)
+                            OR UPPER(lh.MA_LOP_HOC) LIKE UPPER(:cc_like)
+                         ORDER BY dk.ID_DANG_KY DESC";
+
+            try
+            {
+                if (int.TryParse(v, out var cid))
+                {
+                    return useAdmin ? await ExecuteQueryAdminAsync<Registration>(sqlById, new { id = cid })
+                                     : await ExecuteQueryAsync<Registration>(sqlById, new { id = cid });
+                }
+                else
+                {
+                    return useAdmin ? await ExecuteQueryAdminAsync<Registration>(sqlByCode, new { cc = v, cc_like = $"%{v}%" })
+                                     : await ExecuteQueryAsync<Registration>(sqlByCode, new { cc = v, cc_like = $"%{v}%" });
+                }
+            }
+            catch (Oracle.ManagedDataAccess.Client.OracleException oex) when (oex.Number == 1031 || oex.Number == 942)
+            {
+                // fallback admin khi cần
+                if (!useAdmin)
+                {
+                    if (int.TryParse(v, out var cid))
+                        return await ExecuteQueryAdminAsync<Registration>(sqlById, new { id = cid });
+                    else
+                        return await ExecuteQueryAdminAsync<Registration>(sqlByCode, new { cc = v, cc_like = $"%{v}%" });
+                }
+                return new List<Registration>();
             }
         }
 

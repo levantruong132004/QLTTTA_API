@@ -10,11 +10,13 @@ namespace QLTTTA_API.Controllers
     {
         private readonly IAuthService _authService;
         private readonly ILogger<AuthController> _logger;
+        private readonly IConfiguration _config;
 
-        public AuthController(IAuthService authService, ILogger<AuthController> logger)
+        public AuthController(IAuthService authService, ILogger<AuthController> logger, IConfiguration config)
         {
             _authService = authService;
             _logger = logger;
+            _config = config;
         }
 
         [HttpPost("login")]
@@ -153,6 +155,50 @@ namespace QLTTTA_API.Controllers
                              ?? "pc";
             var valid = await _authService.CheckSessionAsync(username, sessionId, deviceType);
             return Ok(new { status = valid ? "valid" : "invalid" });
+        }
+
+        [HttpGet("me")]
+        public async Task<IActionResult> Me()
+        {
+            var sid = Request.Headers["X-Session-Id"].FirstOrDefault();
+            var deviceType = Request.Headers["X-Device-Type"].FirstOrDefault()?.Trim().ToLowerInvariant() ?? "pc";
+            if (deviceType != "mobile" && deviceType != "pc") deviceType = "pc";
+            if (string.IsNullOrWhiteSpace(sid)) return Unauthorized(new { Success = false, Message = "Thiếu phiên đăng nhập" });
+
+            try
+            {
+                var cs = _config.GetConnectionString("OracleDbConnection") ?? string.Empty;
+                using var conn = new Oracle.ManagedDataAccess.Client.OracleConnection(cs);
+                await conn.OpenAsync();
+                var col = deviceType == "mobile" ? "SESSION_ID_MOBILE" : "SESSION_ID_PC";
+                var sql = $@"SELECT tk.ID_NGUOI_DUNG, tk.TEN_DANG_NHAP, tk.EMAIL, vt.TEN_VAI_TRO, vt.ID_VAI_TRO, hv.HO_TEN
+                               FROM TAI_KHOAN tk
+                          LEFT JOIN VAI_TRO vt ON vt.ID_VAI_TRO = tk.ID_VAI_TRO
+                          LEFT JOIN HOC_VIEN hv ON hv.ID_HOC_VIEN = tk.ID_NGUOI_DUNG
+                              WHERE {col} = :sid";
+                using var cmd = new Oracle.ManagedDataAccess.Client.OracleCommand(sql, conn) { BindByName = true };
+                cmd.Parameters.Add(":sid", Oracle.ManagedDataAccess.Client.OracleDbType.Varchar2).Value = sid;
+                using var rdr = await cmd.ExecuteReaderAsync(System.Data.CommandBehavior.SingleRow);
+                if (await rdr.ReadAsync())
+                {
+                    var user = new QLTTTA_API.Models.UserInfo
+                    {
+                        UserId = rdr.IsDBNull(0) ? 0 : rdr.GetInt32(0),
+                        Username = rdr.IsDBNull(1) ? string.Empty : rdr.GetString(1),
+                        Email = rdr.IsDBNull(2) ? string.Empty : rdr.GetString(2),
+                        Role = rdr.IsDBNull(3) ? string.Empty : rdr.GetString(3),
+                        RoleId = rdr.IsDBNull(4) ? 0 : rdr.GetInt32(4),
+                        FullName = rdr.IsDBNull(5) ? string.Empty : rdr.GetString(5)
+                    };
+                    return Ok(new { Success = true, User = user });
+                }
+                return Unauthorized(new { Success = false, Message = "Phiên không khớp" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Me endpoint error");
+                return StatusCode(500, new { Success = false, Message = "Lỗi hệ thống" });
+            }
         }
     }
 }

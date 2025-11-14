@@ -477,6 +477,118 @@ namespace QLTTTA_WEB.Controllers
             return RedirectToAction("Pay", new { registrationId });
         }
 
+        // ==== Student QR lookup for registrations (scan/search only, no approve/reject) ====
+        [HttpGet]
+        public IActionResult QrLookupRegistrations(string? returnUrl)
+        {
+            if (HttpContext.Session.GetString("UserId") == null)
+                return RedirectToAction("Login", "Account", new { returnUrl = Url.Action("QrLookupRegistrations", "Student") });
+
+            ViewBag.ReturnUrl = string.IsNullOrWhiteSpace(returnUrl) ? Url.Action("MyRegistrations", "Student") : returnUrl;
+            return View("~/Views/Student/QrLookupRegistrations.cshtml");
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> QrSearchRegistrations(string q, string? returnUrl)
+        {
+            if (HttpContext.Session.GetString("UserId") == null)
+                return RedirectToAction("Login", "Account", new { returnUrl = Url.Action("QrLookupRegistrations", "Student") });
+
+            if (string.IsNullOrWhiteSpace(q))
+            {
+                TempData["ErrorMessage"] = "Không có dữ liệu QR hoặc mã để tra cứu.";
+                return RedirectToAction("QrLookupRegistrations", new { returnUrl });
+            }
+
+            try
+            {
+                // Trường hợp q là URL có chứa tham số q bên trong
+                if (Uri.TryCreate(q.Trim(), UriKind.Absolute, out var maybeUrl))
+                {
+                    var innerQ = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(maybeUrl.Query).TryGetValue("q", out var vals)
+                        ? vals.ToString()
+                        : null;
+                    if (!string.IsNullOrWhiteSpace(innerQ))
+                    {
+                        q = innerQ;
+                    }
+                }
+
+                var text = q.Trim();
+                var upper = text.ToUpperInvariant();
+                bool tryClass = upper.StartsWith("CLASS:") || upper.StartsWith("LOP:") || (!upper.StartsWith("REG:") && !upper.StartsWith("REGID:") && !text.Contains("{"));
+
+                if (tryClass)
+                {
+                    var classCode = upper.StartsWith("CLASS:") ? text.Substring(6).Trim() : (upper.StartsWith("LOP:") ? text.Substring(4).Trim() : text);
+                    if (!string.IsNullOrWhiteSpace(classCode))
+                    {
+                        var clsRes = await _httpClient.GetAsync($"api/classes?search={Uri.EscapeDataString(classCode)}");
+                        var clsBody = await clsRes.Content.ReadAsStringAsync();
+                        if (clsRes.IsSuccessStatusCode)
+                        {
+                            var classes = JsonSerializer.Deserialize<List<QLTTTA_WEB.Models.AdminClassItem>>(clsBody, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                            var match = classes.FirstOrDefault(c => string.Equals(c.ClassCode, classCode, StringComparison.OrdinalIgnoreCase));
+                            if (match != null)
+                            {
+                                var regRes = await _httpClient.GetAsync($"api/registrations?status={Uri.EscapeDataString("Chờ duyệt")}&classCode={Uri.EscapeDataString(match.ClassCode)}");
+                                var regBody = await regRes.Content.ReadAsStringAsync();
+                                List<QLTTTA_WEB.Models.AdminRegistrationItem> regData = new();
+                                if (regRes.IsSuccessStatusCode)
+                                {
+                                    regData = JsonSerializer.Deserialize<List<QLTTTA_WEB.Models.AdminRegistrationItem>>(regBody, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                                }
+
+                                if (regData.Count == 0)
+                                {
+                                    var regResAll = await _httpClient.GetAsync($"api/registrations?classCode={Uri.EscapeDataString(match.ClassCode)}");
+                                    var regBodyAll = await regResAll.Content.ReadAsStringAsync();
+                                    if (regResAll.IsSuccessStatusCode)
+                                    {
+                                        regData = JsonSerializer.Deserialize<List<QLTTTA_WEB.Models.AdminRegistrationItem>>(regBodyAll, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                                    }
+                                }
+                                // Mine-only filter
+                                var uidStr = HttpContext.Session.GetString("UserId");
+                                int.TryParse(uidStr, out var sid);
+                                if (sid > 0) regData = regData.Where(r => r.StudentId == sid).ToList(); else regData = new();
+
+                                ViewBag.Query = q;
+                                ViewBag.ReturnUrl = string.IsNullOrWhiteSpace(returnUrl) ? Url.Action("MyRegistrations", "Student") : returnUrl;
+                                return View("~/Views/Student/QrSearchResults.cshtml", regData);
+                            }
+                        }
+                    }
+                }
+
+                // Mặc định: tra cứu theo mã/QR/ID đơn đăng ký
+                var url = $"api/registrations/search?q={Uri.EscapeDataString(q)}";
+                var res = await _httpClient.GetAsync(url);
+                var body = await res.Content.ReadAsStringAsync();
+                if (!res.IsSuccessStatusCode)
+                {
+                    TempData["ErrorMessage"] = string.IsNullOrWhiteSpace(body) ? "Tra cứu thất bại" : body;
+                    return RedirectToAction("QrLookupRegistrations", new { returnUrl });
+                }
+
+                var data = JsonSerializer.Deserialize<List<QLTTTA_WEB.Models.AdminRegistrationItem>>(body, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                // Mine-only filter
+                var uidStr2 = HttpContext.Session.GetString("UserId");
+                int.TryParse(uidStr2, out var sid2);
+                if (sid2 > 0) data = data.Where(r => r.StudentId == sid2).ToList(); else data = new();
+                ViewBag.Query = q;
+                ViewBag.ReturnUrl = string.IsNullOrWhiteSpace(returnUrl) ? Url.Action("MyRegistrations", "Student") : returnUrl;
+                return View("~/Views/Student/QrSearchResults.cshtml", data);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Student QR search error");
+                TempData["ErrorMessage"] = "Có lỗi xảy ra khi tra cứu. Vui lòng thử lại.";
+                return RedirectToAction("QrLookupRegistrations", new { returnUrl });
+            }
+        }
+        // ==== End Student QR lookup ====
+
         // Xác thực chữ ký số (để học viên kiểm tra)
         [HttpGet]
         public async Task<IActionResult> VerifySignature(int invoiceId)
