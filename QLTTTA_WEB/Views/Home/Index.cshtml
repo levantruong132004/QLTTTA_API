@@ -3,9 +3,15 @@
     ViewData["Title"] = "Trang chủ";
     var roleStr = (string)(ViewBag.Role ?? "");
     var roleId = Context.Session.GetString("RoleId");
-    bool isStaff = roleStr.Contains("NhanVienHocVu", StringComparison.OrdinalIgnoreCase) ||
-                   roleStr.Contains("QuanTriVien", StringComparison.OrdinalIgnoreCase) ||
-                   (roleId == "4" || roleId == "5");
+    bool isAdmin = roleId == "5" || roleStr.Contains("QuanTri", StringComparison.OrdinalIgnoreCase) ||
+    roleStr.Contains("Quản trị", StringComparison.OrdinalIgnoreCase);
+    bool isStaff = roleId == "4" || roleStr.Contains("NhanVienHocVu", StringComparison.OrdinalIgnoreCase) ||
+    roleStr.Contains("Nhân viên", StringComparison.OrdinalIgnoreCase);
+    bool isAccountant = roleId == "3" || roleStr.Contains("KeToan", StringComparison.OrdinalIgnoreCase) ||
+    roleStr.Contains("Kế toán", StringComparison.OrdinalIgnoreCase);
+    bool isEmployee = isAdmin || isStaff || isAccountant;
+    bool isStudent = roleStr.Contains("HocVien", StringComparison.OrdinalIgnoreCase) || roleStr.Contains("Học viên",
+    StringComparison.OrdinalIgnoreCase);
 }
 
 @* ===================== STYLE (Chung cho desktop & mobile, có media query bên dưới) ===================== *@
@@ -252,7 +258,7 @@
 
         <div class="vintage-divider"></div>
 
-        @if (isStaff)
+        @if (isEmployee)
         {
             <h2 style="text-align: center; margin-bottom: 1.5rem;">
                 <i class="fas fa-chalkboard"></i> DANH SÁCH LỚP HỌC
@@ -263,12 +269,16 @@
                         <div class="col-md-6">
                             <label class="form-label"><i class="fas fa-filter"></i> Chọn khóa học</label>
                             <select name="courseId" class="form-select" onchange="this.form.submit()">
-                                <option value="0" selected="@(Model != null && Model.SelectedCourseId.HasValue && Model.SelectedCourseId.Value == 0)">Tất cả khóa học</option>
+                                <option value="0"
+                                    selected="@(Model != null && Model.SelectedCourseId.HasValue && Model.SelectedCourseId.Value == 0)">
+                                    Tất cả khóa học</option>
                                 @if (Model?.StaffCourses != null && Model.StaffCourses.Any())
                                 {
                                     foreach (var c in Model.StaffCourses)
                                     {
-                                        <option value="@c.CourseId" selected="@(Model != null && Model.SelectedCourseId.HasValue && Model.SelectedCourseId.Value == c.CourseId)">@c.CourseName</option>
+                                        <option value="@c.CourseId"
+                                            selected="@(Model != null && Model.SelectedCourseId.HasValue && Model.SelectedCourseId.Value == c.CourseId)">
+                                            @c.CourseName</option>
                                     }
                                 }
                             </select>
@@ -319,7 +329,7 @@
             </h2>
 
             @* ===================== THÔNG TIN HỌC VIÊN ===================== *@
-            @if (Model?.Student != null)
+                @if (Model?.Student != null)
             {
                 <div class="retro-card">
                     <div class="retro-card-body">
@@ -354,39 +364,42 @@
 
         <div class="vintage-divider"></div>
 
-        <h2 style="text-align: center; margin-bottom: 1.5rem;">
-            <i class="fas fa-book"></i> DANH SÁCH KHÓA HỌC
-        </h2>
-        @* ===================== DANH SÁCH KHÓA HỌC - GRID CHO DESKTOP & MOBILE (auto responsive) ===================== *@
-        @if (Model?.Courses != null && Model.Courses.Any())
+        @if (isStudent)
         {
-            <div class="course-grid">
-                @foreach (var course in Model.Courses.Take(6))
-                {
-                    <div class="course-item">
-                        <div class="course-title">
-                            <i class="fas fa-bookmark"></i> @course.CourseName
+            <h2 style="text-align: center; margin-bottom: 1.5rem;">
+                <i class="fas fa-book"></i> DANH SÁCH KHÓA HỌC
+            </h2>
+            @* ===================== DANH SÁCH KHÓA HỌC - GRID CHO DESKTOP & MOBILE (auto responsive) ===================== *@
+                @if (Model?.Courses != null && Model.Courses.Any())
+            {
+                <div class="course-grid">
+                    @foreach (var course in Model.Courses.Take(6))
+                    {
+                        <div class="course-item">
+                            <div class="course-title">
+                                <i class="fas fa-bookmark"></i> @course.CourseName
+                            </div>
+                            <div class="course-meta">
+                                <i class="fas fa-align-left"></i> @course.Description
+                            </div>
                         </div>
-                        <div class="course-meta">
-                            <i class="fas fa-align-left"></i> @course.Description
-                        </div>
-                    </div>
-                }
-            </div>
-        }
-        else
-        {
-            <div class="retro-alert retro-alert-info text-center">
-                <div class="retro-alert-content">
-                    <i class="fas fa-info-circle"></i> Hiện tại chưa có khóa học nào.
+                    }
                 </div>
+            }
+            else
+            {
+                <div class="retro-alert retro-alert-info text-center">
+                    <div class="retro-alert-content">
+                        <i class="fas fa-info-circle"></i> Hiện tại chưa có khóa học nào.
+                    </div>
+                </div>
+            }
+            @* ===================== NÚT CHUYỂN TRANG (chỉ Học viên) ===================== *@
+                <div class="text-center mb-3" style="margin-top:1rem;">
+                <a asp-controller="Student" asp-action="Courses" class="btn btn-success">
+                    <i class="fas fa-list"></i> Xem tất cả và đăng ký
+                </a>
             </div>
         }
-        @* ===================== NÚT CHUYỂN TRANG (Chung) ===================== *@
-        <div class="text-center mb-3" style="margin-top:1rem;">
-            <a asp-controller="Student" asp-action="Courses" class="btn btn-success">
-                <i class="fas fa-list"></i> Xem tất cả và đăng ký
-            </a>
-        </div>
     </div>
 </div>

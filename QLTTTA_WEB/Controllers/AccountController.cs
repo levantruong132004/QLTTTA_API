@@ -228,6 +228,7 @@ namespace QLTTTA_WEB.Controllers
                 if (!string.IsNullOrEmpty(sid))
                 {
                     req.Headers.Add("X-Session-Id", sid);
+                    req.Headers.Add("X-Device-Type", "pc");
                 }
                 await _httpClient.SendAsync(req);
             }

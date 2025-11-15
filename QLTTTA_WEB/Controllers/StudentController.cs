@@ -16,6 +16,22 @@ namespace QLTTTA_WEB.Controllers
             _httpClient = httpClientFactory.CreateClient("ApiClient");
             _logger = logger;
         }
+        // Staff/admin checker aligned with Admin.ManageController
+        private bool IsStaff()
+        {
+            var role = HttpContext.Session.GetString("Role") ?? string.Empty;
+            var roleIdStr = HttpContext.Session.GetString("RoleId");
+            int.TryParse(roleIdStr, out var roleId);
+            var username = HttpContext.Session.GetString("Username") ?? string.Empty;
+            if (username.Equals("QLTTTA_ADMIN", StringComparison.OrdinalIgnoreCase) ||
+                username.Equals("QLTTA_ADMIN", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            return roleId == 4
+                || role.Contains("NhanVienHocVu", StringComparison.OrdinalIgnoreCase)
+                || role.Contains("QuanTri", StringComparison.OrdinalIgnoreCase);
+        }
 
         // Quyền xem/chỉnh sửa sẽ do database (VIEW + quyền UPDATE) kiểm soát theo user đang kết nối.
         // Chỉ cần đảm bảo đã đăng nhập (có session UserId) ở tầng web.
@@ -785,8 +801,8 @@ namespace QLTTTA_WEB.Controllers
         // ================= Admin: Quản lý học viên (gom từ StudentsController) =================
         public async Task<IActionResult> Index(int pageNumber = 1, int pageSize = 10, string? search = null)
         {
-            if (!IsAuthenticated())
-                return RedirectToAction("Login", "Account");
+            if (!IsStaff())
+                return RedirectToAction("Index", "Home");
 
             try
             {
@@ -829,8 +845,8 @@ namespace QLTTTA_WEB.Controllers
 
         public async Task<IActionResult> Details(int id)
         {
-            if (!IsAuthenticated())
-                return RedirectToAction("Login", "Account");
+            if (!IsStaff())
+                return RedirectToAction("Index", "Home");
 
             try
             {
@@ -863,8 +879,8 @@ namespace QLTTTA_WEB.Controllers
 
         public IActionResult Create()
         {
-            if (!IsAuthenticated())
-                return RedirectToAction("Login", "Account");
+            if (!IsStaff())
+                return RedirectToAction("Index", "Home");
 
             return View();
         }
@@ -873,8 +889,8 @@ namespace QLTTTA_WEB.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(StudentCreateViewModel model)
         {
-            if (!IsAuthenticated())
-                return RedirectToAction("Login", "Account");
+            if (!IsStaff())
+                return RedirectToAction("Index", "Home");
 
             if (!ModelState.IsValid)
             {
@@ -927,8 +943,8 @@ namespace QLTTTA_WEB.Controllers
 
         public async Task<IActionResult> Edit(int id)
         {
-            if (!IsAuthenticated())
-                return RedirectToAction("Login", "Account");
+            if (!IsStaff())
+                return RedirectToAction("Index", "Home");
 
             try
             {
@@ -975,8 +991,8 @@ namespace QLTTTA_WEB.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, StudentEditViewModel model)
         {
-            if (!IsAuthenticated())
-                return RedirectToAction("Login", "Account");
+            if (!IsStaff())
+                return RedirectToAction("Index", "Home");
 
             if (id != model.StudentId)
             {
@@ -1035,8 +1051,8 @@ namespace QLTTTA_WEB.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Delete(int id)
         {
-            if (!IsAuthenticated())
-                return RedirectToAction("Login", "Account");
+            if (!IsStaff())
+                return RedirectToAction("Index", "Home");
 
             try
             {

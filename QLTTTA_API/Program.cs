@@ -33,6 +33,8 @@ try
     builder.Services.AddScoped<IPaymentService, PaymentService>();
     builder.Services.AddScoped<IDigitalSignatureService, DigitalSignatureService>(); // Thêm service chữ ký số
     builder.Services.AddSingleton<IQrLoginService, InMemoryQrLoginService>();
+    builder.Services.AddScoped<IStaffService, StaffService>();
+    builder.Services.AddScoped<IAdminStaffService, AdminStaffService>();
 
     // Add CORS
     builder.Services.AddCors(options =>
@@ -43,7 +45,9 @@ try
                       "http://localhost:7169",
                       "https://localhost:7169",
                       "http://localhost:5165",
-                      "https://localhost:5165") // Port của web app
+                      "https://localhost:5165",
+                      "http://localhost:6165",
+                      "https://localhost:6165") // Port của web app
                   .AllowAnyHeader()
                   .AllowAnyMethod()
                   .AllowCredentials();

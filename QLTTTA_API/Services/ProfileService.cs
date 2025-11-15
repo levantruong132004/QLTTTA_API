@@ -69,7 +69,7 @@ namespace QLTTTA_API.Services
         {
             // Theo yêu cầu: chỉ cho phép HV tự cập nhật SỐ ĐIỆN THOẠI và ĐỊA CHỈ thông qua quyền UPDATE trên view của mình
             const string sql = @"UPDATE QLTT_ADMIN.V_THONGTIN_CANHAN_HV
-SET SO_DIEN_THOẠI = :p_sdt, DIA_CHI = :p_diachi
+SET SO_DIEN_THOAI = :p_sdt, DIA_CHI = :p_diachi
 WHERE UPPER(TEN_DANG_NHAP) = USER";
             using var conn = await GetConnectionAsync();
             using var cmd = new OracleCommand(sql, conn) { BindByName = true };
@@ -85,53 +85,31 @@ WHERE UPPER(TEN_DANG_NHAP) = USER";
         /// </summary>
         public async Task<List<Course>> GetAllCoursesAsync()
         {
-            // Dùng VIEW đã được cấp quyền cho Học viên (role_hocvien)
             const string sql = "SELECT MA_KHOA_HOC, TEN_KHOA_HOC, MO_TA, HOC_PHI_TIEU_CHUAN FROM QLTT_ADMIN.V_DANHSACH_KHOAHOC ORDER BY TEN_KHOA_HOC";
-            // theo yêu cầu, hiển thị không lộ ID ra web; nhưng API vẫn có thể lấy đầy đủ
-            async Task<List<Course>> ReadAsync(Oracle.ManagedDataAccess.Client.OracleConnection conn)
+            using var conn = await GetConnectionAsync();
+            using var cmd = new OracleCommand(sql, conn);
+            using var reader = await cmd.ExecuteReaderAsync();
+            var list = new List<Course>();
+            while (await reader.ReadAsync())
             {
-                using var cmd = new OracleCommand(sql, conn);
-                using var reader = await cmd.ExecuteReaderAsync();
-                var list = new List<Course>();
-                while (await reader.ReadAsync())
+                var feeObj = reader.IsDBNull(3) ? null : reader.GetValue(3);
+                int fee = 0;
+                if (feeObj != null)
                 {
-                    var feeObj = reader.IsDBNull(3) ? null : reader.GetValue(3);
-                    int fee = 0;
-                    if (feeObj != null)
-                    {
-                        if (feeObj is decimal dec) fee = (int)dec;
-                        else if (feeObj is int i) fee = i;
-                        else if (int.TryParse(feeObj.ToString(), out var parsed)) fee = parsed;
-                    }
-                    list.Add(new Course
-                    {
-                        CourseId = 0, // ẩn ID
-                        CourseCode = reader.IsDBNull(0) ? null : reader.GetString(0),
-                        CourseName = reader.IsDBNull(1) ? null : reader.GetString(1),
-                        Description = reader.IsDBNull(2) ? null : reader.GetString(2),
-                        StandardFee = fee
-                    });
+                    if (feeObj is decimal dec) fee = (int)dec;
+                    else if (feeObj is int i) fee = i;
+                    else if (int.TryParse(feeObj.ToString(), out var parsed)) fee = parsed;
                 }
-                return list;
+                list.Add(new Course
+                {
+                    CourseId = 0,
+                    CourseCode = reader.IsDBNull(0) ? null : reader.GetString(0),
+                    CourseName = reader.IsDBNull(1) ? null : reader.GetString(1),
+                    Description = reader.IsDBNull(2) ? null : reader.GetString(2),
+                    StandardFee = fee
+                });
             }
-
-            try
-            {
-                using var conn = await GetConnectionAsync();
-                return await ReadAsync(conn);
-            }
-            catch (UnauthorizedAccessException) // Mất session user -> fallback admin để vẫn trả dữ liệu công khai
-            {
-                // Khi API restart, cache phiên user mất -> fallback admin cho danh sách công khai này
-                using var conn = await GetAdminConnectionAsync();
-                return await ReadAsync(conn);
-            }
-            catch (Oracle.ManagedDataAccess.Client.OracleException oex) when (oex.Number == 1031)
-            {
-                // ORA-01031: thiếu quyền xem bảng/góc nhìn -> fallback admin để không chặn hiển thị
-                using var conn = await GetAdminConnectionAsync();
-                return await ReadAsync(conn);
-            }
+            return list;
         }
 
         /// <summary>
@@ -189,58 +167,13 @@ WHERE UPPER(TEN_DANG_NHAP) = USER";
                                                                                         || TO_NCHAR(l2.GIO_BAT_DAU) || TO_NCHAR('-') || TO_NCHAR(l2.GIO_KET_THUC),
                                                                                         TO_NCHAR('; ')
                                                                                 ) WITHIN GROUP (ORDER BY l2.THU_TRONG_TUAN, l2.GIO_BAT_DAU)
-                                                                 FROM LICH_HOC l2 WHERE l2.ID_LOP_HOC = lh.ID_LOP_HOC
+                                                                 FROM QLTT_ADMIN.LICH_HOC l2 WHERE l2.ID_LOP_HOC = lh.ID_LOP_HOC
                                                              ) AS SCHEDULE_TEXT
-                        FROM LOP_HOC lh
-                        JOIN KHOA_HOC kh ON kh.ID_KHOA_HOC = lh.ID_KHOA_HOC
+                        FROM QLTT_ADMIN.LOP_HOC lh
+                        JOIN QLTT_ADMIN.KHOA_HOC kh ON kh.ID_KHOA_HOC = lh.ID_KHOA_HOC
                         WHERE kh.MA_KHOA_HOC = :code AND lh.TRANG_THAI = 'Đang tuyển sinh'
                         ORDER BY lh.ID_LOP_HOC DESC";
-            try
-            {
-                return await ExecuteQueryAsync<QLTTTA_API.Models.DTOs.OpenClassItem>(sql, new { code = courseCode });
-            }
-            catch (UnauthorizedAccessException)
-            {
-                using var conn = await GetAdminConnectionAsync();
-                using var cmd = new Oracle.ManagedDataAccess.Client.OracleCommand(sql, conn) { BindByName = true };
-                cmd.Parameters.Add(":code", Oracle.ManagedDataAccess.Client.OracleDbType.Varchar2).Value = courseCode;
-                using var reader = await cmd.ExecuteReaderAsync();
-                var list = new List<QLTTTA_API.Models.DTOs.OpenClassItem>();
-                while (await reader.ReadAsync())
-                {
-                    list.Add(new QLTTTA_API.Models.DTOs.OpenClassItem
-                    {
-                        ClassId = reader.GetInt32(0),
-                        ClassCode = reader.GetString(1),
-                        ClassName = reader.GetString(2),
-                        MaxSize = reader.IsDBNull(3) ? 0 : Convert.ToInt32(reader.GetValue(3)),
-                        CourseName = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
-                        ScheduleText = reader.IsDBNull(5) ? null : reader.GetString(5)
-                    });
-                }
-                return list;
-            }
-            catch (Oracle.ManagedDataAccess.Client.OracleException oex) when (oex.Number == 1031 || oex.Number == 942)
-            {
-                using var conn = await GetAdminConnectionAsync();
-                using var cmd = new Oracle.ManagedDataAccess.Client.OracleCommand(sql, conn) { BindByName = true };
-                cmd.Parameters.Add(":code", Oracle.ManagedDataAccess.Client.OracleDbType.Varchar2).Value = courseCode;
-                using var reader = await cmd.ExecuteReaderAsync();
-                var list = new List<QLTTTA_API.Models.DTOs.OpenClassItem>();
-                while (await reader.ReadAsync())
-                {
-                    list.Add(new QLTTTA_API.Models.DTOs.OpenClassItem
-                    {
-                        ClassId = reader.GetInt32(0),
-                        ClassCode = reader.GetString(1),
-                        ClassName = reader.GetString(2),
-                        MaxSize = reader.IsDBNull(3) ? 0 : Convert.ToInt32(reader.GetValue(3)),
-                        CourseName = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
-                        ScheduleText = reader.IsDBNull(5) ? null : reader.GetString(5)
-                    });
-                }
-                return list;
-            }
+            return await ExecuteQueryAsync<QLTTTA_API.Models.DTOs.OpenClassItem>(sql, new { code = courseCode });
         }
 
         public async Task<(bool Success, string Message)> RegisterToClassAsync(int classId, int? studentId = null)
@@ -248,75 +181,27 @@ WHERE UPPER(TEN_DANG_NHAP) = USER";
             try
             {
                 int hvId;
+                using var userConn = await GetConnectionAsync();
                 if (studentId.HasValue && studentId.Value > 0)
                 {
                     hvId = studentId.Value;
                 }
                 else
                 {
-                    // 1) Thử lấy ID theo USER hiện tại qua kết nối per-user (nếu có quyền)
-                    try
+                    using var cmdUser = new OracleCommand("SELECT ID_NGUOI_DUNG FROM QLTT_ADMIN.TAI_KHOAN WHERE UPPER(TEN_DANG_NHAP)=USER", userConn);
+                    var obj = await cmdUser.ExecuteScalarAsync();
+                    if (obj != null && obj != DBNull.Value)
                     {
-                        using var userConn = await GetConnectionAsync();
-                        using var cmdUser = new OracleCommand("SELECT ID_NGUOI_DUNG FROM TAI_KHOAN WHERE UPPER(TEN_DANG_NHAP)=USER", userConn);
-                        var obj = await cmdUser.ExecuteScalarAsync();
-                        if (obj != null && obj != DBNull.Value)
-                        {
-                            hvId = Convert.ToInt32(obj);
-                        }
-                        else
-                        {
-                            throw new UnauthorizedAccessException("Không xác định được học viên theo USER");
-                        }
-                    }
-                    catch (UnauthorizedAccessException)
-                    {
-                        var sessionId = _httpContextAccessor.HttpContext?.Request?.Headers["X-Session-Id"].FirstOrDefault();
-                        if (string.IsNullOrWhiteSpace(sessionId))
-                        {
-                            return (false, "Phiên đăng nhập không hợp lệ hoặc đã hết hạn");
-                        }
-                        using var adminConn = await GetAdminConnectionAsync();
-                        var deviceType = _httpContextAccessor.HttpContext?.Request?.Headers["X-Device-Type"].FirstOrDefault()?.Trim().ToLowerInvariant() ?? "pc";
-                        if (deviceType != "pc" && deviceType != "mobile") deviceType = "pc";
-                        var columnName = deviceType == "mobile" ? "SESSION_ID_MOBILE" : "SESSION_ID_PC";
-                        using var findCmd = new OracleCommand($"SELECT ID_NGUOI_DUNG FROM TAI_KHOAN WHERE {columnName} = :sid", adminConn) { BindByName = true };
-                        findCmd.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sessionId;
-                        var obj = await findCmd.ExecuteScalarAsync();
-                        if (obj == null || obj == DBNull.Value)
-                        {
-                            return (false, "Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại");
-                        }
                         hvId = Convert.ToInt32(obj);
                     }
-                    catch (OracleException oex) when (oex.Number == 942 || oex.Number == 1031)
+                    else
                     {
-                        // 2) Fallback theo cơ chế session header nhưng vẫn theo cột per-device
-                        var sessionId = _httpContextAccessor.HttpContext?.Request?.Headers["X-Session-Id"].FirstOrDefault();
-                        if (string.IsNullOrWhiteSpace(sessionId))
-                        {
-                            return (false, "Phiên đăng nhập không hợp lệ hoặc đã hết hạn");
-                        }
-                        using var adminConn = await GetAdminConnectionAsync();
-                        var deviceType2 = _httpContextAccessor.HttpContext?.Request?.Headers["X-Device-Type"].FirstOrDefault()?.Trim().ToLowerInvariant() ?? "pc";
-                        if (deviceType2 != "pc" && deviceType2 != "mobile") deviceType2 = "pc";
-                        var columnName2 = deviceType2 == "mobile" ? "SESSION_ID_MOBILE" : "SESSION_ID_PC";
-                        using var findCmd = new OracleCommand($"SELECT ID_NGUOI_DUNG FROM TAI_KHOAN WHERE {columnName2} = :sid", adminConn) { BindByName = true };
-                        findCmd.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sessionId;
-                        var obj = await findCmd.ExecuteScalarAsync();
-                        if (obj == null || obj == DBNull.Value)
-                        {
-                            return (false, "Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại");
-                        }
-                        hvId = Convert.ToInt32(obj);
+                        return (false, "Không xác định được học viên hiện tại");
                     }
                 }
-
-                // Thực hiện INSERT bằng kết nối admin để đảm bảo đủ quyền và dữ liệu nhất quán
-                using var conn = await GetAdminConnectionAsync();
-                var sql = @"INSERT INTO DON_DANG_KY (MA_DANG_KY, NGAY_DANG_KY, TRANG_THAI, ID_HOC_VIEN, ID_LOP_HOC)
+                var sql = @"INSERT INTO QLTT_ADMIN.DON_DANG_KY (MA_DANG_KY, NGAY_DANG_KY, TRANG_THAI, ID_HOC_VIEN, ID_LOP_HOC)
                             VALUES ('DGK_'||TO_CHAR(SYSDATE,'YYYYMMDDHH24MISS')||'_'||TRUNC(DBMS_RANDOM.VALUE(1000,9999)), SYSDATE, N'Chờ duyệt', :hv, :cid)";
-                using var cmd = new OracleCommand(sql, conn) { BindByName = true };
+                using var cmd = new OracleCommand(sql, userConn) { BindByName = true };
                 cmd.Parameters.Add(":hv", OracleDbType.Int32).Value = hvId;
                 cmd.Parameters.Add(":cid", OracleDbType.Int32).Value = classId;
                 await cmd.ExecuteNonQueryAsync();
@@ -355,11 +240,11 @@ WHERE UPPER(TEN_DANG_NHAP) = USER";
                                    kh.TEN_KHOA_HOC, lh.TEN_LOP_HOC, lh.NGAY_BAT_DAU,
                                    hd.ID_HOA_DON, hd.MA_HOA_DON, hd.TRANG_THAI as HOA_DON_TRANG_THAI,
                                    CASE WHEN hd.CHU_KY_BASE64 IS NOT NULL THEN 1 ELSE 0 END as CO_CHU_KY
-                            FROM DON_DANG_KY dk
-                            JOIN LOP_HOC lh ON dk.ID_LOP_HOC = lh.ID_LOP_HOC
-                            JOIN KHOA_HOC kh ON lh.ID_KHOA_HOC = kh.ID_KHOA_HOC
-                            LEFT JOIN HOA_DON hd ON dk.ID_DANG_KY = hd.ID_DANG_KY
-                            WHERE dk.ID_HOC_VIEN = (SELECT ID_NGUOI_DUNG FROM TAI_KHOAN WHERE UPPER(TEN_DANG_NHAP) = USER)
+                        FROM QLTT_ADMIN.DON_DANG_KY dk
+                        JOIN QLTT_ADMIN.LOP_HOC lh ON dk.ID_LOP_HOC = lh.ID_LOP_HOC
+                        JOIN QLTT_ADMIN.KHOA_HOC kh ON lh.ID_KHOA_HOC = kh.ID_KHOA_HOC
+                        LEFT JOIN QLTT_ADMIN.HOA_DON hd ON dk.ID_DANG_KY = hd.ID_DANG_KY
+                        WHERE dk.ID_HOC_VIEN = (SELECT ID_NGUOI_DUNG FROM QLTT_ADMIN.TAI_KHOAN WHERE UPPER(TEN_DANG_NHAP) = USER)
                             ORDER BY dk.NGAY_DANG_KY DESC";
 
                 using var conn = await GetConnectionAsync();
@@ -410,7 +295,7 @@ WHERE UPPER(TEN_DANG_NHAP) = USER";
                         var deviceType3 = _httpContextAccessor.HttpContext?.Request?.Headers["X-Device-Type"].FirstOrDefault()?.Trim().ToLowerInvariant() ?? "pc";
                         if (deviceType3 != "pc" && deviceType3 != "mobile") deviceType3 = "pc";
                         var columnName3 = deviceType3 == "mobile" ? "SESSION_ID_MOBILE" : "SESSION_ID_PC";
-                        using var findCmd = new Oracle.ManagedDataAccess.Client.OracleCommand($"SELECT ID_NGUOI_DUNG FROM TAI_KHOAN WHERE {columnName3} = :sid", adminConn) { BindByName = true };
+                        using var findCmd = new Oracle.ManagedDataAccess.Client.OracleCommand($"SELECT ID_NGUOI_DUNG FROM QLTT_ADMIN.TAI_KHOAN WHERE {columnName3} = :sid", adminConn) { BindByName = true };
                         findCmd.Parameters.Add(":sid", Oracle.ManagedDataAccess.Client.OracleDbType.Varchar2).Value = sessionId;
                         var obj = await findCmd.ExecuteScalarAsync();
                         if (obj != null && obj != DBNull.Value)
@@ -431,10 +316,10 @@ WHERE UPPER(TEN_DANG_NHAP) = USER";
                     sql = @"SELECT dk.ID_DANG_KY, dk.MA_DANG_KY, dk.NGAY_DANG_KY, dk.TRANG_THAI,
                                    kh.TEN_KHOA_HOC, lh.TEN_LOP_HOC, lh.NGAY_BAT_DAU, lh.NGAY_KET_THUC,
                                    hv.HO_TEN, hv.EMAIL, hv.SO_DIEN_THOAI
-                            FROM DON_DANG_KY dk
-                            JOIN LOP_HOC lh ON dk.ID_LOP_HOC = lh.ID_LOP_HOC
-                            JOIN KHOA_HOC kh ON lh.ID_KHOA_HOC = kh.ID_KHOA_HOC
-                            JOIN HOC_VIEN hv ON dk.ID_HOC_VIEN = hv.ID_HOC_VIEN
+                            FROM QLTT_ADMIN.DON_DANG_KY dk
+                            JOIN QLTT_ADMIN.LOP_HOC lh ON dk.ID_LOP_HOC = lh.ID_LOP_HOC
+                            JOIN QLTT_ADMIN.KHOA_HOC kh ON lh.ID_KHOA_HOC = kh.ID_KHOA_HOC
+                            JOIN QLTT_ADMIN.HOC_VIEN hv ON dk.ID_HOC_VIEN = hv.ID_HOC_VIEN
                            WHERE dk.ID_DANG_KY = :regId AND dk.ID_HOC_VIEN = :hvId";
                 }
                 else
@@ -442,12 +327,12 @@ WHERE UPPER(TEN_DANG_NHAP) = USER";
                     sql = @"SELECT dk.ID_DANG_KY, dk.MA_DANG_KY, dk.NGAY_DANG_KY, dk.TRANG_THAI,
                                    kh.TEN_KHOA_HOC, lh.TEN_LOP_HOC, lh.NGAY_BAT_DAU, lh.NGAY_KET_THUC,
                                    hv.HO_TEN, hv.EMAIL, hv.SO_DIEN_THOAI
-                            FROM DON_DANG_KY dk
-                            JOIN LOP_HOC lh ON dk.ID_LOP_HOC = lh.ID_LOP_HOC
-                            JOIN KHOA_HOC kh ON lh.ID_KHOA_HOC = kh.ID_KHOA_HOC
-                            JOIN HOC_VIEN hv ON dk.ID_HOC_VIEN = hv.ID_HOC_VIEN
+                            FROM QLTT_ADMIN.DON_DANG_KY dk
+                            JOIN QLTT_ADMIN.LOP_HOC lh ON dk.ID_LOP_HOC = lh.ID_LOP_HOC
+                            JOIN QLTT_ADMIN.KHOA_HOC kh ON lh.ID_KHOA_HOC = kh.ID_KHOA_HOC
+                            JOIN QLTT_ADMIN.HOC_VIEN hv ON dk.ID_HOC_VIEN = hv.ID_HOC_VIEN
                            WHERE dk.ID_DANG_KY = :regId
-                             AND dk.ID_HOC_VIEN = (SELECT ID_NGUOI_DUNG FROM TAI_KHOAN WHERE UPPER(TEN_DANG_NHAP) = USER)";
+                             AND dk.ID_HOC_VIEN = (SELECT ID_NGUOI_DUNG FROM QLTT_ADMIN.TAI_KHOAN WHERE UPPER(TEN_DANG_NHAP) = USER)";
                 }
 
                 using var conn = await GetConnectionAsync();

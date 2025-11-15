@@ -41,29 +41,17 @@ namespace QLTTTA_API.Services
         }
 
         /// <summary>
-        /// Trả về kết nối ưu tiên theo user. Nếu provider ném lỗi (không hợp lệ / hết hạn) sẽ log và fallback sang admin.
+        /// Trả về kết nối theo user (per-user). Không fallback về admin nếu có provider; nếu phiên không hợp lệ sẽ ném lỗi.
         /// </summary>
         public async Task<OracleConnection> GetConnectionAsync()
         {
             if (_userConnProvider != null)
             {
-                try
-                {
-                    var userConn = await _userConnProvider.GetUserConnectionAsync();
-                    await EnsureCurrentSchemaAsync(userConn);
-                    return userConn;
-                }
-                catch (UnauthorizedAccessException uex)
-                {
-                    // Session missing/invalid: fall back to admin connection for read operations
-                    _logger.LogWarning(uex, "User session invalid or missing. Falling back to admin connection");
-                    // continue to fallback below
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to obtain user connection, falling back to admin connection");
-                }
+                var userConn = await _userConnProvider.GetUserConnectionAsync();
+                await EnsureCurrentSchemaAsync(userConn);
+                return userConn;
             }
+            // Không có provider (trường hợp đặc biệt) mới dùng admin
             var connection = new OracleConnection(_connectionString);
             await connection.OpenAsync();
             await EnsureCurrentSchemaAsync(connection);

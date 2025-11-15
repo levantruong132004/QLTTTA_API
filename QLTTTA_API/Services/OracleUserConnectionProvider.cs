@@ -113,6 +113,19 @@ namespace QLTTTA_API.Services
                 throw new UnauthorizedAccessException("Phiên đăng nhập đã hết hạn hoặc không hợp lệ");
             }
 
+            // Nếu là tài khoản admin theo username, bỏ qua kiểm tra DB và trả về kết nối admin ngay
+            if (!string.IsNullOrWhiteSpace(cred.Username) &&
+                (cred.Username.Equals("QLTT_ADMIN", StringComparison.OrdinalIgnoreCase)
+                 || cred.Username.Equals("qltt_admin", StringComparison.OrdinalIgnoreCase)
+                 || cred.Username.Equals("QLTTTA_ADMIN", StringComparison.OrdinalIgnoreCase)
+                 || cred.Username.Equals("QLTTA_ADMIN", StringComparison.OrdinalIgnoreCase)))
+            {
+                var adminCsEarly = _configuration.GetConnectionString("OracleDbConnection") ?? throw new Exception("Missing OracleDbConnection");
+                var adminConnEarly = new OracleConnection(adminCsEarly);
+                await adminConnEarly.OpenAsync(ct);
+                return adminConnEarly;
+            }
+
             // Optional: verify session still matches DB before opening user connection
             try
             {
@@ -120,11 +133,16 @@ namespace QLTTTA_API.Services
                 using var adminConn = new OracleConnection(adminCs); // Mở kết nối admin để kiểm tra phiên trong DB
                 await adminConn.OpenAsync(ct);
                 int? userId = null;
-                using (var findCmd = new OracleCommand("SELECT ID_NGUOI_DUNG FROM TAI_KHOAN WHERE TEN_DANG_NHAP = :u", adminConn) { BindByName = true }) // lấy ID người dùng
+                int? roleId = null;
+                using (var findCmd = new OracleCommand("SELECT ID_NGUOI_DUNG, ID_VAI_TRO FROM QLTT_ADMIN.TAI_KHOAN WHERE TEN_DANG_NHAP = :u", adminConn) { BindByName = true }) // lấy ID + ROLE
                 {
                     findCmd.Parameters.Add(":u", OracleDbType.Varchar2).Value = cred.Username;
-                    var o = await findCmd.ExecuteScalarAsync(ct);
-                    if (o != null && int.TryParse(o.ToString(), out var idVal)) userId = idVal;
+                    using var r = await findCmd.ExecuteReaderAsync(ct);
+                    if (await r.ReadAsync(ct))
+                    {
+                        if (!r.IsDBNull(0)) userId = r.GetInt32(0);
+                        if (!r.IsDBNull(1)) roleId = r.GetInt32(1);
+                    }
                 }
                 if (!userId.HasValue)
                 {
@@ -132,7 +150,7 @@ namespace QLTTTA_API.Services
                 }
                 // Kiểm tra theo cột per-device (không fallback legacy)
                 string columnName = deviceType == "mobile" ? "SESSION_ID_MOBILE" : "SESSION_ID_PC";
-                using var checkCmdNew = new OracleCommand($"SELECT COUNT(*) FROM TAI_KHOAN WHERE ID_NGUOI_DUNG = :id AND {columnName} = :sid", adminConn) { BindByName = true };
+                using var checkCmdNew = new OracleCommand($"SELECT COUNT(*) FROM QLTT_ADMIN.TAI_KHOAN WHERE ID_NGUOI_DUNG = :id AND {columnName} = :sid", adminConn) { BindByName = true };
                 checkCmdNew.Parameters.Add(":id", OracleDbType.Int32).Value = userId.Value;
                 checkCmdNew.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sessionId;
                 var cntObjNew = await checkCmdNew.ExecuteScalarAsync(ct);
@@ -141,6 +159,15 @@ namespace QLTTTA_API.Services
                 {
                     _logger.LogWarning("Session mismatch in DB for user {User}", cred.Username);
                     throw new UnauthorizedAccessException("Phiên đăng nhập không hợp lệ");
+                }
+
+                // Nếu người dùng có vai trò admin (ID_VAI_TRO = 5) thì dùng kết nối admin cho tất cả truy vấn
+                if (roleId.HasValue && roleId.Value == 5)
+                {
+                    var adminCs2 = _configuration.GetConnectionString("OracleDbConnection") ?? throw new Exception("Missing OracleDbConnection");
+                    var adminConn2 = new OracleConnection(adminCs2);
+                    await adminConn2.OpenAsync(ct);
+                    return adminConn2;
                 }
             }
             catch (UnauthorizedAccessException)
@@ -151,6 +178,18 @@ namespace QLTTTA_API.Services
             {
                 _logger.LogError(ex, "Error validating session against DB");
                 throw new UnauthorizedAccessException("Không xác thực được phiên đăng nhập");
+            }
+
+            // Nếu đăng nhập bằng tài khoản admin theo username, luôn dùng kết nối admin cấu hình
+            if (cred.Username.Equals("QLTT_ADMIN", StringComparison.OrdinalIgnoreCase)
+                || cred.Username.Equals("qltt_admin", StringComparison.OrdinalIgnoreCase)
+                || cred.Username.Equals("QLTTTA_ADMIN", StringComparison.OrdinalIgnoreCase)
+                || cred.Username.Equals("QLTTA_ADMIN", StringComparison.OrdinalIgnoreCase))
+            {
+                var adminCs = _configuration.GetConnectionString("OracleDbConnection") ?? throw new Exception("Missing OracleDbConnection");
+                var adminConn = new OracleConnection(adminCs);
+                await adminConn.OpenAsync(ct);
+                return adminConn;
             }
 
             // Build user connection using same DataSource as admin connection string

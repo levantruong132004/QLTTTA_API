@@ -250,6 +250,7 @@ namespace QLTTTA_API.Models.DTOs
         public string? ClassName { get; set; }
         public string? CourseName { get; set; }
         public int StandardFee { get; set; }
+        public int? InvoiceId { get; set; }
     }
 
     // DTOs cho học viên xem hóa đơn và chữ ký số

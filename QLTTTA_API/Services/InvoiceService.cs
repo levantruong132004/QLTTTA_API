@@ -25,14 +25,14 @@ namespace QLTTTA_API.Services
                 using var conn = await GetConnectionAsync();
 
                 // Kiểm tra đơn đã duyệt và chưa có hóa đơn
-                using (var chk = new OracleCommand(@"SELECT TRANG_THAI FROM DON_DANG_KY WHERE ID_DANG_KY=:id", conn) { BindByName = true })
+                using (var chk = new OracleCommand(@"SELECT TRANG_THAI FROM QLTT_ADMIN.DON_DANG_KY WHERE ID_DANG_KY=:id", conn) { BindByName = true })
                 {
                     chk.Parameters.Add(":id", OracleDbType.Int32).Value = registrationId;
                     var st = (await chk.ExecuteScalarAsync())?.ToString();
                     if (!string.Equals(st, "Đã duyệt", StringComparison.OrdinalIgnoreCase))
                         return new ApiResponse<Invoice> { Success = false, Message = "Đơn đăng ký chưa được duyệt" };
                 }
-                using (var chkInv = new OracleCommand(@"SELECT COUNT(*) FROM HOA_DON WHERE ID_DANG_KY=:id", conn) { BindByName = true })
+                using (var chkInv = new OracleCommand(@"SELECT COUNT(*) FROM QLTT_ADMIN.HOA_DON WHERE ID_DANG_KY=:id", conn) { BindByName = true })
                 {
                     chkInv.Parameters.Add(":id", OracleDbType.Int32).Value = registrationId;
                     var cnt = Convert.ToInt32(await chkInv.ExecuteScalarAsync());
@@ -40,7 +40,7 @@ namespace QLTTTA_API.Services
                 }
 
                 var code = $"HD_{DateTime.UtcNow:yyyyMMddHHmmss}_{Random.Shared.Next(1000, 9999)}";
-                using (var cmd = new OracleCommand(@"INSERT INTO HOA_DON (MA_HOA_DON, NGAY_TAO, NGAY_HET_HAN, SO_TIEN, TRANG_THAI, ID_DANG_KY)
+                using (var cmd = new OracleCommand(@"INSERT INTO QLTT_ADMIN.HOA_DON (MA_HOA_DON, NGAY_TAO, NGAY_HET_HAN, SO_TIEN, TRANG_THAI, ID_DANG_KY)
                                                      VALUES (:code, SYSDATE, :due, :amt, 'Chưa thanh toán', :rid)
                                                      RETURNING ID_HOA_DON INTO :out_id", conn) { BindByName = true })
                 {
@@ -53,7 +53,7 @@ namespace QLTTTA_API.Services
                     await cmd.ExecuteNonQueryAsync();
 
                     var invId = Convert.ToInt32(outId.Value?.ToString());
-                    using var fetch = new OracleCommand(@"SELECT ID_HOA_DON, MA_HOA_DON, NGAY_TAO, NGAY_HET_HAN, SO_TIEN, TRANG_THAI, ID_DANG_KY FROM HOA_DON WHERE ID_HOA_DON=:id", conn) { BindByName = true };
+                    using var fetch = new OracleCommand(@"SELECT ID_HOA_DON, MA_HOA_DON, NGAY_TAO, NGAY_HET_HAN, SO_TIEN, TRANG_THAI, ID_DANG_KY FROM QLTT_ADMIN.HOA_DON WHERE ID_HOA_DON=:id", conn) { BindByName = true };
                     fetch.Parameters.Add(":id", OracleDbType.Int32).Value = invId;
                     using var r = await fetch.ExecuteReaderAsync();
                     if (await r.ReadAsync())
@@ -94,7 +94,7 @@ namespace QLTTTA_API.Services
         {
             var sql = @"SELECT ID_HOA_DON, MA_HOA_DON, NGAY_TAO, NGAY_HET_HAN, SO_TIEN, TRANG_THAI, ID_DANG_KY,
                               CHU_KY_BASE64, THUAT_TOAN, ID_KE_TOAN_KY, NGAY_KY
-                        FROM HOA_DON WHERE ID_DANG_KY=:rid";
+                    FROM QLTT_ADMIN.HOA_DON WHERE ID_DANG_KY=:rid";
             using var conn = await GetConnectionAsync();
             using var cmd = new OracleCommand(sql, conn) { BindByName = true };
             cmd.Parameters.Add(":rid", OracleDbType.Int32).Value = registrationId;
@@ -123,7 +123,7 @@ namespace QLTTTA_API.Services
         {
             var sql = @"SELECT ID_HOA_DON, MA_HOA_DON, NGAY_TAO, NGAY_HET_HAN, SO_TIEN, TRANG_THAI, ID_DANG_KY,
                               CHU_KY_BASE64, THUAT_TOAN, ID_KE_TOAN_KY, NGAY_KY
-                        FROM HOA_DON WHERE ID_HOA_DON=:id";
+                    FROM QLTT_ADMIN.HOA_DON WHERE ID_HOA_DON=:id";
             using var conn = await GetConnectionAsync();
             using var cmd = new OracleCommand(sql, conn) { BindByName = true };
             cmd.Parameters.Add(":id", OracleDbType.Int32).Value = invoiceId;
@@ -153,7 +153,7 @@ namespace QLTTTA_API.Services
             try
             {
                 using var conn = await GetConnectionAsync();
-                using var cmd = new OracleCommand("UPDATE HOA_DON SET TRANG_THAI = :st WHERE ID_HOA_DON = :id", conn) { BindByName = true };
+                using var cmd = new OracleCommand("UPDATE QLTT_ADMIN.HOA_DON SET TRANG_THAI = :st WHERE ID_HOA_DON = :id", conn) { BindByName = true };
                 cmd.Parameters.Add(":st", OracleDbType.Varchar2).Value = status;
                 cmd.Parameters.Add(":id", OracleDbType.Int32).Value = invoiceId;
                 var rows = await cmd.ExecuteNonQueryAsync();

@@ -19,13 +19,33 @@ namespace QLTTTA_WEB.Controllers.Admin
             int.TryParse(roleIdStr, out var roleId);
             var username = HttpContext.Session.GetString("Username") ?? string.Empty;
             if (username.Equals("QLTTTA_ADMIN", StringComparison.OrdinalIgnoreCase) ||
-                username.Equals("QLTTA_ADMIN", StringComparison.OrdinalIgnoreCase))
+                username.Equals("QLTTA_ADMIN", StringComparison.OrdinalIgnoreCase) ||
+                username.Equals("QLTT_ADMIN", StringComparison.OrdinalIgnoreCase) ||
+                username.Equals("qltt_admin", StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
             return roleId == 4
                 || role.Contains("NhanVienHocVu", StringComparison.OrdinalIgnoreCase)
                 || role.Contains("QuanTri", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private bool IsAdmin()
+        {
+            var role = HttpContext.Session.GetString("Role") ?? string.Empty;
+            var roleIdStr = HttpContext.Session.GetString("RoleId");
+            int.TryParse(roleIdStr, out var roleId);
+            var username = HttpContext.Session.GetString("Username") ?? string.Empty;
+            if (username.Equals("QLTTTA_ADMIN", StringComparison.OrdinalIgnoreCase) ||
+                username.Equals("QLTTA_ADMIN", StringComparison.OrdinalIgnoreCase) ||
+                username.Equals("QLTT_ADMIN", StringComparison.OrdinalIgnoreCase) ||
+                username.Equals("qltt_admin", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            return roleId == 5
+                || role.Contains("QuanTri", StringComparison.OrdinalIgnoreCase)
+                || role.Contains("Admin", StringComparison.OrdinalIgnoreCase);
         }
 
         public async Task<IActionResult> Courses()
@@ -98,7 +118,7 @@ namespace QLTTTA_WEB.Controllers.Admin
             var qs = new List<string>();
             if (courseId.HasValue) qs.Add($"courseId={courseId}");
             if (!string.IsNullOrWhiteSpace(search)) qs.Add($"search={Uri.EscapeDataString(search)}");
-            var url = "api/classes" + (qs.Count>0? ("?"+string.Join("&", qs)) : "");
+            var url = "api/classes" + (qs.Count > 0 ? ("?" + string.Join("&", qs)) : "");
             var res = await _http.GetAsync(url);
             var body = await res.Content.ReadAsStringAsync();
             List<QLTTTA_WEB.Models.AdminClassItem> data;
@@ -254,13 +274,13 @@ namespace QLTTTA_WEB.Controllers.Admin
         public async Task<IActionResult> Registrations(string? status, string? classCode)
         {
             if (!IsStaff()) return RedirectToAction("Index", "Home");
-            
+
             // MẶC ĐỊNH: Nếu không truyền status, tự động lọc "Chờ duyệt"
             if (string.IsNullOrWhiteSpace(status))
             {
                 status = "Chờ duyệt";
             }
-            
+
             try
             {
                 var hasAny = !string.IsNullOrWhiteSpace(status) || !string.IsNullOrWhiteSpace(classCode);
@@ -270,11 +290,11 @@ namespace QLTTTA_WEB.Controllers.Admin
                           + (!string.IsNullOrWhiteSpace(classCode) ? $"classCode={Uri.EscapeDataString(classCode!)}" : "");
                 var res = await _http.GetAsync(url);
                 var body = await res.Content.ReadAsStringAsync();
-                
+
                 if (!res.IsSuccessStatusCode)
                 {
                     _logger.LogWarning("Registrations list failed: {Status} {Body}", res.StatusCode, body);
-                    
+
                     // Trích xuất message lỗi gọn gàng
                     string errorMsg = "Không thể tải danh sách đăng ký";
                     try
@@ -297,19 +317,19 @@ namespace QLTTTA_WEB.Controllers.Admin
                             errorMsg = body;
                         }
                     }
-                    
+
                     TempData["ErrorMessage"] = errorMsg;
                     ViewBag.CurrentStatus = status;
                     ViewBag.CurrentClassCode = classCode;
                     return View("~/Views/Admin/Registrations.cshtml", new List<QLTTTA_WEB.Models.AdminRegistrationItem>());
                 }
-                
+
                 var data = JsonSerializer.Deserialize<List<QLTTTA_WEB.Models.AdminRegistrationItem>>(body, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
-                
+
                 // Truyền status hiện tại vào ViewBag để form lọc biết
                 ViewBag.CurrentStatus = status;
                 ViewBag.CurrentClassCode = classCode;
-                
+
                 return View("~/Views/Admin/Registrations.cshtml", data);
             }
             catch (Exception ex)
@@ -475,7 +495,7 @@ namespace QLTTTA_WEB.Controllers.Admin
             var url = $"api/registrations/{id}/approve" + (classId.HasValue ? $"?classId={classId}" : "");
             var res = await _http.PostAsync(url, new StringContent("", Encoding.UTF8, "application/json"));
             TempData[res.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] = await res.Content.ReadAsStringAsync();
-            
+
             // Redirect về trang Registrations với filter "Chờ duyệt"
             return RedirectToAction("Registrations", new { status = "Chờ duyệt" });
         }
@@ -488,7 +508,7 @@ namespace QLTTTA_WEB.Controllers.Admin
             var url = $"api/registrations/{id}/reject";
             var res = await _http.PostAsync(url, new StringContent("", Encoding.UTF8, "application/json"));
             TempData[res.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] = await res.Content.ReadAsStringAsync();
-            
+
             // Redirect về trang Registrations với filter "Chờ duyệt"
             return RedirectToAction("Registrations", new { status = "Chờ duyệt" });
         }
@@ -523,7 +543,8 @@ namespace QLTTTA_WEB.Controllers.Admin
                         using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(body) ? "{}" : body);
                         if (doc.RootElement.TryGetProperty("message", out var m) && !string.IsNullOrWhiteSpace(m.GetString()))
                             msg = m.GetString()!;
-                    } catch { msg = body; }
+                    }
+                    catch { msg = body; }
                     TempData["ErrorMessage"] = msg;
                 }
             }
@@ -536,10 +557,114 @@ namespace QLTTTA_WEB.Controllers.Admin
         }
 
         [HttpGet]
-        public IActionResult Staff()
+        public async Task<IActionResult> Staff()
         {
-            if (!IsStaff()) return RedirectToAction("Index", "Home");
-            return View("~/Views/Admin/Staff.cshtml");
+            if (!IsAdmin()) return RedirectToAction("Index", "Home");
+            try
+            {
+                var res = await _http.GetAsync("api/admin/staff");
+                var body = await res.Content.ReadAsStringAsync();
+                if (!res.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("Load staff failed: {Status} {Body}", res.StatusCode, body);
+                    TempData["ErrorMessage"] = string.IsNullOrWhiteSpace(body) ? "Không thể tải danh sách nhân viên" : body;
+                    return View("~/Views/Admin/Staff.cshtml", new List<QLTTTA_WEB.Models.StaffAdminItem>());
+                }
+                using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(body) ? "{}" : body);
+                var dataEl = doc.RootElement.TryGetProperty("data", out var d) ? d : doc.RootElement;
+                var list = System.Text.Json.JsonSerializer.Deserialize<List<QLTTTA_WEB.Models.StaffAdminItem>>(dataEl.GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                return View("~/Views/Admin/Staff.cshtml", list);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Staff page load error");
+                TempData["ErrorMessage"] = "Có lỗi xảy ra khi tải danh sách nhân viên";
+                return View("~/Views/Admin/Staff.cshtml", new List<QLTTTA_WEB.Models.StaffAdminItem>());
+            }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreateStaff(QLTTTA_WEB.Models.StaffCreateModel model)
+        {
+            if (!IsAdmin()) return RedirectToAction("Staff");
+            try
+            {
+                var payload = new
+                {
+                    Username = model.Username,
+                    Password = model.Password,
+                    Email = model.Email,
+                    RoleId = model.RoleId,
+                    FullName = model.FullName,
+                    EmployeeCode = model.EmployeeCode,
+                    Sex = model.Sex,
+                    Phone = model.Phone
+                };
+                var res = await _http.PostAsync("api/admin/staff", new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json"));
+                var body = await res.Content.ReadAsStringAsync();
+                if (res.IsSuccessStatusCode)
+                {
+                    TempData["SuccessMessage"] = "Tạo nhân viên thành công";
+                }
+                else
+                {
+                    TempData["ErrorMessage"] = string.IsNullOrWhiteSpace(body) ? "Không thể tạo nhân viên" : body;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "CreateStaff error");
+                TempData["ErrorMessage"] = "Có lỗi xảy ra khi tạo nhân viên";
+            }
+            return RedirectToAction("Staff");
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateStaff(QLTTTA_WEB.Models.StaffUpdateModel model)
+        {
+            if (!IsAdmin()) return RedirectToAction("Staff");
+            try
+            {
+                var payload = new
+                {
+                    Email = model.Email,
+                    RoleId = model.RoleId,
+                    FullName = model.FullName,
+                    Sex = model.Sex,
+                    Phone = model.Phone
+                };
+                var res = await _http.PutAsync($"api/admin/staff/{model.UserId}", new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json"));
+                var body = await res.Content.ReadAsStringAsync();
+                TempData[res.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] = string.IsNullOrWhiteSpace(body) ? (res.IsSuccessStatusCode ? "Cập nhật thành công" : "Cập nhật thất bại") : body;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "UpdateStaff error");
+                TempData["ErrorMessage"] = "Có lỗi xảy ra khi cập nhật nhân viên";
+            }
+            return RedirectToAction("Staff");
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> LockStaff(int userId)
+        {
+            if (!IsAdmin()) return RedirectToAction("Staff");
+            var res = await _http.PostAsync($"api/admin/staff/{userId}/lock", new StringContent("", Encoding.UTF8, "application/json"));
+            TempData[res.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] = await res.Content.ReadAsStringAsync();
+            return RedirectToAction("Staff");
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UnlockStaff(int userId)
+        {
+            if (!IsAdmin()) return RedirectToAction("Staff");
+            var res = await _http.PostAsync($"api/admin/staff/{userId}/unlock", new StringContent("", Encoding.UTF8, "application/json"));
+            TempData[res.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] = await res.Content.ReadAsStringAsync();
+            return RedirectToAction("Staff");
         }
     }
 }

@@ -16,12 +16,27 @@ namespace QLTTTA_WEB.Controllers
             _logger = logger;
         }
 
+        private bool IsAccountant()
+        {
+            var role = HttpContext.Session.GetString("Role") ?? string.Empty;
+            var roleIdStr = HttpContext.Session.GetString("RoleId");
+            int.TryParse(roleIdStr, out var roleId);
+            var username = HttpContext.Session.GetString("Username") ?? string.Empty;
+            // Admins can also access accountant pages
+            if (username.Equals("QLTTTA_ADMIN", StringComparison.OrdinalIgnoreCase) ||
+                username.Equals("QLTTA_ADMIN", StringComparison.OrdinalIgnoreCase) ||
+                role.Contains("QuanTri", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            return role.Contains("KeToan", StringComparison.OrdinalIgnoreCase) || roleId == 6; // 6 if mapped
+        }
+
         [HttpGet]
         public async Task<IActionResult> Index(int? courseId, int? classId)
         {
-            // Require login
-            if (HttpContext.Session.GetString("UserId") == null)
-                return RedirectToAction("Login", "Account");
+            if (!IsAccountant())
+                return RedirectToAction("Index", "Home");
 
             var vm = new AccountantHomeViewModel
             {
@@ -87,8 +102,8 @@ namespace QLTTTA_WEB.Controllers
         [HttpGet]
         public async Task<IActionResult> Invoice(int id)
         {
-            if (HttpContext.Session.GetString("UserId") == null)
-                return RedirectToAction("Login", "Account");
+            if (!IsAccountant())
+                return RedirectToAction("Index", "Home");
 
             var page = new AccountantInvoicePageViewModel();
             try
@@ -197,8 +212,8 @@ namespace QLTTTA_WEB.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateInvoice(int registrationId, DateTime dueDate, int amount)
         {
-            if (HttpContext.Session.GetString("UserId") == null)
-                return RedirectToAction("Login", "Account");
+            if (!IsAccountant())
+                return RedirectToAction("Index", "Home");
 
             try
             {
@@ -249,8 +264,8 @@ namespace QLTTTA_WEB.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SignInvoiceUpload(int invoiceId, IFormFile privateKey)
         {
-            if (HttpContext.Session.GetString("UserId") == null)
-                return RedirectToAction("Login", "Account");
+            if (!IsAccountant())
+                return RedirectToAction("Index", "Home");
 
             try
             {
@@ -322,8 +337,8 @@ namespace QLTTTA_WEB.Controllers
         [HttpGet]
         public async Task<IActionResult> PendingPayments()
         {
-            if (HttpContext.Session.GetString("UserId") == null)
-                return RedirectToAction("Login", "Account");
+            if (!IsAccountant())
+                return RedirectToAction("Index", "Home");
 
             var pendingList = new List<PendingPaymentViewModel>();
             try
@@ -360,8 +375,8 @@ namespace QLTTTA_WEB.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ConfirmPayment(int invoiceId)
         {
-            if (HttpContext.Session.GetString("UserId") == null)
-                return RedirectToAction("Login", "Account");
+            if (!IsAccountant())
+                return RedirectToAction("Index", "Home");
 
             try
             {

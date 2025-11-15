@@ -1,0 +1,161 @@
+@model QLTTTA_WEB.Models.StaffStudentDetailViewModel
+@{
+    ViewData["Title"] = "Chi tiết học viên";
+}
+
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0"><i class="fas fa-user"></i> Học viên #@Model.Student.StudentId</h2>
+        <div>
+            <a asp-action="Index" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Quay lại</a>
+        </div>
+    </div>
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+    }
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success">@TempData["SuccessMessage"]</div>
+    }
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-8">
+                    <p class="mb-1"><strong>Họ tên:</strong> @Model.Student.FullName</p>
+                    <p class="mb-1"><strong>Email:</strong> @Model.Student.Email</p>
+                    <p class="mb-1"><strong>Số điện thoại:</strong> @Model.Student.PhoneNumber</p>
+                    <p class="mb-1"><strong>Trạng thái:</strong>
+                        @if (Model.Student.IsActive)
+                        {
+                            <span class="badge bg-success">Hoạt động</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">Đã khóa</span>
+                        }
+                    </p>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    @if (Model.Student.IsActive)
+                    {
+                        <form asp-action="Lock" method="post" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@Model.Student.StudentId" />
+                            <button type="submit" class="btn btn-warning"
+                                onclick="return confirm('Khóa tài khoản học viên này?');">
+                                <i class="fas fa-lock"></i> Khóa tài khoản
+                            </button>
+                        </form>
+                    }
+                    else
+                    {
+                        <form asp-action="Unlock" method="post" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@Model.Student.StudentId" />
+                            <button type="submit" class="btn btn-success"
+                                onclick="return confirm('Mở khóa tài khoản học viên này?');">
+                                <i class="fas fa-unlock"></i> Mở khóa tài khoản
+                            </button>
+                        </form>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header bg-light"><strong><i class="fas fa-clipboard-check"></i> Đơn đăng ký</strong>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Mã đơn</th>
+                                    <th>Ngày đăng ký</th>
+                                    <th>Trạng thái</th>
+                                    <th>Lớp - Khóa</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (Model.Registrations != null && Model.Registrations.Count > 0)
+                                {
+                                    foreach (var r in Model.Registrations)
+                                    {
+                                        <tr>
+                                            <td>@r.RegistrationCode</td>
+                                            <td>@(r.RegistrationDate?.ToString("dd/MM/yyyy"))</td>
+                                            <td>@r.Status</td>
+                                            <td>
+                                                <div>@r.ClassName</div>
+                                                <div class="text-muted small">@r.CourseName</div>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted">Không có dữ liệu</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header bg-light"><strong><i class="fas fa-file-invoice"></i> Hóa đơn</strong></div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Mã hóa đơn</th>
+                                    <th>Ngày tạo</th>
+                                    <th>Hết hạn</th>
+                                    <th>Số tiền</th>
+                                    <th>Trạng thái</th>
+                                    <th>Lớp - Khóa</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (Model.Invoices != null && Model.Invoices.Count > 0)
+                                {
+                                    foreach (var i in Model.Invoices)
+                                    {
+                                        <tr>
+                                            <td>@i.InvoiceCode</td>
+                                            <td>@(i.CreatedDate?.ToString("dd/MM/yyyy"))</td>
+                                            <td>@(i.DueDate?.ToString("dd/MM/yyyy"))</td>
+                                            <td>@String.Format(new System.Globalization.CultureInfo("vi-VN"), "{0:C0}",
+                                                                                        i.Amount)</td>
+                                    <td>@i.Status</td>
+                                    <td>
+                                        <div>@i.ClassName</div>
+                                        <div class="text-muted small">@i.CourseName</div>
+                                    </td>
+                                </tr>
+                                                                }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted">Không có dữ liệu</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -24,20 +24,20 @@ namespace QLTTTA_API.Services
             try
             {
                 using var conn = await GetConnectionAsync();
-                
+
                 // Kiểm tra hóa đơn tồn tại và chưa thanh toán
-                using var chkCmd = new OracleCommand(@"SELECT TRANG_THAI FROM HOA_DON WHERE ID_HOA_DON = :id", conn) { BindByName = true };
+                using var chkCmd = new OracleCommand(@"SELECT TRANG_THAI FROM QLTT_ADMIN.HOA_DON WHERE ID_HOA_DON = :id", conn) { BindByName = true };
                 chkCmd.Parameters.Add(":id", OracleDbType.Int32).Value = invoiceId;
                 var status = (await chkCmd.ExecuteScalarAsync())?.ToString();
-                
+
                 if (status == null)
                     return new ApiResponse<bool> { Success = false, Message = "Không tìm thấy hóa đơn" };
-                    
+
                 if (status == "Đã thanh toán")
                     return new ApiResponse<bool> { Success = false, Message = "Hóa đơn đã được thanh toán" };
 
                 // Cập nhật trạng thái hóa đơn sang "Chờ xác nhận thanh toán"
-                using var updateCmd = new OracleCommand(@"UPDATE HOA_DON SET TRANG_THAI = N'Chờ xác nhận thanh toán' WHERE ID_HOA_DON = :id", conn) { BindByName = true };
+                using var updateCmd = new OracleCommand(@"UPDATE QLTT_ADMIN.HOA_DON SET TRANG_THAI = N'Chờ xác nhận thanh toán' WHERE ID_HOA_DON = :id", conn) { BindByName = true };
                 updateCmd.Parameters.Add(":id", OracleDbType.Int32).Value = invoiceId;
                 await updateCmd.ExecuteNonQueryAsync();
 
@@ -60,17 +60,17 @@ namespace QLTTTA_API.Services
                 var sql = @"SELECT hd.ID_HOA_DON, hd.MA_HOA_DON, hd.SO_TIEN, hd.NGAY_TAO,
                                    hv.HO_TEN as TEN_HOC_VIEN, dk.MA_DANG_KY,
                                    kh.TEN_KHOA_HOC
-                            FROM HOA_DON hd
-                            JOIN DON_DANG_KY dk ON dk.ID_DANG_KY = hd.ID_DANG_KY
-                            JOIN HOC_VIEN hv ON hv.ID_HOC_VIEN = dk.ID_HOC_VIEN
-                            JOIN LOP_HOC lh ON lh.ID_LOP_HOC = dk.ID_LOP_HOC
-                            JOIN KHOA_HOC kh ON kh.ID_KHOA_HOC = lh.ID_KHOA_HOC
+                        FROM QLTT_ADMIN.HOA_DON hd
+                        JOIN QLTT_ADMIN.DON_DANG_KY dk ON dk.ID_DANG_KY = hd.ID_DANG_KY
+                        JOIN QLTT_ADMIN.HOC_VIEN hv ON hv.ID_HOC_VIEN = dk.ID_HOC_VIEN
+                        JOIN QLTT_ADMIN.LOP_HOC lh ON lh.ID_LOP_HOC = dk.ID_LOP_HOC
+                        JOIN QLTT_ADMIN.KHOA_HOC kh ON kh.ID_KHOA_HOC = lh.ID_KHOA_HOC
                             WHERE hd.TRANG_THAI = N'Chờ xác nhận thanh toán'
                             ORDER BY hd.NGAY_TAO DESC";
-                            
+
                 using var cmd = new OracleCommand(sql, conn);
                 using var reader = await cmd.ExecuteReaderAsync();
-                
+
                 while (await reader.ReadAsync())
                 {
                     list.Add(new PendingPaymentDto
@@ -98,23 +98,23 @@ namespace QLTTTA_API.Services
             try
             {
                 using var conn = await GetConnectionAsync();
-                
+
                 // Lấy thông tin hóa đơn
-                using var getInvCmd = new OracleCommand(@"SELECT SO_TIEN, TRANG_THAI FROM HOA_DON WHERE ID_HOA_DON = :id", conn) { BindByName = true };
+                using var getInvCmd = new OracleCommand(@"SELECT SO_TIEN, TRANG_THAI FROM QLTT_ADMIN.HOA_DON WHERE ID_HOA_DON = :id", conn) { BindByName = true };
                 getInvCmd.Parameters.Add(":id", OracleDbType.Int32).Value = invoiceId;
                 using var reader = await getInvCmd.ExecuteReaderAsync();
-                
+
                 if (!await reader.ReadAsync())
                     return new ApiResponse<bool> { Success = false, Message = "Không tìm thấy hóa đơn" };
-                    
+
                 var amount = Convert.ToInt32(reader.GetValue(0));
                 var status = reader.GetString(1);
-                
+
                 if (status != "Chờ xác nhận thanh toán")
                     return new ApiResponse<bool> { Success = false, Message = "Hóa đơn không ở trạng thái chờ xác nhận" };
 
                 // Tạo phiếu thanh toán
-                using var insertCmd = new OracleCommand(@"INSERT INTO PHIEU_THANH_TOAN 
+                using var insertCmd = new OracleCommand(@"INSERT INTO QLTT_ADMIN.PHIEU_THANH_TOAN 
                     (NGAY_THANH_TOAN, SO_TIEN_DA_TRA, PHUONG_THUC_THANH_TOAN, ID_HOA_DON, ID_KE_TOAN_XAC_NHAN)
                     VALUES (SYSDATE, :amount, N'Chuyển khoản', :invoiceId, :accountantId)", conn) { BindByName = true };
                 insertCmd.Parameters.Add(":amount", OracleDbType.Decimal).Value = amount;
@@ -123,7 +123,7 @@ namespace QLTTTA_API.Services
                 await insertCmd.ExecuteNonQueryAsync();
 
                 // Cập nhật trạng thái hóa đơn
-                using var updateCmd = new OracleCommand(@"UPDATE HOA_DON SET TRANG_THAI = N'Đã thanh toán' WHERE ID_HOA_DON = :id", conn) { BindByName = true };
+                using var updateCmd = new OracleCommand(@"UPDATE QLTT_ADMIN.HOA_DON SET TRANG_THAI = N'Đã thanh toán' WHERE ID_HOA_DON = :id", conn) { BindByName = true };
                 updateCmd.Parameters.Add(":id", OracleDbType.Int32).Value = invoiceId;
                 await updateCmd.ExecuteNonQueryAsync();
 
@@ -143,7 +143,7 @@ namespace QLTTTA_API.Services
                 using var conn = await GetConnectionAsync();
 
                 // Validate invoice exists
-                using (var chkInv = new OracleCommand("SELECT TRANG_THAI FROM HOA_DON WHERE ID_HOA_DON = :id", conn) { BindByName = true })
+                using (var chkInv = new OracleCommand("SELECT TRANG_THAI FROM QLTT_ADMIN.HOA_DON WHERE ID_HOA_DON = :id", conn) { BindByName = true })
                 {
                     chkInv.Parameters.Add(":id", OracleDbType.Int32).Value = dto.InvoiceId;
                     var st = (await chkInv.ExecuteScalarAsync())?.ToString();
@@ -152,7 +152,7 @@ namespace QLTTTA_API.Services
                 }
 
                 // Insert payment (support IDENTITY PK)
-                using var cmd = new OracleCommand(@"INSERT INTO PAYMENTS (PAYMENT_DATE, AMOUNT, PAYMENT_METHOD, INVOICE_ID, ACCOUNTANT_ID)
+                using var cmd = new OracleCommand(@"INSERT INTO QLTT_ADMIN.PAYMENTS (PAYMENT_DATE, AMOUNT, PAYMENT_METHOD, INVOICE_ID, ACCOUNTANT_ID)
                                                    VALUES (SYSDATE, :amt, :mtd, :inv, :acc)
                                                    RETURNING PAYMENT_ID INTO :out_id", conn) { BindByName = true };
                 cmd.Parameters.Add(":amt", OracleDbType.Decimal).Value = dto.Amount;
@@ -165,7 +165,7 @@ namespace QLTTTA_API.Services
                 var paymentId = Convert.ToInt32(outId.Value?.ToString());
 
                 // Update invoice status to paid
-                using (var upInv = new OracleCommand("UPDATE HOA_DON SET TRANG_THAI = 'Đã thanh toán' WHERE ID_HOA_DON = :id", conn) { BindByName = true })
+                using (var upInv = new OracleCommand("UPDATE QLTT_ADMIN.HOA_DON SET TRANG_THAI = 'Đã thanh toán' WHERE ID_HOA_DON = :id", conn) { BindByName = true })
                 {
                     upInv.Parameters.Add(":id", OracleDbType.Int32).Value = dto.InvoiceId;
                     await upInv.ExecuteNonQueryAsync();
@@ -173,7 +173,7 @@ namespace QLTTTA_API.Services
 
                 // Fetch created payment
                 using var fetch = new OracleCommand(@"SELECT PAYMENT_ID, PAYMENT_DATE, AMOUNT, PAYMENT_METHOD, INVOICE_ID, ACCOUNTANT_ID
-                                                      FROM PAYMENTS WHERE PAYMENT_ID = :id", conn) { BindByName = true };
+                                                      FROM QLTT_ADMIN.PAYMENTS WHERE PAYMENT_ID = :id", conn) { BindByName = true };
                 fetch.Parameters.Add(":id", OracleDbType.Int32).Value = paymentId;
                 using var r = await fetch.ExecuteReaderAsync();
                 if (await r.ReadAsync())
@@ -207,7 +207,7 @@ namespace QLTTTA_API.Services
             var list = new List<Payment>();
             using var conn = await GetConnectionAsync();
             var sql = @"SELECT PAYMENT_ID, PAYMENT_DATE, AMOUNT, PAYMENT_METHOD, INVOICE_ID, ACCOUNTANT_ID
-                        FROM PAYMENTS WHERE INVOICE_ID = :id ORDER BY PAYMENT_ID DESC";
+                        FROM QLTT_ADMIN.PAYMENTS WHERE INVOICE_ID = :id ORDER BY PAYMENT_ID DESC";
             using var cmd = new OracleCommand(sql, conn) { BindByName = true };
             cmd.Parameters.Add(":id", OracleDbType.Int32).Value = invoiceId;
             using var r = await cmd.ExecuteReaderAsync();
@@ -226,7 +226,7 @@ namespace QLTTTA_API.Services
             return list;
         }
     }
-    
+
     // DTO cho danh sách chờ xác nhận
     public class PendingPaymentDto
     {

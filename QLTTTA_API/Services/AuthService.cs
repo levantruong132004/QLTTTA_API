@@ -1,6 +1,7 @@
 using Oracle.ManagedDataAccess.Client;
 using QLTTTA_API.Models;
 using System.Data;
+using Microsoft.AspNetCore.Http;
 
 namespace QLTTTA_API.Services
 {
@@ -49,17 +50,19 @@ namespace QLTTTA_API.Services
         private readonly IOtpStore _otpStore;
         private readonly IEmailService _emailService;
         private readonly bool _useSpRegister;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
         /// <summary>
         /// Khởi tạo service với cấu hình DB, logger và cache phiên.
         /// </summary>
-        public AuthService(IConfiguration configuration, ILogger<AuthService> logger, IUserCredentialCache credCache, IOtpStore otpStore, IEmailService emailService)
+        public AuthService(IConfiguration configuration, ILogger<AuthService> logger, IUserCredentialCache credCache, IOtpStore otpStore, IEmailService emailService, IHttpContextAccessor httpContextAccessor)
         {
             _connectionString = configuration.GetConnectionString("OracleDbConnection") ?? throw new ArgumentNullException(nameof(configuration));
             _logger = logger;
             _credCache = credCache;
             _otpStore = otpStore;
             _emailService = emailService;
+            _httpContextAccessor = httpContextAccessor;
             // Allow bypassing stored procedure for registration if environment has issues
             var useSp = configuration["Registration:UseStoredProcedure"];
             _useSpRegister = string.IsNullOrWhiteSpace(useSp) ? false : useSp.Equals("true", StringComparison.OrdinalIgnoreCase);
@@ -565,11 +568,11 @@ namespace QLTTTA_API.Services
                 // Map some common Oracle errors to user-friendly messages
                 string msg = oex.Number switch
                 {
-                    1      => "Tên đăng nhập hoặc email đã tồn tại (trùng UNIQUE)",
-                    1400   => "Thiếu dữ liệu bắt buộc (không được để trống)",
-                    12899  => "Giá trị quá dài so với cột (vui lòng rút gọn)",
-                    2291   => "Không tìm thấy tham chiếu khoá ngoại phù hợp",
-                    _      => $"Không thể tạo tài khoản (DB ORA-{oex.Number})"
+                    1 => "Tên đăng nhập hoặc email đã tồn tại (trùng UNIQUE)",
+                    1400 => "Thiếu dữ liệu bắt buộc (không được để trống)",
+                    12899 => "Giá trị quá dài so với cột (vui lòng rút gọn)",
+                    2291 => "Không tìm thấy tham chiếu khoá ngoại phù hợp",
+                    _ => $"Không thể tạo tài khoản (DB ORA-{oex.Number})"
                 };
                 return new RegisterResponse { Success = false, Message = msg };
             }
@@ -627,6 +630,8 @@ namespace QLTTTA_API.Services
                         {
                             _logger.LogWarning(ex, "Could not update password for existing user {Username}", uname);
                         }
+                        // Bảo đảm quyền và vai trò cần thiết cho học viên (đường inline không dùng SP)
+                        await EnsureStudentGrantsAsync(adminConnection, uname);
                         return true; // User đã tồn tại
                     }
                 }
@@ -646,6 +651,9 @@ namespace QLTTTA_API.Services
                     await grantCmd.ExecuteNonQueryAsync();
                 }
 
+                // Gán vai trò học viên và profile (nếu có) để truy cập các VIEW/PROC
+                await EnsureStudentGrantsAsync(adminConnection, uname);
+
                 return true;
             }
             catch (OracleException oex) when (oex.Number == 1920) // ORA-01920: user name conflicts with another user or role name
@@ -662,6 +670,52 @@ namespace QLTTTA_API.Services
             {
                 _logger.LogError(ex, "Error creating Oracle USER {Username}", uname);
                 return false;
+            }
+        }
+
+        // Bảo đảm user được cấp các quyền/role cần thiết để truy cập view học viên khi đăng ký theo đường inline
+        private async Task EnsureStudentGrantsAsync(OracleConnection adminConnection, string upperUsername)
+        {
+            try
+            {
+                // GRANT role_hocvien (nếu role tồn tại)
+                try
+                {
+                    using var g1 = new OracleCommand($"GRANT role_hocvien TO \"{upperUsername}\"", adminConnection);
+                    await g1.ExecuteNonQueryAsync();
+                }
+                catch (OracleException oex) when (oex.Number == 1919 || oex.Number == 1917 || oex.Number == 1927)
+                {
+                    // 1919/1917/1927: role/privilege không tồn tại hoặc đã được cấp – bỏ qua yên lặng
+                    _logger.LogDebug(oex, "Grant role_hocvien skipped for {User}", upperUsername);
+                }
+
+                // Đảm bảo CREATE SESSION (trong trường hợp CONNECT role không đủ)
+                try
+                {
+                    using var g2 = new OracleCommand($"GRANT CREATE SESSION TO \"{upperUsername}\"", adminConnection);
+                    await g2.ExecuteNonQueryAsync();
+                }
+                catch (OracleException oex) when (oex.Number == 1917 || oex.Number == 1927)
+                {
+                    _logger.LogDebug(oex, "Grant CREATE SESSION skipped for {User}", upperUsername);
+                }
+
+                // Thiết lập profile nếu có (không bắt buộc)
+                try
+                {
+                    using var prof = new OracleCommand($"ALTER USER \"{upperUsername}\" PROFILE TTTA_USER_PROFILE", adminConnection);
+                    await prof.ExecuteNonQueryAsync();
+                }
+                catch (OracleException oex) when (oex.Number == 65066 || oex.Number == 1917 || oex.Number == 1435)
+                {
+                    // Profile không tồn tại hoặc thiếu quyền – bỏ qua
+                    _logger.LogDebug(oex, "Profile assignment skipped for {User}", upperUsername);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "EnsureStudentGrantsAsync encountered non-fatal error for {User}", upperUsername);
             }
         }
 
@@ -730,7 +784,42 @@ namespace QLTTTA_API.Services
                 var dbValNew = await cmdNew.ExecuteScalarAsync();
                 var currentSidNew = dbValNew?.ToString();
                 if (string.IsNullOrEmpty(currentSidNew)) return false;
-                return string.Equals(currentSidNew, sessionId, StringComparison.Ordinal);
+                if (!string.Equals(currentSidNew, sessionId, StringComparison.Ordinal)) return false;
+
+                // Bổ sung: xác minh phiên thực sự còn hợp lệ bằng cách thử mở kết nối bằng credential cache.
+                // Điều này giúp chặn trường hợp tài khoản Oracle đã bị LOCK nhưng cột SESSION_ID còn giá trị cũ.
+                try
+                {
+                    if (_credCache.TryGet(sessionId, out var cred) && !string.IsNullOrEmpty(cred.Username) && !string.IsNullOrEmpty(cred.Password))
+                    {
+                        var baseCs = new OracleConnectionStringBuilder(_connectionString);
+                        var userCs = new OracleConnectionStringBuilder
+                        {
+                            DataSource = baseCs.DataSource,
+                            UserID = cred.Username,
+                            Password = cred.Password
+                        };
+                        using var test = new OracleConnection(userCs.ConnectionString);
+                        await test.OpenAsync();
+                    }
+                    else
+                    {
+                        // Không có credential trong cache -> coi như phiên không hợp lệ để buộc đăng nhập lại
+                        return false;
+                    }
+                }
+                catch (OracleException oex) when (oex.Number == 28000 || oex.Number == 1017)
+                {
+                    // 28000: account locked, 1017: invalid credential
+                    return false;
+                }
+                catch
+                {
+                    // Lỗi khác: coi như phiên không hợp lệ
+                    return false;
+                }
+
+                return true;
             }
             catch (Exception ex)
             {
@@ -742,21 +831,102 @@ namespace QLTTTA_API.Services
         /// <summary>
         /// Đăng xuất: xóa credential trong cache. Không xóa SESSION_ID_HIENTAI theo yêu cầu (giữ để thiết bị cũ tự out khi đăng nhập mới).
         /// </summary>
-        public Task LogoutAsync(string username, string sessionId)
+        public async Task LogoutAsync(string username, string sessionId)
         {
-            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(sessionId)) return Task.CompletedTask;
+            if (string.IsNullOrWhiteSpace(sessionId)) return; // nothing to do
             try
             {
                 _credCache.Remove(sessionId);
-                // Theo yêu cầu mới: KHÔNG set NULL SESSION_ID_HIENTAI khi logout.
-                // Cơ chế kiểm tra phiên sẽ dựa vào so khớp cookie với SESSION_ID_HIENTAI hiện tại trong DB.
-                // Nếu người dùng đăng nhập nơi khác, SESSION_ID_HIENTAI sẽ được cập nhật giá trị mới và thiết bị cũ tự bị out do mismatch.
+
+                // Optionally clear DB session column on logout (configurable)
+                var clearFlag = true;
+                try
+                {
+                    var cfg = _httpContextAccessor.HttpContext?.RequestServices.GetService(typeof(IConfiguration)) as IConfiguration;
+                    var val = cfg?["Logout:ClearSessionColumn"];
+                    if (!string.IsNullOrWhiteSpace(val)) clearFlag = val.Equals("true", StringComparison.OrdinalIgnoreCase);
+                }
+                catch { /* ignore */ }
+
+                if (clearFlag)
+                {
+                    using var conn = new OracleConnection(_connectionString);
+                    await conn.OpenAsync();
+
+                    // Determine device type from header; default pc
+                    var deviceType = _httpContextAccessor.HttpContext?.Request?.Headers["X-Device-Type"].FirstOrDefault()?.Trim().ToLowerInvariant() ?? "pc";
+                    if (deviceType != "pc" && deviceType != "mobile") deviceType = "pc";
+                    var col = deviceType == "mobile" ? "SESSION_ID_MOBILE" : "SESSION_ID_PC";
+
+                    // If username missing, resolve from sessionId
+                    if (string.IsNullOrWhiteSpace(username))
+                    {
+                        using var findU = new OracleCommand($"SELECT TEN_DANG_NHAP FROM TAI_KHOAN WHERE {col} = :sid", conn) { BindByName = true };
+                        findU.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sessionId;
+                        var o = await findU.ExecuteScalarAsync();
+                        username = o?.ToString() ?? string.Empty;
+                    }
+
+                    // Clear the session column
+                    using (var up = new OracleCommand($"UPDATE TAI_KHOAN SET {col} = NULL WHERE {col} = :sid", conn) { BindByName = true })
+                    {
+                        up.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sessionId;
+                        await up.ExecuteNonQueryAsync();
+                    }
+
+                    // Best-effort: tag client id for auditing of logout
+                    try
+                    {
+                        if (!string.IsNullOrWhiteSpace(username))
+                        {
+                            using var setId = new OracleCommand("BEGIN DBMS_SESSION.SET_IDENTIFIER(:u); DBMS_APPLICATION_INFO.SET_CLIENT_INFO(:i); END;", conn) { BindByName = true };
+                            setId.Parameters.Add(":u", OracleDbType.Varchar2).Value = username;
+                            setId.Parameters.Add(":i", OracleDbType.Varchar2).Value = $"logout;user={username}";
+                            await setId.ExecuteNonQueryAsync();
+                        }
+                    }
+                    catch { /* ignore */ }
+
+                    // Optional: attempt to disconnect active Oracle sessions for this user (skip admin accounts)
+                    try
+                    {
+                        var upper = (username ?? string.Empty).Trim().ToUpperInvariant();
+                        var isAdminUser = upper == "QLTT_ADMIN" || upper == "QLTTTA_ADMIN" || upper == "QLTTA_ADMIN";
+                        if (!string.IsNullOrWhiteSpace(upper) && !isAdminUser)
+                        {
+                            using var sessCmd = new OracleCommand(@"SELECT SID, SERIAL# FROM V$SESSION WHERE USERNAME = :uname", conn) { BindByName = true };
+                            sessCmd.Parameters.Add(":uname", OracleDbType.Varchar2).Value = upper;
+                            using var rdr = await sessCmd.ExecuteReaderAsync();
+                            while (await rdr.ReadAsync())
+                            {
+                                var sid = rdr.GetInt32(0);
+                                var serial = rdr.GetInt32(1);
+                                try
+                                {
+                                    using var kill = new OracleCommand($"ALTER SYSTEM DISCONNECT SESSION '{sid},{serial}' POST_TRANSACTION", conn);
+                                    await kill.ExecuteNonQueryAsync();
+                                }
+                                catch (OracleException oex)
+                                {
+                                    // ignore insufficient privileges or invalid session
+                                    if (oex.Number != 1031 && oex.Number != 3086)
+                                    {
+                                        _logger.LogDebug(oex, "DISCONNECT SESSION failed for {User} sid={Sid} serial={Serial}", username, sid, serial);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception exKill)
+                    {
+                        _logger.LogDebug(exKill, "Skip killing sessions for {User}", username);
+                    }
+                }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error during logout for user {Username} session {SessionId}", username, sessionId);
             }
-            return Task.CompletedTask;
         }
 
         public async Task<OtpInitiateResponse> InitiateRegisterOtpAsync(RegisterRequest request)

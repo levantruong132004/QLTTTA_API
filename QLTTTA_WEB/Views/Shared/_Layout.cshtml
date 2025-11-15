@@ -6,10 +6,6 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - Trung tâm Tiếng Anh LDA</title>
-    <!-- Google Fonts - Merriweather + Noto Serif (full Vietnamese support) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700;900&family=Noto+Serif:wght@400;600;700&display=swap" rel="stylesheet">
     <!-- Retro Vintage Theme -->
     <link rel="stylesheet" href="~/css/retro-vintage.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
@@ -37,17 +33,37 @@
                     var __roleIdStr = Context.Session.GetString("RoleId");
                     int __roleId = 0; int.TryParse(__roleIdStr, out __roleId);
                     var __roleName = Context.Session.GetString("Role") ?? string.Empty;
-                    <li class="retro-nav-item">
-                        <a class="retro-nav-link" asp-controller="Student" asp-action="Profile">
-                            <i class="fas fa-user-graduate"></i> Học viên
-                        </a>
-                    </li>
-                    <li class="retro-nav-item">
-                        <a class="retro-nav-link" asp-controller="Student" asp-action="Courses">
-                            <i class="fas fa-book"></i> Khóa học
-                        </a>
-                    </li>
-                    @if (__roleName.Contains("HocVien", StringComparison.OrdinalIgnoreCase))
+                    var __username = Context.Session.GetString("Username") ?? string.Empty;
+                    bool __isAdmin = __roleId == 5
+                        || __roleName.Contains("QuanTri", StringComparison.OrdinalIgnoreCase)
+                        || __roleName.Contains("Quản trị", StringComparison.OrdinalIgnoreCase)
+                        || __roleName.Contains("Admin", StringComparison.OrdinalIgnoreCase)
+                        || __username.Equals("QLTTTA_ADMIN", StringComparison.OrdinalIgnoreCase)
+                        || __username.Equals("QLTTA_ADMIN", StringComparison.OrdinalIgnoreCase)
+                        || __username.Equals("QLTT_ADMIN", StringComparison.OrdinalIgnoreCase)
+                        || __username.Equals("qltt_admin", StringComparison.OrdinalIgnoreCase);
+                    bool __isHocVu = __roleId == 4
+                        || __roleName.Contains("NhanVienHocVu", StringComparison.OrdinalIgnoreCase)
+                        || __roleName.Contains("Nhân viên học vụ", StringComparison.OrdinalIgnoreCase)
+                        || __roleName.Contains("NhanVien", StringComparison.OrdinalIgnoreCase);
+                    bool __isKeToan = __roleId == 3
+                        || __roleName.Contains("KeToan", StringComparison.OrdinalIgnoreCase)
+                        || __roleName.Contains("Kế toán", StringComparison.OrdinalIgnoreCase);
+                    @* Chỉ Học viên mới thấy mục Học viên & Khóa học *@
+                    @if (__roleName.Contains("HocVien", StringComparison.OrdinalIgnoreCase) || __roleName.Contains("Học viên", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <li class="retro-nav-item">
+                            <a class="retro-nav-link" asp-controller="Student" asp-action="Profile">
+                                <i class="fas fa-user-graduate"></i> Học viên
+                            </a>
+                        </li>
+                        <li class="retro-nav-item">
+                            <a class="retro-nav-link" asp-controller="Student" asp-action="Courses">
+                                <i class="fas fa-book"></i> Khóa học
+                            </a>
+                        </li>
+                    }
+                    @if (__roleName.Contains("HocVien", StringComparison.OrdinalIgnoreCase) || __roleName.Contains("Học viên", StringComparison.OrdinalIgnoreCase))
                     {
                         <li class="retro-nav-item">
                             <a class="retro-nav-link" asp-controller="Student" asp-action="MyRegistrations">
@@ -55,7 +71,7 @@
                             </a>
                         </li>
                     }
-                    @if (__roleName.Contains("KeToan", StringComparison.OrdinalIgnoreCase))
+                    @if (__isKeToan)
                     {
                         <li class="retro-nav-item dropdown">
                             <a class="retro-nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"
@@ -72,8 +88,7 @@
                             </ul>
                         </li>
                     }
-                    @if (__roleId == 4 || __roleName.Contains("NhanVienHocVu", StringComparison.OrdinalIgnoreCase) ||
-                                    __roleName.Contains("QuanTri", StringComparison.OrdinalIgnoreCase))
+                    @if (__isHocVu || __isAdmin)
                     {
                         <li class="retro-nav-item dropdown">
                             <a class="retro-nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"
@@ -81,15 +96,21 @@
                                 <i class="fas fa-cog"></i> Quản trị
                             </a>
                             <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" asp-controller="Manage" asp-action="Courses"><i
-                                            class="fas fa-book"></i> Quản lý khóa học</a></li>
-                                <li><a class="dropdown-item" asp-controller="Manage" asp-action="Classes"><i
-                                            class="fas fa-chalkboard"></i> Quản lý lớp</a></li>
-                                <li><a class="dropdown-item" asp-controller="Manage" asp-action="Registrations"><i
-                                            class="fas fa-clipboard-check"></i> Duyệt đăng ký</a></li>
-                                <li><hr class="dropdown-divider" /></li>
-                                <li><a class="dropdown-item" asp-controller="Manage" asp-action="Staff"><i class="fas fa-users"></i> Quản lý nhân viên</a></li>
-                                <li><a class="dropdown-item" asp-controller="Manage" asp-action="Invoices"><i class="fas fa-file-invoice-dollar"></i> Quản lý hóa đơn</a></li>
+                                @* Nhân viên học vụ: các mục quản trị học vụ *@
+                                @if (__isHocVu && !__isAdmin)
+                                {
+                                    <li><a class="dropdown-item" asp-controller="StaffStudents" asp-action="Index"><i class="fas fa-users"></i> Quản lý học viên</a></li>
+                                    <li><hr class="dropdown-divider" /></li>
+                                    <li><a class="dropdown-item" asp-controller="Manage" asp-action="Courses"><i class="fas fa-book"></i> Quản lý khóa học</a></li>
+                                    <li><a class="dropdown-item" asp-controller="Manage" asp-action="Classes"><i class="fas fa-chalkboard"></i> Quản lý lớp</a></li>
+                                    <li><a class="dropdown-item" asp-controller="Manage" asp-action="Registrations"><i class="fas fa-clipboard-check"></i> Duyệt đăng ký</a></li>
+                                }
+                                @* Admin: chỉ 2 mục theo yêu cầu *@
+                                @if (__isAdmin)
+                                {
+                                    <li><a class="dropdown-item" asp-controller="Manage" asp-action="Staff"><i class="fas fa-users"></i> Quản lý nhân viên</a></li>
+                                    <li><a class="dropdown-item" asp-controller="Manage" asp-action="Invoices"><i class="fas fa-key"></i> Tạo cặp khóa ký số</a></li>
+                                }
                             </ul>
                         </li>
                     }
@@ -123,22 +144,30 @@
                     var __mRoleIdStr = Context.Session.GetString("RoleId");
                     int __mRoleId = 0; int.TryParse(__mRoleIdStr, out __mRoleId);
                     var __mRoleName = Context.Session.GetString("Role") ?? string.Empty;
-                    <li class="mb-2">
-                        <a class="retro-nav-link" style="display:block;" asp-controller="Student" asp-action="Profile"><i
-                                class="fas fa-user-graduate"></i> Học viên</a>
-                    </li>
-                    <li class="mb-2">
-                        <a class="retro-nav-link" style="display:block;" asp-controller="Student" asp-action="Courses"><i
-                                class="fas fa-book"></i> Khóa học</a>
-                    </li>
-                    @if (__mRoleName.Contains("HocVien", StringComparison.OrdinalIgnoreCase))
+                    var __mUsername = Context.Session.GetString("Username") ?? string.Empty;
+                    bool __mIsAdmin = __mRoleId == 5 || __mRoleName.Contains("QuanTri", StringComparison.OrdinalIgnoreCase) || __mRoleName.Contains("Quản trị", StringComparison.OrdinalIgnoreCase) || __mRoleName.Contains("Admin", StringComparison.OrdinalIgnoreCase) || __mUsername.Equals("QLTTTA_ADMIN", StringComparison.OrdinalIgnoreCase) || __mUsername.Equals("QLTTA_ADMIN", StringComparison.OrdinalIgnoreCase) || __mUsername.Equals("QLTT_ADMIN", StringComparison.OrdinalIgnoreCase) || __mUsername.Equals("qltt_admin", StringComparison.OrdinalIgnoreCase);
+                    bool __mIsHocVu = __mRoleId == 4 || __mRoleName.Contains("NhanVienHocVu", StringComparison.OrdinalIgnoreCase) || __mRoleName.Contains("Nhân viên học vụ", StringComparison.OrdinalIgnoreCase) || __mRoleName.Contains("NhanVien", StringComparison.OrdinalIgnoreCase);
+                    bool __mIsKeToan = __mRoleId == 3 || __mRoleName.Contains("KeToan", StringComparison.OrdinalIgnoreCase) || __mRoleName.Contains("Kế toán", StringComparison.OrdinalIgnoreCase);
+                    @* Chỉ Học viên mới thấy mục Học viên & Khóa học (mobile) *@
+                    @if (__mRoleName.Contains("HocVien", StringComparison.OrdinalIgnoreCase) || __mRoleName.Contains("Học viên", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <li class="mb-2">
+                            <a class="retro-nav-link" style="display:block;" asp-controller="Student" asp-action="Profile"><i
+                                    class="fas fa-user-graduate"></i> Học viên</a>
+                        </li>
+                        <li class="mb-2">
+                            <a class="retro-nav-link" style="display:block;" asp-controller="Student" asp-action="Courses"><i
+                                    class="fas fa-book"></i> Khóa học</a>
+                        </li>
+                    }
+                    @if (__mRoleName.Contains("HocVien", StringComparison.OrdinalIgnoreCase) || __mRoleName.Contains("Học viên", StringComparison.OrdinalIgnoreCase))
                     {
                         <li class="mb-2">
                             <a class="retro-nav-link" style="display:block;" asp-controller="Student" asp-action="MyRegistrations"><i
                                     class="fas fa-file-alt"></i> Đơn & Hóa đơn</a>
                         </li>
                     }
-                    @if (__mRoleName.Contains("KeToan", StringComparison.OrdinalIgnoreCase))
+                    @if (__mIsKeToan)
                     {
                         <li class="mb-2">
                             <a class="retro-nav-link" style="display:block;" asp-controller="Accountant" asp-action="Index"><i
@@ -149,28 +178,35 @@
                                     class="fas fa-bell"></i> Thanh toán chờ xác nhận</a>
                         </li>
                     }
-                    @if (__mRoleId == 4 || __mRoleName.Contains("NhanVienHocVu", StringComparison.OrdinalIgnoreCase) ||
-                                    __mRoleName.Contains("QuanTri", StringComparison.OrdinalIgnoreCase))
+                    @if (__mIsHocVu || __mIsAdmin)
                     {
-                        <li class="mb-2">
-                            <a class="retro-nav-link" style="display:block;" asp-controller="Manage" asp-action="Courses"><i
-                                    class="fas fa-book"></i> Quản lý khóa học</a>
-                        </li>
-                        <li class="mb-2">
-                            <a class="retro-nav-link" style="display:block;" asp-controller="Manage" asp-action="Classes"><i
-                                    class="fas fa-chalkboard"></i> Quản lý lớp</a>
-                        </li>
-                        <li class="mb-2">
-                            <a class="retro-nav-link" style="display:block;" asp-controller="Manage"
-                                asp-action="Registrations"><i class="fas fa-clipboard-check"></i> Duyệt đăng ký</a>
-                        </li>
-                        <li><hr class="dropdown-divider" style="border-color:#8b6f47" /></li>
-                        <li class="mb-2">
-                            <a class="retro-nav-link" style="display:block;" asp-controller="Manage" asp-action="Staff"><i class="fas fa-users"></i> Quản lý nhân viên</a>
-                        </li>
-                        <li class="mb-2">
-                            <a class="retro-nav-link" style="display:block;" asp-controller="Manage" asp-action="Invoices"><i class="fas fa-file-invoice-dollar"></i> Quản lý hóa đơn</a>
-                        </li>
+                        @* Nhân viên học vụ: nhóm quản trị học vụ *@
+                        @if (__mIsHocVu && !__mIsAdmin)
+                        {
+                            <li class="mb-2">
+                                <a class="retro-nav-link" style="display:block;" asp-controller="StaffStudents" asp-action="Index"><i class="fas fa-users"></i> Quản lý học viên</a>
+                            </li>
+                            <li class="mb-2">
+                                <a class="retro-nav-link" style="display:block;" asp-controller="Manage" asp-action="Courses"><i class="fas fa-book"></i> Quản lý khóa học</a>
+                            </li>
+                            <li class="mb-2">
+                                <a class="retro-nav-link" style="display:block;" asp-controller="Manage" asp-action="Classes"><i class="fas fa-chalkboard"></i> Quản lý lớp</a>
+                            </li>
+                            <li class="mb-2">
+                                <a class="retro-nav-link" style="display:block;" asp-controller="Manage" asp-action="Registrations"><i class="fas fa-clipboard-check"></i> Duyệt đăng ký</a>
+                            </li>
+                        }
+                        @* Admin: chỉ 2 mục *@
+                        @if (__mIsAdmin)
+                        {
+                            <li class="mb-2"><hr class="dropdown-divider" style="border-color:#8b6f47" /></li>
+                            <li class="mb-2">
+                                <a class="retro-nav-link" style="display:block;" asp-controller="Manage" asp-action="Staff"><i class="fas fa-users"></i> Quản lý nhân viên</a>
+                            </li>
+                            <li class="mb-2">
+                                <a class="retro-nav-link" style="display:block;" asp-controller="Manage" asp-action="Invoices"><i class="fas fa-key"></i> Tạo cặp khóa ký số</a>
+                            </li>
+                        }
                     }
                     <li class="mb-2">
                         <form asp-controller="Account" asp-action="Logout" method="post">

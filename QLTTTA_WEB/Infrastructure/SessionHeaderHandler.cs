@@ -23,6 +23,11 @@ namespace QLTTTA_WEB.Infrastructure
                 {
                     request.Headers.Remove("X-Session-Id");
                     request.Headers.Add("X-Session-Id", sessionId);
+                    // Default device type for web app
+                    if (!request.Headers.Contains("X-Device-Type"))
+                    {
+                        request.Headers.Add("X-Device-Type", "pc");
+                    }
                 }
             }
             catch

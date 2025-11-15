@@ -43,7 +43,7 @@ namespace QLTTTA_API.Services
 
             var countSql = $@"
                 SELECT COUNT(*) 
-                FROM KHOA_HOC 
+                FROM QLTT_ADMIN.KHOA_HOC 
                 {whereClause.Replace("COURSE_NAME", "TEN_KHOA_HOC").Replace("COURSE_CODE", "MA_KHOA_HOC")}";
 
             var dataSql = $@"
@@ -55,7 +55,7 @@ namespace QLTTTA_API.Services
                         c.MO_TA             AS DESCRIPTION,
                         c.HOC_PHI_TIEU_CHUAN AS STANDARD_FEE,
                         ROW_NUMBER() OVER (ORDER BY c.ID_KHOA_HOC) as rn
-                    FROM KHOA_HOC c
+                    FROM QLTT_ADMIN.KHOA_HOC c
                     {whereClause.Replace("COURSE_NAME", "TEN_KHOA_HOC").Replace("COURSE_CODE", "MA_KHOA_HOC")}
                 ) WHERE rn BETWEEN :offset + 1 AND :offset + :pagesize";
 
@@ -87,33 +87,11 @@ namespace QLTTTA_API.Services
                                      TEN_KHOA_HOC      AS COURSE_NAME,
                                      MO_TA             AS DESCRIPTION,
                                      HOC_PHI_TIEU_CHUAN AS STANDARD_FEE
-                                 FROM KHOA_HOC WHERE ID_KHOA_HOC = :id";
+                                 FROM QLTT_ADMIN.KHOA_HOC WHERE ID_KHOA_HOC = :id";
 
-            // Thử dùng kết nối theo user trước; nếu phiên user thiếu/hết hạn, fallback sang kết nối admin
-            try
+            using (var conn = await GetConnectionAsync())
+            using (var cmd = new Oracle.ManagedDataAccess.Client.OracleCommand(sql, conn))
             {
-                using var conn = await GetConnectionAsync();
-                using var cmd = new Oracle.ManagedDataAccess.Client.OracleCommand(sql, conn);
-                cmd.Parameters.Add(":id", id);
-                using var reader = await cmd.ExecuteReaderAsync(System.Data.CommandBehavior.SingleRow);
-                if (await reader.ReadAsync())
-                {
-                    return new Course
-                    {
-                        CourseId = reader.GetInt32(reader.GetOrdinal("COURSE_ID")),
-                        CourseCode = reader.IsDBNull(reader.GetOrdinal("COURSE_CODE")) ? null : reader.GetString(reader.GetOrdinal("COURSE_CODE")),
-                        CourseName = reader.IsDBNull(reader.GetOrdinal("COURSE_NAME")) ? null : reader.GetString(reader.GetOrdinal("COURSE_NAME")),
-                        Description = reader.IsDBNull(reader.GetOrdinal("DESCRIPTION")) ? string.Empty : reader.GetString(reader.GetOrdinal("DESCRIPTION")),
-                        StandardFee = reader.IsDBNull(reader.GetOrdinal("STANDARD_FEE")) ? 0 : Convert.ToInt32(Math.Round(Convert.ToDecimal(reader["STANDARD_FEE"])))
-                    };
-                }
-                return null;
-            }
-            catch (UnauthorizedAccessException)
-            {
-                _logger.LogWarning("User session missing/invalid. Falling back to admin connection for public course detail {CourseId}.", id);
-                using var conn = await GetAdminConnectionAsync();
-                using var cmd = new Oracle.ManagedDataAccess.Client.OracleCommand(sql, conn);
                 cmd.Parameters.Add(":id", id);
                 using var reader = await cmd.ExecuteReaderAsync(System.Data.CommandBehavior.SingleRow);
                 if (await reader.ReadAsync())
@@ -139,7 +117,7 @@ namespace QLTTTA_API.Services
             try
             {
                 // Kiểm tra mã khóa học đã tồn tại
-                var existingSql = "SELECT COUNT(*) FROM KHOA_HOC WHERE MA_KHOA_HOC = :coursecode";
+                var existingSql = "SELECT COUNT(*) FROM QLTT_ADMIN.KHOA_HOC WHERE MA_KHOA_HOC = :coursecode";
                 var exists = Convert.ToInt32(await ExecuteScalarAsync(existingSql, new { coursecode = dto.CourseCode }));
 
                 if (exists > 0)
@@ -152,7 +130,7 @@ namespace QLTTTA_API.Services
                 }
 
                 var sql = @"
-                    INSERT INTO KHOA_HOC 
+                    INSERT INTO QLTT_ADMIN.KHOA_HOC 
                     (MA_KHOA_HOC, TEN_KHOA_HOC, MO_TA, HOC_PHI_TIEU_CHUAN)
                     VALUES (:coursecode, :coursename, :description, :standardfee)";
 
@@ -169,7 +147,7 @@ namespace QLTTTA_API.Services
                 // Lấy thông tin khóa học vừa tạo
                 var newCourse = await ExecuteQuerySingleAsync<Course>(
                         @"SELECT ID_KHOA_HOC AS COURSE_ID, MA_KHOA_HOC AS COURSE_CODE, TEN_KHOA_HOC AS COURSE_NAME, MO_TA AS DESCRIPTION, HOC_PHI_TIEU_CHUAN AS STANDARD_FEE 
-                                            FROM KHOA_HOC WHERE MA_KHOA_HOC = :coursecode",
+                                            FROM QLTT_ADMIN.KHOA_HOC WHERE MA_KHOA_HOC = :coursecode",
                         new { coursecode = dto.CourseCode });
 
                 return new ApiResponse<Course>
@@ -210,7 +188,7 @@ namespace QLTTTA_API.Services
 
                 // Kiểm tra mã khóa học trùng (ngoại trừ chính nó)
                 var existingSql = @"
-                    SELECT COUNT(*) FROM KHOA_HOC 
+                    SELECT COUNT(*) FROM QLTT_ADMIN.KHOA_HOC 
                     WHERE MA_KHOA_HOC = :coursecode AND ID_KHOA_HOC != :courseid";
                 var exists = Convert.ToInt32(await ExecuteScalarAsync(existingSql,
                     new { coursecode = dto.CourseCode, courseid = dto.CourseId }));
@@ -225,7 +203,7 @@ namespace QLTTTA_API.Services
                 }
 
                 var sql = @"
-                    UPDATE KHOA_HOC SET
+                    UPDATE QLTT_ADMIN.KHOA_HOC SET
                         MA_KHOA_HOC = :coursecode,
                         TEN_KHOA_HOC = :coursename,
                         MO_TA = :description,
@@ -271,7 +249,7 @@ namespace QLTTTA_API.Services
             try
             {
                 // Kiểm tra khóa học có lớp học không
-                var classSql = "SELECT COUNT(*) FROM LOP_HOC WHERE ID_KHOA_HOC = :id";
+                var classSql = "SELECT COUNT(*) FROM QLTT_ADMIN.LOP_HOC WHERE ID_KHOA_HOC = :id";
                 var hasClasses = Convert.ToInt32(await ExecuteScalarAsync(classSql, new { id }));
 
                 if (hasClasses > 0)
@@ -283,7 +261,7 @@ namespace QLTTTA_API.Services
                     };
                 }
 
-                var sql = "DELETE FROM KHOA_HOC WHERE ID_KHOA_HOC = :id";
+                var sql = "DELETE FROM QLTT_ADMIN.KHOA_HOC WHERE ID_KHOA_HOC = :id";
                 var rowsAffected = await ExecuteNonQueryAsync(sql, new { id });
 
                 if (rowsAffected == 0)
@@ -324,68 +302,23 @@ namespace QLTTTA_API.Services
                             TEN_KHOA_HOC      AS COURSE_NAME,
                             MO_TA             AS DESCRIPTION,
                             HOC_PHI_TIEU_CHUAN AS STANDARD_FEE
-                        FROM KHOA_HOC ORDER BY TEN_KHOA_HOC";
-            // Cố gắng dùng kết nối user trước; nếu phiên user không còn (sau khi server restart), fallback sang admin cho truy vấn công khai này
-            try
+                        FROM QLTT_ADMIN.KHOA_HOC ORDER BY TEN_KHOA_HOC";
+            using var conn = await GetConnectionAsync();
+            using var cmd = new OracleCommand(sql, conn);
+            using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.Default);
+            var list = new List<Course>();
+            while (await reader.ReadAsync())
             {
-                using var conn = await GetConnectionAsync();
-                using var cmd = new OracleCommand(sql, conn);
-                using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.Default);
-                var list = new List<Course>();
-                while (await reader.ReadAsync())
+                list.Add(new Course
                 {
-                    list.Add(new Course
-                    {
-                        CourseId = reader.GetInt32(reader.GetOrdinal("COURSE_ID")),
-                        CourseCode = reader.IsDBNull(reader.GetOrdinal("COURSE_CODE")) ? null : reader.GetString(reader.GetOrdinal("COURSE_CODE")),
-                        CourseName = reader.IsDBNull(reader.GetOrdinal("COURSE_NAME")) ? null : reader.GetString(reader.GetOrdinal("COURSE_NAME")),
-                        Description = reader.IsDBNull(reader.GetOrdinal("DESCRIPTION")) ? string.Empty : reader.GetString(reader.GetOrdinal("DESCRIPTION")),
-                        StandardFee = reader.IsDBNull(reader.GetOrdinal("STANDARD_FEE")) ? 0 : Convert.ToInt32(Math.Round(Convert.ToDecimal(reader["STANDARD_FEE"])))
-                    });
-                }
-                return list;
+                    CourseId = reader.GetInt32(reader.GetOrdinal("COURSE_ID")),
+                    CourseCode = reader.IsDBNull(reader.GetOrdinal("COURSE_CODE")) ? null : reader.GetString(reader.GetOrdinal("COURSE_CODE")),
+                    CourseName = reader.IsDBNull(reader.GetOrdinal("COURSE_NAME")) ? null : reader.GetString(reader.GetOrdinal("COURSE_NAME")),
+                    Description = reader.IsDBNull(reader.GetOrdinal("DESCRIPTION")) ? string.Empty : reader.GetString(reader.GetOrdinal("DESCRIPTION")),
+                    StandardFee = reader.IsDBNull(reader.GetOrdinal("STANDARD_FEE")) ? 0 : Convert.ToInt32(Math.Round(Convert.ToDecimal(reader["STANDARD_FEE"])))
+                });
             }
-            catch (UnauthorizedAccessException)
-            {
-                _logger.LogWarning("User session missing/invalid. Falling back to admin connection for public course list.");
-                using var conn = await GetAdminConnectionAsync();
-                using var cmd = new OracleCommand(sql, conn);
-                using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.Default);
-                var list = new List<Course>();
-                while (await reader.ReadAsync())
-                {
-                    list.Add(new Course
-                    {
-                        CourseId = reader.GetInt32(reader.GetOrdinal("COURSE_ID")),
-                        CourseCode = reader.IsDBNull(reader.GetOrdinal("COURSE_CODE")) ? null : reader.GetString(reader.GetOrdinal("COURSE_CODE")),
-                        CourseName = reader.IsDBNull(reader.GetOrdinal("COURSE_NAME")) ? null : reader.GetString(reader.GetOrdinal("COURSE_NAME")),
-                        Description = reader.IsDBNull(reader.GetOrdinal("DESCRIPTION")) ? string.Empty : reader.GetString(reader.GetOrdinal("DESCRIPTION")),
-                        StandardFee = reader.IsDBNull(reader.GetOrdinal("STANDARD_FEE")) ? 0 : Convert.ToInt32(Math.Round(Convert.ToDecimal(reader["STANDARD_FEE"])))
-                    });
-                }
-                return list;
-            }
-            catch (OracleException oex) when (oex.Number == 1031 || oex.Number == 942)
-            {
-                // ORA-01031 insufficient privileges or ORA-00942 table or view does not exist under user connection
-                _logger.LogWarning(oex, "Insufficient privileges or missing object under user connection. Falling back to admin for course list.");
-                using var conn = await GetAdminConnectionAsync();
-                using var cmd = new OracleCommand(sql, conn);
-                using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.Default);
-                var list = new List<Course>();
-                while (await reader.ReadAsync())
-                {
-                    list.Add(new Course
-                    {
-                        CourseId = reader.GetInt32(reader.GetOrdinal("COURSE_ID")),
-                        CourseCode = reader.IsDBNull(reader.GetOrdinal("COURSE_CODE")) ? null : reader.GetString(reader.GetOrdinal("COURSE_CODE")),
-                        CourseName = reader.IsDBNull(reader.GetOrdinal("COURSE_NAME")) ? null : reader.GetString(reader.GetOrdinal("COURSE_NAME")),
-                        Description = reader.IsDBNull(reader.GetOrdinal("DESCRIPTION")) ? string.Empty : reader.GetString(reader.GetOrdinal("DESCRIPTION")),
-                        StandardFee = reader.IsDBNull(reader.GetOrdinal("STANDARD_FEE")) ? 0 : Convert.ToInt32(Math.Round(Convert.ToDecimal(reader["STANDARD_FEE"])))
-                    });
-                }
-                return list;
-            }
+            return list;
         }
     }
 }

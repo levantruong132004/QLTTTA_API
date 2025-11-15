@@ -24,6 +24,60 @@
 				"$msCompile"
 			],
 			"group": "build"
+		},
+		{
+			"label": "dotnet-build",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"build"
+			],
+			"group": "build"
+		},
+		{
+			"label": "dotnet-build",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"build"
+			],
+			"group": "build"
+		},
+		{
+			"label": "dotnet-build",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"build"
+			],
+			"group": "build"
+		},
+		{
+			"label": "dotnet-build",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"build"
+			],
+			"group": "build"
+		},
+		{
+			"label": "dotnet-build",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"build"
+			],
+			"group": "build"
+		},
+		{
+			"label": "dotnet-build",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"build"
+			],
+			"group": "build"
 		}
 	]
 }
