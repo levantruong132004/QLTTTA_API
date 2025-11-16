@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:qlttta_app_mobile/models/dashboard_stats.dart';
 import 'package:qlttta_app_mobile/screens/login_screen.dart';
+import 'package:qlttta_app_mobile/screens/my_profile_screen.dart';
 import 'package:qlttta_app_mobile/screens/students_screen.dart';
 import 'package:qlttta_app_mobile/screens/courses_screen.dart';
 import 'package:qlttta_app_mobile/screens/classes_screen.dart';
@@ -31,6 +32,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadDisplayName();
     _loadRoleId();
+    // Tạm thời load với role mặc định, sẽ refetch sau khi roleId được lấy.
     _statsFuture = _dashboardService.getStats();
   }
 
@@ -49,6 +51,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _roleId = prefs.getInt('roleId') ?? 1; // Default to HocVien
+      // Sau khi biết role chính xác thì refetch stats để lấy đúng số liệu.
+      _statsFuture = _dashboardService.getStats();
     });
   }
 
@@ -363,11 +367,8 @@ class _HomeScreenState extends State<HomeScreen> {
           subtitle: 'Xem thông tin cá nhân',
           color: RetroColors.info,
           onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Chức năng hồ sơ đang phát triển'),
-                duration: Duration(seconds: 1),
-              ),
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const MyProfileScreen()),
             );
           },
         ),
@@ -402,21 +403,9 @@ class _HomeScreenState extends State<HomeScreen> {
       return actions;
     }
     
-    // Role 2: GiangVien - Student list, schedule
+    // Role 2: GiangVien - QR scan and settings only (student list in dashboard)
     if (_roleId == 2) {
       actions.addAll([
-        _QuickActionTile(
-          icon: Icons.people_alt_rounded,
-          title: 'Danh sách học viên',
-          subtitle: 'Xem tất cả học viên',
-          color: RetroColors.success,
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const StudentsScreen()),
-            );
-          },
-        ),
-        const SizedBox(height: 12),
         _QuickActionTile(
           icon: Icons.qr_code_scanner,
           title: 'Scan QR đăng nhập web',
@@ -480,20 +469,8 @@ class _HomeScreenState extends State<HomeScreen> {
       return actions;
     }
     
-    // Role 4 & 5: NhanVienHocVu & Admin - Full student access
+    // Role 4 & 5: NhanVienHocVu & Admin - QR scan and settings (student list in dashboard)
     actions.addAll([
-      _QuickActionTile(
-        icon: Icons.people_alt_rounded,
-        title: 'Danh sách học viên',
-        subtitle: 'Xem tất cả học viên',
-        color: RetroColors.success,
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const StudentsScreen()),
-          );
-        },
-      ),
-      const SizedBox(height: 12),
       _QuickActionTile(
         icon: Icons.qr_code_scanner,
         title: 'Scan QR đăng nhập web',
@@ -685,67 +662,272 @@ class _QrScanApproveScreenState extends State<QrScanApproveScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Quét QR đăng nhập web')),
-      body: Column(
-        children: [
-          Expanded(
-            child: MobileScanner(
-              onDetect: (capture) async {
-                if (_scanned) return;
-                final barcodes = capture.barcodes;
-                for (final bc in barcodes) {
-                  final raw = bc.rawValue;
-                  if (raw == null) continue;
-                  final id = _parseQr(raw);
-                  if (id != null) {
-                    setState(() { _scanned = true; _challengeId = id; _status = 'Đã quét, gửi lên để xác nhận...'; });
-                    await _auth.qrScan(id);
-                    if (mounted) {
-                      setState(() { _status = 'Đã quét. Chờ bạn phê duyệt.'; });
-                    }
-                    break;
-                  }
-                }
-              },
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        leading: IconButton(
+          icon: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
             ),
+            child: const Icon(Icons.arrow_back_rounded, size: 20),
           ),
-          if (_challengeId != null && !_decisionMade)
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: () async {
-                      if (_challengeId == null) return;
-                      final r = await _auth.qrApprove(_challengeId!, true);
-                      if (mounted) {
-                        setState(() { _decisionMade = true; _status = r['success'] == true && r['status'] == 'approved' ? 'ĐÃ PHÊ DUYỆT' : 'Phê duyệt thất bại'; });
-                      }
-                    },
-                    icon: const Icon(Icons.check),
-                    label: const Text('Phê duyệt'),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text(
+          'Quét QR đăng nhập web',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+        ),
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color(0xFF8B4513).withOpacity(0.85),
+              const Color(0xFFD2691E).withOpacity(0.75),
+              const Color(0xFFF4A460).withOpacity(0.65),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              const SizedBox(height: 60),
+              // Scanner frame
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: Stack(
+                      children: [
+                        MobileScanner(
+                          onDetect: (capture) async {
+                            if (_scanned) return;
+                            final barcodes = capture.barcodes;
+                            for (final bc in barcodes) {
+                              final raw = bc.rawValue;
+                              if (raw == null) continue;
+                              final id = _parseQr(raw);
+                              if (id != null) {
+                                setState(() { _scanned = true; _challengeId = id; _status = 'Đã quét, gửi lên để xác nhận...'; });
+                                await _auth.qrScan(id);
+                                if (mounted) {
+                                  setState(() { _status = 'Đã quét. Chờ bạn phê duyệt.'; });
+                                }
+                                break;
+                              }
+                            }
+                          },
+                        ),
+                        // Scanner overlay
+                        if (!_scanned)
+                          Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.white, width: 3),
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-                    onPressed: () async {
-                      if (_challengeId == null) return;
-                      await _auth.qrApprove(_challengeId!, false);
-                      if (mounted) {
-                        setState(() { _decisionMade = true; _status = 'ĐÃ TỪ CHỐI'; });
-                      }
-                    },
-                    icon: const Icon(Icons.close),
-                    label: const Text('Từ chối'),
-                  ),
-                ],
+                ),
               ),
-            ),
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Text(_status, style: const TextStyle(fontWeight: FontWeight.bold)),
+              // Status and buttons
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, -5),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Status indicator
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _scanned
+                            ? (_decisionMade
+                                ? (_status.contains('PHÊ DUYỆT') ? const Color(0xFF4CAF50) : const Color(0xFFF44336))
+                                : const Color(0xFFFF9800))
+                            : Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _scanned
+                                ? (_decisionMade
+                                    ? (_status.contains('PHÊ DUYỆT') ? Icons.check_circle_rounded : Icons.cancel_rounded)
+                                    : Icons.pending_rounded)
+                                : Icons.qr_code_scanner_rounded,
+                            color: _scanned && !_decisionMade ? Colors.white : (_scanned ? Colors.white : Colors.grey.shade600),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _status,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                              color: _scanned && !_decisionMade ? Colors.white : (_scanned ? Colors.white : Colors.grey.shade700),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_challengeId != null && !_decisionMade) ...[
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: 56,
+                              child: ElevatedButton(
+                                onPressed: () async {
+                                  if (_challengeId == null) return;
+                                  final r = await _auth.qrApprove(_challengeId!, true);
+                                  if (mounted) {
+                                    setState(() {
+                                      _decisionMade = true;
+                                      _status = r['success'] == true && r['status'] == 'approved'
+                                          ? 'ĐÃ PHÊ DUYỆT'
+                                          : 'Phê duyệt thất bại';
+                                    });
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.transparent,
+                                  foregroundColor: Colors.white,
+                                  padding: EdgeInsets.zero,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  elevation: 0,
+                                  shadowColor: Colors.transparent,
+                                ),
+                                child: Ink(
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [Color(0xFF4CAF50), Color(0xFF66BB6A)],
+                                      begin: Alignment.centerLeft,
+                                      end: Alignment.centerRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(16),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFF4CAF50).withOpacity(0.3),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 6),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Container(
+                                    alignment: Alignment.center,
+                                    child: const Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.check_circle_rounded, size: 22),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Phê duyệt',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: SizedBox(
+                              height: 56,
+                              child: ElevatedButton(
+                                onPressed: () async {
+                                  if (_challengeId == null) return;
+                                  await _auth.qrApprove(_challengeId!, false);
+                                  if (mounted) {
+                                    setState(() {
+                                      _decisionMade = true;
+                                      _status = 'ĐÃ TỪ CHỐI';
+                                    });
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.transparent,
+                                  foregroundColor: Colors.white,
+                                  padding: EdgeInsets.zero,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  elevation: 0,
+                                  shadowColor: Colors.transparent,
+                                ),
+                                child: Ink(
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [Color(0xFFF44336), Color(0xFFEF5350)],
+                                      begin: Alignment.centerLeft,
+                                      end: Alignment.centerRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(16),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFFF44336).withOpacity(0.3),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 6),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Container(
+                                    alignment: Alignment.center,
+                                    child: const Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.cancel_rounded, size: 22),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Từ chối',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

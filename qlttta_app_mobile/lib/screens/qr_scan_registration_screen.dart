@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qlttta_app_mobile/models/registration.dart';
 import 'package:qlttta_app_mobile/services/registration_service.dart';
-import 'package:qlttta_app_mobile/theme/retro_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:qlttta_app_mobile/screens/qr_generate_screen.dart';
 import 'package:image_picker/image_picker.dart';
@@ -111,42 +110,66 @@ class _QrScanRegistrationScreenState extends State<QrScanRegistrationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: RetroColors.background,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: RetroColors.primary,
-        title: const Text('Quét QR / Tìm đăng ký', style: TextStyle(fontSize: 16)),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        leading: IconButton(
+          icon: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.arrow_back_rounded, size: 20),
+          ),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text(
+          'Quét QR / Tìm đăng ký',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
         actions: [
           IconButton(
             onPressed: () async {
-              // Bottom sheet để nhập nội dung tạo QR (mặc định lấy ô nhập tay hoặc mã quét gần nhất)
               final initial = _manualCtrl.text.trim().isNotEmpty ? _manualCtrl.text.trim() : (_lastCode ?? '');
               final ctrl = TextEditingController(text: initial);
               final payload = await showModalBottomSheet<String>(
                 context: context,
                 isScrollControlled: true,
+                backgroundColor: Colors.white,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
                 builder: (ctx) {
                   return Padding(
                     padding: EdgeInsets.only(
-                      left: 16,
-                      right: 16,
-                      top: 16,
-                      bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+                      left: 20,
+                      right: 20,
+                      top: 20,
+                      bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Nội dung mã QR'),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: ctrl,
-                          decoration: const InputDecoration(
-                            hintText: 'REG:/REGID:/CLASS: ... hoặc mã cần mã hóa',
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                          ),
+                        const Text(
+                          'Nội dung mã QR',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 12),
+                        TextField(
+                          controller: ctrl,
+                          decoration: InputDecoration(
+                            hintText: 'REG:/REGID:/CLASS: ... hoặc mã cần mã hóa',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
@@ -156,8 +179,16 @@ class _QrScanRegistrationScreenState extends State<QrScanRegistrationScreen> {
                             ),
                             const SizedBox(width: 8),
                             ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF8B4513),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              ),
                               onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-                              icon: const Icon(Icons.qr_code_2_rounded),
+                              icon: const Icon(Icons.qr_code_2_rounded, size: 20),
                               label: const Text('Tạo QR'),
                             ),
                           ],
@@ -168,8 +199,6 @@ class _QrScanRegistrationScreenState extends State<QrScanRegistrationScreen> {
                 },
               );
               if (payload != null && payload.isNotEmpty && context.mounted) {
-                // Mở màn hình hiển thị QR
-                // ignore: use_build_context_synchronously
                 Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => QrGenerateScreen(payload: payload),
@@ -177,17 +206,38 @@ class _QrScanRegistrationScreenState extends State<QrScanRegistrationScreen> {
                 );
               }
             },
-            icon: const Icon(Icons.qr_code_2_rounded),
+            icon: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.qr_code_2_rounded, size: 20),
+            ),
             tooltip: 'Tạo QR',
           ),
           IconButton(
             onPressed: () => _controller.toggleTorch(),
-            icon: const Icon(Icons.flash_on_rounded),
+            icon: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.flash_on_rounded, size: 20),
+            ),
             tooltip: 'Bật/tắt đèn',
           ),
           IconButton(
             onPressed: () => _controller.switchCamera(),
-            icon: const Icon(Icons.cameraswitch_rounded),
+            icon: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.cameraswitch_rounded, size: 20),
+            ),
             tooltip: 'Đổi camera',
           ),
           IconButton(
@@ -225,135 +275,270 @@ class _QrScanRegistrationScreenState extends State<QrScanRegistrationScreen> {
                 );
               }
             },
-            icon: const Icon(Icons.photo_library_outlined),
+            icon: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.photo_library_outlined, size: 20),
+            ),
             tooltip: 'Quét từ ảnh',
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _manualCtrl,
-                    style: const TextStyle(fontSize: 14),
-                    decoration: const InputDecoration(
-                      hintText: 'Nhập mã đăng ký / lớp...',
-                      hintStyle: TextStyle(fontSize: 13),
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              const Color(0xFF8B4513).withOpacity(0.9),
+              const Color(0xFFD2691E).withOpacity(0.7),
+              const Color(0xFFF4A460).withOpacity(0.5),
+            ],
+          ),
+        ),
+        child: Column(
+          children: [
+            SizedBox(height: MediaQuery.of(context).padding.top + 60),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: TextField(
+                        controller: _manualCtrl,
+                        style: const TextStyle(fontSize: 14),
+                        decoration: InputDecoration(
+                          hintText: 'Nhập mã đăng ký / lớp...',
+                          hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        ),
+                      ),
                     ),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF8B4513),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      elevation: 2,
+                    ),
+                    onPressed: () async {
+                      final q = _manualCtrl.text.trim();
+                      if (q.isEmpty) return;
+                      setState(() { _isProcessing = true; _lastCode = q; });
+                      final items = await _searchAndFilter(q);
+                      if (!mounted) return;
+                      setState(() { _results = items; _isProcessing = false; });
+                    },
+                    icon: const Icon(Icons.search, size: 18),
+                    label: const Text('Tìm', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withOpacity(0.3), width: 3),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(17),
+                child: AspectRatio(
+                  aspectRatio: 1,
+                  child: MobileScanner(
+                    controller: _controller,
+                    onDetect: _handleBarcode,
                   ),
                 ),
-                const SizedBox(width: 8),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  ),
-                  onPressed: () async {
-                    final q = _manualCtrl.text.trim();
-                    if (q.isEmpty) return;
-                    setState(() { _isProcessing = true; _lastCode = q; });
-                    final items = await _searchAndFilter(q);
-                    if (!mounted) return;
-                    setState(() { _results = items; _isProcessing = false; });
-                  },
-                  icon: const Icon(Icons.search, size: 18),
-                  label: const Text('Tìm', style: TextStyle(fontSize: 14)),
-                )
-              ],
+              ),
             ),
-          ),
-          AspectRatio(
-            aspectRatio: 1,
-            child: MobileScanner(
-              controller: _controller,
-              onDetect: _handleBarcode,
-            ),
-          ),
-          if (_isProcessing)
-            const Padding(
-              padding: EdgeInsets.all(12.0),
-              child: LinearProgressIndicator(),
-            ),
-          Expanded(
-            child: _results.isEmpty
-                ? Center(
-                    child: Text(
-                      _lastCode == null
-                          ? 'Hướng camera vào mã QR để tìm đơn đăng ký'
-                          : 'Không tìm thấy kết quả cho: $_lastCode',
-                      style: TextStyle(color: RetroColors.textSecondary),
+            if (_isProcessing)
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: LinearProgressIndicator(
+                  backgroundColor: Colors.white.withOpacity(0.3),
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            Expanded(
+              child: _results.isEmpty
+                  ? Center(
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 32),
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _lastCode == null ? Icons.qr_code_scanner_rounded : Icons.search_off_rounded,
+                              size: 48,
+                              color: const Color(0xFF8B4513).withOpacity(0.6),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              _lastCode == null
+                                  ? 'Hướng camera vào mã QR để tìm đơn đăng ký'
+                                  : 'Không tìm thấy kết quả cho: $_lastCode',
+                              style: TextStyle(
+                                color: Colors.grey.shade700,
+                                fontSize: 14,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemCount: _results.length,
+                      itemBuilder: (_, i) => _regTile(_results[i]),
                     ),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.all(12),
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemCount: _results.length,
-                    itemBuilder: (_, i) => _regTile(_results[i]),
-                  ),
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _regTile(Registration r) {
-    // Màu theo trạng thái
     Color statusColor;
     IconData statusIcon;
     final status = r.getStatusText().toLowerCase();
     
     if (status.contains('duyệt') || status.contains('approved')) {
-      statusColor = RetroColors.success;
-      statusIcon = Icons.check_circle;
+      statusColor = const Color(0xFF4CAF50);
+      statusIcon = Icons.check_circle_rounded;
     } else if (status.contains('chờ') || status.contains('pending')) {
-      statusColor = RetroColors.warning;
-      statusIcon = Icons.schedule;
+      statusColor = const Color(0xFFFF9800);
+      statusIcon = Icons.schedule_rounded;
     } else if (status.contains('từ chối') || status.contains('reject')) {
-      statusColor = RetroColors.error;
-      statusIcon = Icons.cancel;
+      statusColor = const Color(0xFFF44336);
+      statusIcon = Icons.cancel_rounded;
     } else {
-      statusColor = RetroColors.info;
-      statusIcon = Icons.info;
+      statusColor = const Color(0xFF2196F3);
+      statusIcon = Icons.info_rounded;
     }
 
-    return Card(
-      elevation: 2,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: RetroColors.primary.withOpacity(0.2), width: 1),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () {
-          Navigator.pop(context, r);
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(14.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header: Tên học viên + Status badge
-              Row(
-                children: [
-                  Expanded(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            Navigator.pop(context, r);
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF8B4513).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(Icons.person_rounded, size: 20, color: const Color(0xFF8B4513)),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        r.studentName ?? 'Học viên #${r.studentId}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1a1a1a),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(statusIcon, size: 14, color: statusColor),
+                          const SizedBox(width: 4),
+                          Text(
+                            r.getStatusText(),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: statusColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (r.className != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
                     child: Row(
                       children: [
-                        Icon(Icons.person, size: 18, color: RetroColors.primary),
-                        const SizedBox(width: 6),
+                        Icon(Icons.class_rounded, size: 16, color: Colors.grey.shade600),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            r.studentName ?? 'Học viên #${r.studentId}',
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: RetroColors.textPrimary,
+                            r.className!,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade800,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -362,93 +547,45 @@ class _QrScanRegistrationScreenState extends State<QrScanRegistrationScreen> {
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: statusColor.withOpacity(0.3)),
-                    ),
+                if (r.courseName != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
                     child: Row(
-                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(statusIcon, size: 14, color: statusColor),
-                        const SizedBox(width: 4),
-                        Text(
-                          r.getStatusText(),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: statusColor,
+                        Icon(Icons.menu_book_rounded, size: 16, color: Colors.grey.shade600),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            r.courseName!,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade800,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              // Thông tin lớp & khóa
-              if (r.className != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(
-                    children: [
-                      Icon(Icons.class_, size: 16, color: RetroColors.textSecondary),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          'Lớp: ${r.className}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: RetroColors.textPrimary,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                Row(
+                  children: [
+                    Icon(Icons.receipt_long_rounded, size: 16, color: Colors.grey.shade600),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Đơn #${r.registrationId}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
                       ),
-                    ],
-                  ),
-                ),
-              if (r.courseName != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(
-                    children: [
-                      Icon(Icons.menu_book, size: 16, color: RetroColors.textSecondary),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          'Khóa: ${r.courseName}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: RetroColors.textPrimary,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              // Mã đơn
-              Row(
-                children: [
-                  Icon(Icons.receipt_long, size: 16, color: RetroColors.textSecondary),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Đơn #${r.registrationId}',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: RetroColors.textSecondary,
-                      fontWeight: FontWeight.w500,
                     ),
-                  ),
-                  const Spacer(),
-                  Icon(Icons.chevron_right, size: 20, color: RetroColors.primary.withOpacity(0.5)),
-                ],
-              ),
-            ],
+                    const Spacer(),
+                    Icon(Icons.arrow_forward_ios_rounded, size: 16, color: const Color(0xFF8B4513).withOpacity(0.5)),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

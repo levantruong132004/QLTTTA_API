@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:qlttta_app_mobile/models/student_profile_details.dart';
 import 'package:qlttta_app_mobile/services/api_service.dart';
 
 class ProfileService {
@@ -27,5 +28,24 @@ class ProfileService {
       }
     } catch (_) {}
     return null;
+  }
+
+  Future<StudentProfileDetails?> getMyProfile() async {
+    try {
+      final res = await _api.get('profile');
+      if (res.statusCode != 200) return null;
+      final data = jsonDecode(res.body);
+      if (data is Map<String, dynamic>) {
+        return StudentProfileDetails.fromJson(data);
+      }
+      if (data is Map) {
+        return StudentProfileDetails.fromJson(Map<String, dynamic>.from(data));
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  void invalidateCache() {
+    _cachedStudentId = null;
   }
 }

@@ -1,171 +1,92 @@
 # 🎓 Hệ thống Quản lý Trung tâm Tiếng Anh LDA
 
-## 📋 Tổng quan
+> LDA (Language Development Academy) là bộ giải pháp quản trị trung tâm tiếng Anh gồm API, website quản trị và ứng dụng di động. Hệ thống được xây dựng nội bộ nhưng đang mở rộng thêm tính năng tự phục vụ cho học viên.
 
-Hệ thống quản lý toàn diện cho trung tâm tiếng Anh LDA với đầy đủ các chức năng:
+## 🧭 Thành phần chính
 
-- Quản lý học viên
-- Quản lý khóa học
-- Quản lý lớp học
-- Quản lý giáo viên
-- Quản lý đăng ký học
-- Quản lý thanh toán
-- Báo cáo và thống kê
+| Module | Công nghệ | Chức năng chính |
+| --- | --- | --- |
+| `QLTTTA_API` | ASP.NET Core 8 · Oracle | REST API, xác thực session, xử lý đăng ký & hóa đơn, chữ ký số. |
+| `QLTTTA_WEB` | ASP.NET Core MVC · Bootstrap 5 | Website quản trị chủ đề retro (dashboard, học viên, hóa đơn, chính sách bảo mật). |
+| `qlttta_app_mobile` | Flutter 3 | Ứng dụng mobile đa vai trò: dashboard, đăng ký, QR đăng nhập web, Hồ sơ của tôi. |
 
-## 🚀 Cách khởi chạy
+## 🚀 Khởi chạy nhanh
 
-### Phương pháp 1: Sử dụng Script tự động
+### 1. Script tự động
+```powershell
+./start-lda-system.bat
+```
+Script mở hai tiến trình `dotnet run` (API + Web) và tự kích hoạt trình duyệt đăng nhập.
 
-1. Chạy file `start-lda-system.bat`
-2. Hệ thống sẽ tự động khởi động API và Web
-3. Trình duyệt sẽ mở trang đăng nhập
+### 2. Chạy thủ công
+```powershell
+# Terminal 1 - API
+cd QLTTTA_API/QLTTTA_API
+dotnet run
 
-### Phương pháp 2: Chạy thủ công
+# Terminal 2 - Web
+cd QLTTTA_API/QLTTTA_WEB
+dotnet run
+```
+- API: `http://localhost:5069`
+- Web: `http://localhost:5165`
+- Mobile: truyền `--dart-define API_BASE_URL=<url>` cho `flutter run` (mặc định `http://10.0.2.2:7158/api` trên emulator).
 
-1. **Khởi động API:**
+## 🔑 Tài khoản mẫu
 
-   ```bash
-   cd "d:\Doan_KLTN\QLTTTA_API\QLTTTA_API"
-   dotnet run
-   ```
+| Username | Password | Vai trò |
+| --- | --- | --- |
+| `admin` | `123456` | Quản trị viên |
+| `hocvu01` | `123456` | Nhân viên học vụ |
+| `ketoan01` | `123456` | Kế toán |
 
-2. **Khởi động Web (terminal mới):**
+> Sau khi đăng nhập, API trả về `X-Session-Id`. Mobile app lưu giá trị này trong `SharedPreferences` và gắn vào mọi request.
 
-   ```bash
-   cd "d:\Doan_KLTN\QLTTTA_API\QLTTTA_WEB"
-   dotnet run
-   ```
+## 🗄️ Thiết lập cơ sở dữ liệu
 
-3. **Truy cập:**
-   - Web: http://localhost:5165
-   - API: http://localhost:5069
+1. Khởi động Oracle Database (giống môi trường triển khai thực tế).
+2. Cập nhật `appsettings.Development.json` (API & Web) với connection string phù hợp.
+3. Chạy `DB/database.sql` để dựng schema, sau đó áp dụng các script vá (`deploy_permissions_views_procs.sql`, `run_fix.ps1`, ...).
+4. Nạp dữ liệu mẫu bằng `sample_data.sql` nhằm có sẵn tài khoản, khóa học, hóa đơn demo.
 
-## 🔑 Tài khoản mặc định
+## ✨ Chức năng đã hoàn thiện
 
-| Username | Password | Vai trò          |
-| -------- | -------- | ---------------- |
-| admin    | 123456   | Quản trị viên    |
-| hocvu01  | 123456   | Nhân viên học vụ |
-| ketoan01 | 123456   | Kế toán          |
+- Dashboard đa vai trò với số liệu khóa học, lớp, đăng ký, hóa đơn.
+- Quản lý học viên: tìm kiếm, phân trang, xem hồ sơ chi tiết đồng bộ API/Web/Mobile.
+- Đăng ký khóa/lớp đang mở, sinh hóa đơn điện tử và trạng thái thanh toán.
+- QR đăng nhập web: web sinh thử thách, mobile quét và phê duyệt.
+- Trang “Chính sách bảo mật” mới (cập nhật 17/11/2025) theo yêu cầu công bố dữ liệu.
+- Mobile app bổ sung “Hồ sơ của tôi”, xem đăng ký và hóa đơn đang chờ.
 
-## 🗄️ Cài đặt Database
-
-1. **Kết nối Oracle Database** với thông tin trong `appsettings.json`
-2. **Chạy script tạo database:**
-   ```sql
-   -- Chạy file sample_data.sql để tạo bảng và dữ liệu mẫu
-   ```
-
-## 📱 Các chức năng chính
-
-### 🧑‍🎓 Quản lý Học viên
-
-- ✅ Xem danh sách học viên (có phân trang)
-- ✅ Tìm kiếm học viên
-- ✅ Thêm học viên mới
-- ✅ Chỉnh sửa thông tin học viên
-- ✅ Xóa học viên (có kiểm tra ràng buộc)
-- ✅ Xem chi tiết học viên
-
-### 📚 Quản lý Khóa học
-
-- 🔄 Đang phát triển...
-
-### 🏫 Quản lý Lớp học
-
-- 🔄 Đang phát triển...
-
-### 👨‍🏫 Quản lý Giáo viên
-
-- 🔄 Đang phát triển...
-
-### 📝 Quản lý Đăng ký
-
-- 🔄 Đang phát triển...
-
-### 💰 Quản lý Thanh toán
-
-- 🔄 Đang phát triển...
-
-## 🎨 Đặc điểm Giao diện
-
-- **Thiết kế hiện đại:** Gradient background, rounded corners
-- **Responsive:** Tương thích mobile, tablet, desktop
-- **Thân thiện:** Icons rõ ràng, màu sắc hài hòa
-- **Hiệu ứng:** Hover effects, smooth transitions
-- **Validation:** Form validation với thông báo lỗi chi tiết
-
-## 🔧 Cấu trúc Technical
-
-### Backend (API)
-
-- **Framework:** ASP.NET Core 8.0
-- **Database:** Oracle Database
-- **Architecture:** Layered (Controller → Service → Repository)
-- **Authentication:** Session-based
-- **API Style:** RESTful
-
-### Frontend (Web)
-
-- **Framework:** ASP.NET Core MVC
-- **UI Framework:** Bootstrap 5
-- **Icons:** Font Awesome 6
-- **CSS:** Custom CSS với Flexbox/Grid
-- **JavaScript:** Vanilla JS + Bootstrap JS
-
-## 📁 Cấu trúc Project
+## 📁 Sơ đồ thư mục
 
 ```
 QLTTTA_API/
-├── QLTTTA_API/          # Backend API
-│   ├── Controllers/     # API Controllers
-│   ├── Services/        # Business Logic
-│   ├── Models/          # Data Models & DTOs
-│   └── Program.cs       # API Configuration
-├── QLTTTA_WEB/          # Frontend Web
-│   ├── Controllers/     # MVC Controllers
-│   ├── Views/           # Razor Views
-│   ├── Models/          # ViewModels
-│   └── wwwroot/         # Static Files
-└── sample_data.sql      # Database Script
+├── QLTTTA_API/          # ASP.NET Core API
+├── QLTTTA_WEB/          # ASP.NET Core MVC web
+├── qlttta_app_mobile/   # Flutter app
+├── DB/                  # Script dựng & vá Oracle schema
+├── ops/cloudflare/      # Công cụ public demo qua Cloudflare Tunnel
+├── sample_data.sql
+└── start-lda-system.bat
 ```
 
-## 🐛 Troubleshooting
+## 🛠️ Troubleshooting nhanh
 
-### Lỗi thường gặp:
+1. **API không kết nối DB:** kiểm tra Oracle listener, user/password, `TNS_ADMIN`; chạy lại script cấp quyền trong `DB/`.
+2. **Web 404/500:** đảm bảo `dotnet restore` thành công; xem log trong terminal để biết action lỗi.
+3. **Mobile bị 401:** xóa cache app hoặc đăng nhập lại để cập nhật `sessionId`; kiểm tra lại `API_BASE_URL`.
+4. **Không thể truy cập từ ngoài mạng:** chạy `ops/cloudflare/run-quick-tunnel.ps1` để mở đường hầm tạm thời.
 
-1. **API không kết nối được Database:**
+## 🗺️ Roadmap
 
-   - Kiểm tra connection string trong `appsettings.json`
-   - Đảm bảo Oracle Database đang chạy
-   - Kiểm tra user/password và service name
+- [ ] Báo cáo doanh thu nâng cao (lọc theo thời gian, xuất Excel).
+- [ ] Đồng bộ lịch giảng cho giáo viên trên mobile.
+- [ ] Kết nối cổng thanh toán nội địa & QR Banking.
+- [ ] Đa ngôn ngữ cho web & app.
 
-2. **Web không gọi được API:**
+## 📮 Liên hệ
 
-   - Kiểm tra API đang chạy trên port 5069
-   - Kiểm tra CORS settings
-   - Kiểm tra firewall/antivirus
-
-3. **Lỗi build:**
-
-   - Chạy `dotnet clean` rồi `dotnet build`
-   - Kiểm tra .NET 8.0 SDK đã cài đặt
-
-4. **Lỗi login:**
-   - Đảm bảo đã chạy script tạo dữ liệu mẫu
-   - Kiểm tra bảng ACCOUNTS có dữ liệu
-
-## 🚧 Roadmap
-
-- [ ] Hoàn thiện tất cả modules quản lý
-- [ ] Thêm Dashboard với charts/statistics
-- [ ] Export/Import Excel
-- [ ] Email notifications
-- [ ] Mobile app
-- [ ] Multi-language support
-
-## 👥 Liên hệ
-
-- **Developer:** [Tên của bạn]
-- **Email:** [Email của bạn]
-- **GitHub:** [GitHub repository]
+- **Team:** LDA Dev Squad
+- **Email:** dev@lda.edu.vn
+- **Website demo:** cung cấp qua Cloudflare Tunnel khi cần (xem `ops/cloudflare`).
