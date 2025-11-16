@@ -1,0 +1,1765 @@
+/* ==========================================
+   RETRO VINTAGE THEME - Inspired by Classic Era
+   Created: 2025
+   ========================================== */
+
+/* ==========================================
+   ROOT VARIABLES - Vintage Color Palette
+   ========================================== */
+:root {
+    /* Primary vintage browns and earth tones */
+    --vintage-brown: #7d5a3b;
+    --vintage-dark-brown: #4a3526;
+    --vintage-light-brown: #a67c52;
+    --vintage-cream: #f4ead5;
+    --vintage-beige: #e8dcc4;
+    --vintage-tan: #d4c4a8;
+    
+    /* Accent colors */
+    --vintage-gold: #b8860b;
+    --vintage-rust: #a85832;
+    --vintage-olive: #6b8e23;
+    --vintage-burgundy: #7c2d37;
+    
+    /* Neutral tones */
+    --vintage-white: #faf8f3;
+    --vintage-off-white: #f5f1e8;
+    --vintage-gray: #8b7d6b;
+    --vintage-dark-gray: #5a4a3a;
+    
+    /* Shadow and effects */
+    --shadow-vintage: 0 4px 6px rgba(74, 53, 38, 0.15);
+    --shadow-deep: 0 8px 16px rgba(74, 53, 38, 0.25);
+    --text-shadow-vintage: 2px 2px 4px rgba(74, 53, 38, 0.3);
+}
+
+/* ==========================================
+   GLOBAL STYLES & TYPOGRAPHY (Enhanced)
+   ========================================== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Set Merriweather for all input text content - elegant Vietnamese support */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
+input[type="url"],
+input[type="search"],
+input[type="number"],
+input[type="date"],
+textarea,
+select,
+.form-control,
+.form-select {
+    font-family: 'Merriweather', Georgia, serif !important;
+}
+
+body {
+    font-family: 'Merriweather', Georgia, serif;
+    background-color: var(--vintage-cream);
+    background-image: 
+        /* Subtle paper texture */
+        linear-gradient(90deg, transparent 79px, var(--vintage-beige) 79px, var(--vintage-beige) 81px, transparent 81px),
+        linear-gradient(transparent 79px, var(--vintage-beige) 79px, var(--vintage-beige) 81px, transparent 81px),
+        /* Diagonal pattern */
+        linear-gradient(45deg, var(--vintage-tan) 25%, transparent 25%),
+        linear-gradient(-45deg, var(--vintage-tan) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, var(--vintage-tan) 75%),
+        linear-gradient(-45deg, transparent 75%, var(--vintage-tan) 75%);
+    background-size: 
+        100% 100%,
+        100% 100%,
+        50px 50px,
+        50px 50px,
+        50px 50px,
+        50px 50px;
+    background-position: 
+        0 0,
+        0 0,
+        0 0,
+        0 25px,
+        25px -25px,
+        -25px 0;
+    color: var(--vintage-dark-brown);
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+/* Retro Typography - Elegant Noto Serif for headings */
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Noto Serif', 'Merriweather', serif !important;
+    font-weight: 700;
+    color: var(--vintage-brown);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 1rem;
+    text-shadow: 2px 2px 4px rgba(125, 90, 59, 0.3);
+}
+
+h1 {
+    font-size: 2.5rem;
+    border-bottom: 4px solid var(--vintage-brown);
+    padding-bottom: 0.5rem;
+    display: inline-block;
+}
+
+h2 {
+    font-size: 2rem;
+    color: var(--vintage-rust);
+}
+
+h3 {
+    font-size: 1.5rem;
+}
+
+p {
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    font-family: 'Merriweather', Georgia, serif;
+    line-height: 1.8;
+}
+
+a {
+    color: var(--vintage-brown);
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+a:hover {
+    color: var(--vintage-rust);
+    text-decoration: underline;
+}
+
+/* ==========================================
+   LAYOUT CONTAINER (Enhanced with vintage paper effect)
+   ========================================== */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2.5rem;
+    background: var(--vintage-white);
+    background-image: 
+        /* Paper grain texture */
+        repeating-linear-gradient(
+            90deg,
+            transparent,
+            transparent 2px,
+            rgba(125, 90, 59, 0.03) 2px,
+            rgba(125, 90, 59, 0.03) 3px
+        );
+    box-shadow: 
+        0 0 0 3px var(--vintage-brown),
+        0 0 0 6px var(--vintage-tan),
+        var(--shadow-deep),
+        inset 0 0 50px rgba(125, 90, 59, 0.05);
+    border: none;
+    border-radius: 0;
+    position: relative;
+}
+
+.container::before {
+    content: '';
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    border: 2px solid var(--vintage-tan);
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+.container::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+        repeating-linear-gradient(
+            0deg,
+            transparent,
+            transparent 29px,
+            rgba(125, 90, 59, 0.04) 29px,
+            rgba(125, 90, 59, 0.04) 30px
+        );
+    pointer-events: none;
+}
+
+/* ==========================================
+   HEADER & NAVIGATION - Retro Style (Enhanced)
+   ========================================== */
+.retro-header {
+    background: linear-gradient(180deg, var(--vintage-dark-brown) 0%, var(--vintage-brown) 100%);
+    padding: 1.5rem 2rem;
+    border-bottom: 5px solid var(--vintage-gold);
+    box-shadow: var(--shadow-vintage);
+    position: relative;
+}
+
+.retro-header::after {
+    content: '';
+    position: absolute;
+    bottom: -5px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: repeating-linear-gradient(
+        90deg,
+        var(--vintage-gold) 0px,
+        var(--vintage-gold) 10px,
+        var(--vintage-brown) 10px,
+        var(--vintage-brown) 20px
+    );
+}
+
+.retro-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.retro-brand {
+    font-family: 'Noto Serif', 'Merriweather', serif !important;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--vintage-cream);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-shadow: var(--text-shadow-vintage);
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border: 3px solid var(--vintage-gold);
+    background: rgba(184, 134, 11, 0.15);
+    transition: all 0.3s ease;
+}
+
+.retro-brand:hover {
+    background: rgba(184, 134, 11, 0.3);
+    color: var(--vintage-gold);
+    text-decoration: none;
+    transform: translateY(-2px);
+}
+
+.retro-nav-links {
+    display: flex;
+    list-style: none;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+}
+
+.retro-nav-item {
+    position: relative;
+}
+
+.retro-nav-link {
+    display: block;
+    padding: 0.75rem 1.25rem;
+    color: var(--vintage-cream);
+    font-family: 'Merriweather', Georgia, serif !important;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: var(--vintage-brown);
+    border: 2px solid var(--vintage-tan);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.retro-nav-link::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: var(--vintage-gold);
+    transition: left 0.3s ease;
+    z-index: -1;
+}
+
+.retro-nav-link:hover {
+    color: var(--vintage-dark-brown);
+    border-color: var(--vintage-gold);
+    text-decoration: none;
+    transform: translateY(-2px);
+}
+
+.retro-nav-link:hover::before {
+    left: 0;
+}
+
+.retro-nav-link.active {
+    background: var(--vintage-rust);
+    border-color: var(--vintage-cream);
+    color: var(--vintage-white);
+}
+
+/* Dropdown menu styling */
+.dropdown-menu {
+    background: var(--vintage-white);
+    border: 3px solid var(--vintage-brown);
+    box-shadow: var(--shadow-deep);
+    border-radius: 0;
+    padding: 0.5rem 0;
+    margin-top: 0.5rem;
+}
+
+.dropdown-item {
+    font-family: 'Merriweather', Georgia, serif !important;
+    color: var(--vintage-dark-brown);
+    padding: 0.6rem 1.25rem;
+    transition: all 0.2s ease;
+    border-left: 3px solid transparent;
+}
+
+.dropdown-item:hover {
+    background: var(--vintage-beige);
+    border-left-color: var(--vintage-rust);
+    color: var(--vintage-brown);
+}
+
+.dropdown-item:active {
+    background: var(--vintage-brown);
+    color: var(--vintage-cream);
+}
+
+.dropdown-divider {
+    border-top: 2px dashed var(--vintage-tan);
+    margin: 0.5rem 0;
+}
+
+/* ==========================================
+   BUTTONS - Premium Vintage Style (Like "CHỌN LỚP")
+   ========================================== */
+
+/* Base retro button - premium styling matching "CHỌN LỚP" */
+.btn,
+.btn-retro,
+.btn-primary,
+.btn-success,
+.btn-danger,
+.btn-warning,
+.btn-info,
+.btn-secondary,
+.btn-outline-primary,
+.btn-outline-success,
+.btn-outline-danger,
+.btn-outline-warning,
+.btn-outline-info,
+.btn-outline-secondary,
+.btn-outline-light,
+.btn-dark,
+button[type="submit"],
+button[type="button"],
+a.btn,
+input[type="submit"],
+input[type="button"] {
+    display: inline-block;
+    padding: 0.75rem 1.75rem;
+    font-family: 'Noto Serif', 'Merriweather', serif !important;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--vintage-cream);
+    background: linear-gradient(145deg, #8b6f47 0%, #6b5437 100%);
+    border: none;
+    border-radius: 0;
+    box-shadow: 
+        0 4px 0 #4a3526,
+        0 6px 12px rgba(74, 53, 38, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    position: relative;
+    text-align: center;
+    line-height: 1.4;
+    overflow: hidden;
+}
+
+.btn::before,
+.btn-retro::before,
+button[type="submit"]::before,
+button[type="button"]::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+    transition: left 0.5s ease;
+}
+
+.btn:hover,
+.btn-retro:hover,
+button[type="submit"]:hover,
+button[type="button"]:hover,
+a.btn:hover {
+    background: linear-gradient(145deg, #9b7f57 0%, #7b6447 100%);
+    transform: translateY(-2px);
+    box-shadow: 
+        0 6px 0 #4a3526,
+        0 8px 16px rgba(74, 53, 38, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    text-decoration: none;
+}
+
+.btn:hover::before,
+button[type="submit"]:hover::before {
+    left: 100%;
+}
+
+.btn:active,
+.btn-retro:active,
+button[type="submit"]:active,
+button[type="button"]:active {
+    transform: translateY(2px);
+    box-shadow: 
+        0 2px 0 #4a3526,
+        0 3px 6px rgba(74, 53, 38, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Icon spacing in buttons */
+.btn i,
+.btn-retro i,
+button i {
+    margin-right: 0.5rem;
+    font-size: 1.1em;
+}
+
+.btn i:only-child,
+.btn-retro i:only-child {
+    margin-right: 0;
+}
+
+
+/* Primary variant (elegant brown with gradient) */
+.btn-primary,
+.btn-retro-primary {
+    background: linear-gradient(145deg, #8b6f47 0%, #6b5437 100%);
+    box-shadow: 
+        0 4px 0 #4a3526,
+        0 6px 12px rgba(74, 53, 38, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    color: var(--vintage-cream);
+}
+
+.btn-primary:hover,
+.btn-retro-primary:hover {
+    background: linear-gradient(145deg, #9b7f57 0%, #7b6447 100%);
+    color: var(--vintage-white);
+}
+
+/* Success variant (rich olive green) */
+.btn-success,
+.btn-retro-success {
+    background: linear-gradient(145deg, #7a9e2d 0%, #5a7e1d 100%);
+    box-shadow: 
+        0 4px 0 #3a4e0d,
+        0 6px 12px rgba(106, 142, 35, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    color: var(--vintage-cream);
+}
+
+.btn-success:hover,
+.btn-retro-success:hover {
+    background: linear-gradient(145deg, #8aae3d 0%, #6a8e2d 100%);
+    color: var(--vintage-white);
+}
+
+/* Danger variant (subtle brown to match primary) */
+.btn-danger,
+.btn-retro-danger {
+    background: linear-gradient(145deg, #8b6f47 0%, #6b5437 100%);
+    box-shadow: 
+        0 4px 0 #4a3526,
+        0 6px 12px rgba(74, 53, 38, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    color: var(--vintage-cream);
+}
+
+.btn-danger:hover,
+.btn-retro-danger:hover {
+    background: linear-gradient(145deg, #9b7f57 0%, #7b6447 100%);
+    color: var(--vintage-white);
+}
+
+/* Warning variant (luxurious gold) */
+.btn-warning,
+.btn-retro-warning {
+    background: linear-gradient(145deg, #c89615 0%, #a87610 100%);
+    box-shadow: 
+        0 4px 0 #765208,
+        0 6px 12px rgba(184, 134, 11, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    color: var(--vintage-dark-brown);
+}
+
+.btn-warning:hover,
+.btn-retro-warning:hover {
+    background: linear-gradient(145deg, #d8a625 0%, #b88620 100%);
+    color: var(--vintage-dark-brown);
+}
+
+/* Info variant (sophisticated teal) */
+.btn-info,
+.btn-retro-info {
+    background: linear-gradient(145deg, #6a8a9b 0%, #4a6a7b 100%);
+    box-shadow: 
+        0 4px 0 #2a4050,
+        0 6px 12px rgba(90, 122, 139, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    color: var(--vintage-cream);
+}
+
+.btn-info:hover,
+.btn-retro-info:hover {
+    background: linear-gradient(145deg, #7a9aab 0%, #5a7a8b 100%);
+    color: var(--vintage-white);
+}
+
+/* Secondary variant (elegant gray) */
+.btn-secondary,
+.btn-retro-secondary {
+    background: linear-gradient(145deg, #9b8d7b 0%, #7b6d5b 100%);
+    box-shadow: 
+        0 4px 0 #4a3a2a,
+        0 6px 12px rgba(139, 125, 107, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    color: var(--vintage-cream);
+}
+
+.btn-secondary:hover,
+.btn-retro-secondary:hover {
+    background: linear-gradient(145deg, #ab9d8b 0%, #8b7d6b 100%);
+    color: var(--vintage-white);
+}
+
+/* Outline variants - elegant borders */
+.btn-outline-primary {
+    background: transparent;
+    color: var(--vintage-brown);
+    border: 3px solid var(--vintage-brown);
+    box-shadow: 
+        0 4px 0 var(--vintage-brown),
+        0 6px 12px rgba(125, 90, 59, 0.2);
+}
+
+.btn-outline-primary:hover {
+    background: linear-gradient(145deg, #8b6f47 0%, #6b5437 100%);
+    color: var(--vintage-cream);
+}
+
+.btn-outline-success {
+    background: transparent;
+    color: var(--vintage-olive);
+    border: 3px solid var(--vintage-olive);
+    box-shadow: 
+        0 4px 0 var(--vintage-olive),
+        0 6px 12px rgba(106, 142, 35, 0.2);
+}
+
+.btn-outline-success:hover {
+    background: linear-gradient(145deg, #7a9e2d 0%, #5a7e1d 100%);
+    color: var(--vintage-cream);
+}
+
+.btn-outline-danger {
+    background: transparent;
+    color: var(--vintage-burgundy);
+    border: 3px solid var(--vintage-burgundy);
+    box-shadow: 
+        0 4px 0 var(--vintage-burgundy),
+        0 6px 12px rgba(124, 45, 55, 0.2);
+}
+
+.btn-outline-danger:hover {
+    background: linear-gradient(145deg, #8c3d47 0%, #6c2d37 100%);
+    color: var(--vintage-cream);
+}
+
+.btn-outline-warning {
+    background: transparent;
+    color: var(--vintage-gold);
+    border: 3px solid var(--vintage-gold);
+    box-shadow: 
+        0 4px 0 var(--vintage-gold),
+        0 6px 12px rgba(184, 134, 11, 0.2);
+}
+
+.btn-outline-warning:hover {
+    background: linear-gradient(145deg, #c89615 0%, #a87610 100%);
+    color: var(--vintage-dark-brown);
+}
+
+.btn-outline-secondary {
+    background: transparent;
+    color: var(--vintage-gray);
+    border: 3px solid var(--vintage-gray);
+    box-shadow: 
+        0 4px 0 var(--vintage-gray),
+        0 6px 12px rgba(139, 125, 107, 0.2);
+}
+
+.btn-outline-secondary:hover {
+    background: linear-gradient(145deg, #9b8d7b 0%, #7b6d5b 100%);
+    color: var(--vintage-cream);
+}
+
+/* Size variants with proportional scaling */
+.btn-sm,
+.btn-retro-sm {
+    padding: 0.5rem 1.25rem !important;
+    font-size: 0.8rem !important;
+    letter-spacing: 1px !important;
+}
+
+/* Small button shadow adjustments for each variant */
+.btn-sm.btn-primary,
+a.btn-sm.btn-primary,
+button.btn-sm.btn-primary {
+    box-shadow: 
+        0 3px 0 #4a3526,
+        0 4px 8px rgba(74, 53, 38, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+.btn-sm.btn-primary:hover,
+a.btn-sm.btn-primary:hover,
+button.btn-sm.btn-primary:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 
+        0 4px 0 #4a3526,
+        0 5px 10px rgba(74, 53, 38, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+}
+
+.btn-sm.btn-success,
+a.btn-sm.btn-success,
+button.btn-sm.btn-success {
+    box-shadow: 
+        0 3px 0 #3a4f15,
+        0 4px 8px rgba(106, 142, 35, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+.btn-sm.btn-success:hover,
+a.btn-sm.btn-success:hover,
+button.btn-sm.btn-success:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 
+        0 4px 0 #3a4f15,
+        0 5px 10px rgba(106, 142, 35, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+}
+
+.btn-sm.btn-danger,
+a.btn-sm.btn-danger,
+button.btn-sm.btn-danger {
+    box-shadow: 
+        0 3px 0 #4a3526,
+        0 4px 8px rgba(74, 53, 38, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+.btn-sm.btn-danger:hover,
+a.btn-sm.btn-danger:hover,
+button.btn-sm.btn-danger:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 
+        0 4px 0 #4a3526,
+        0 5px 10px rgba(74, 53, 38, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+}
+
+.btn-sm.btn-warning,
+a.btn-sm.btn-warning,
+button.btn-sm.btn-warning {
+    box-shadow: 
+        0 3px 0 #8b6914,
+        0 4px 8px rgba(184, 134, 11, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+.btn-sm.btn-warning:hover,
+a.btn-sm.btn-warning:hover,
+button.btn-sm.btn-warning:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 
+        0 4px 0 #8b6914,
+        0 5px 10px rgba(184, 134, 11, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+}
+
+.btn-sm.btn-info,
+a.btn-sm.btn-info,
+button.btn-sm.btn-info {
+    box-shadow: 
+        0 3px 0 #2a4050,
+        0 4px 8px rgba(90, 122, 139, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+.btn-sm.btn-info:hover,
+a.btn-sm.btn-info:hover,
+button.btn-sm.btn-info:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 
+        0 4px 0 #2a4050,
+        0 5px 10px rgba(90, 122, 139, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+}
+
+.btn-sm.btn-secondary,
+a.btn-sm.btn-secondary,
+button.btn-sm.btn-secondary {
+    box-shadow: 
+        0 3px 0 #4a3a2a,
+        0 4px 8px rgba(139, 125, 107, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+.btn-sm.btn-secondary:hover,
+a.btn-sm.btn-secondary:hover,
+button.btn-sm.btn-secondary:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 
+        0 4px 0 #4a3a2a,
+        0 5px 10px rgba(139, 125, 107, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+}
+
+.btn-sm:active,
+.btn-retro-sm:active {
+    transform: translateY(1px) !important;
+}
+
+.btn-lg,
+.btn-retro-lg {
+    padding: 1rem 2.5rem;
+    font-size: 1.05rem;
+    letter-spacing: 2px;
+    box-shadow: 
+        0 6px 0 #4a3526,
+        0 8px 16px rgba(74, 53, 38, 0.5),
+        inset 0 2px 0 rgba(255, 255, 255, 0.2);
+}
+
+.btn-lg:hover,
+.btn-retro-lg:hover {
+    transform: translateY(-3px);
+    box-shadow: 
+        0 9px 0 #4a3526,
+        0 11px 20px rgba(74, 53, 38, 0.6),
+        inset 0 2px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* Block button */
+.btn-block {
+    display: block;
+    width: 100%;
+}
+
+/* Button group */
+.btn-group {
+    display: inline-flex;
+    gap: 0.75rem;
+}
+
+/* Disabled state with refined styling */
+.btn:disabled,
+.btn-retro:disabled,
+button[type="submit"]:disabled,
+button[type="button"]:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none !important;
+    background: linear-gradient(145deg, #9b8d7b 0%, #7b6d5b 100%) !important;
+    box-shadow: 
+        0 3px 0 #5a4a3a,
+        0 4px 8px rgba(139, 125, 107, 0.3),
+        inset 0 1px 0 rgba(0, 0, 0, 0.1) !important;
+    color: var(--vintage-tan) !important;
+}
+
+/* Force all button-like elements to inherit retro style */
+button,
+[role="button"],
+.button {
+    font-family: 'Noto Serif', 'Merriweather', serif !important;
+}
+
+/* Ensure text inputs in tables and forms get proper styling */
+.retro-table input[type="text"],
+.retro-table input[type="number"],
+.retro-table input[type="date"],
+.retro-card input[type="text"],
+.retro-card input[type="number"],
+.retro-card input[type="date"] {
+    padding: 0.5rem;
+    border: 2px solid var(--vintage-brown);
+    background: var(--vintage-white);
+    font-family: 'Merriweather', Georgia, serif !important;
+}
+
+/* ==========================================
+   FORMS - Classic Paper Style (Enhanced)
+   ========================================== */
+.retro-form {
+    background: var(--vintage-off-white);
+    padding: 2rem;
+    border: 3px double var(--vintage-brown);
+    box-shadow: var(--shadow-vintage);
+    position: relative;
+}
+
+.retro-form::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 29px,
+        var(--vintage-tan) 29px,
+        var(--vintage-tan) 30px
+    );
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+.form-group,
+.form-group-retro {
+    margin-bottom: 1.5rem;
+    position: relative;
+}
+
+.form-label,
+.form-label-retro,
+label {
+    display: block;
+    font-family: 'Noto Serif', 'Merriweather', serif !important;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--vintage-dark-brown);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.5rem;
+}
+
+.form-control,
+.form-control-retro,
+.form-select,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
+input[type="url"],
+input[type="search"],
+input[type="number"],
+input[type="date"],
+textarea,
+select {
+    width: 100%;
+    padding: 0.65rem 1rem;
+    font-family: 'Times New Roman', Times, serif !important;
+    font-size: 1rem;
+    color: var(--vintage-dark-brown);
+    background: var(--vintage-white);
+    border: 2px solid var(--vintage-brown);
+    outline: none;
+    transition: all 0.3s ease;
+    box-shadow: inset 2px 2px 4px rgba(74, 53, 38, 0.1);
+}
+
+.form-control:focus,
+.form-control-retro:focus,
+.form-select:focus,
+input:focus,
+textarea:focus,
+select:focus {
+    border-color: var(--vintage-rust);
+    box-shadow: inset 2px 2px 4px rgba(168, 88, 50, 0.2), 0 0 0 3px rgba(168, 88, 50, 0.15);
+}
+
+.form-control::placeholder,
+.form-control-retro::placeholder,
+input::placeholder,
+textarea::placeholder {
+    color: var(--vintage-gray);
+    font-style: italic;
+}
+
+textarea.form-control,
+textarea.form-control-retro {
+    resize: vertical;
+    min-height: 120px;
+    font-family: 'Times New Roman', Times, serif !important;
+}
+
+select.form-control,
+select.form-control-retro,
+.form-select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%237d5a3b' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    padding-right: 2.5rem;
+    appearance: none;
+}
+
+.form-check,
+.form-check-retro {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.form-check input[type="checkbox"],
+.form-check input[type="radio"],
+.form-check-retro input[type="checkbox"],
+.form-check-retro input[type="radio"] {
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 2px solid var(--vintage-brown);
+    appearance: none;
+    cursor: pointer;
+    position: relative;
+}
+
+.form-check input[type="checkbox"]:checked::after,
+.form-check-retro input[type="checkbox"]:checked::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--vintage-brown);
+    font-size: 1rem;
+    font-weight: bold;
+}
+
+.form-check input[type="radio"],
+.form-check-retro input[type="radio"] {
+    border-radius: 50%;
+}
+
+.form-check input[type="radio"]:checked::after,
+.form-check-retro input[type="radio"]:checked::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px;
+    height: 8px;
+    background: var(--vintage-brown);
+    border-radius: 50%;
+}
+
+/* ==========================================
+   TABLES - Vintage Ledger Style
+   ========================================== */
+.retro-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: var(--vintage-white);
+    border: 3px solid var(--vintage-brown);
+    box-shadow: var(--shadow-vintage);
+    overflow: hidden;
+}
+
+.retro-table thead {
+    background: linear-gradient(180deg, var(--vintage-brown) 0%, var(--vintage-dark-brown) 100%);
+    color: var(--vintage-cream);
+}
+
+.retro-table thead th {
+    padding: 1rem;
+    font-family: 'Noto Serif', 'Merriweather', serif !important;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0px !important;
+    text-align: left;
+    border-right: 1px solid var(--vintage-tan);
+    border-bottom: 3px solid var(--vintage-gold);
+}
+
+.retro-table thead th:last-child {
+    border-right: none;
+}
+
+.retro-table tbody tr {
+    background: var(--vintage-off-white);
+    transition: background 0.2s ease;
+}
+
+.retro-table tbody tr:nth-child(even) {
+    background: var(--vintage-cream);
+}
+
+.retro-table tbody tr:hover {
+    background: var(--vintage-beige);
+}
+
+.retro-table tbody td {
+    padding: 0.875rem 1rem;
+    border-right: 1px solid var(--vintage-tan);
+    border-bottom: 1px solid var(--vintage-tan);
+    font-family: 'Merriweather', Georgia, serif !important;
+    letter-spacing: 0px !important;
+}
+
+.retro-table tbody td:last-child {
+    border-right: none;
+}
+
+.retro-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Table actions */
+.table-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* ==========================================
+   CARDS - Vintage Photo Frame Style (Enhanced)
+   ========================================== */
+.retro-card {
+    background: var(--vintage-white);
+    background-image: 
+        repeating-linear-gradient(
+            90deg,
+            transparent,
+            transparent 2px,
+            rgba(125, 90, 59, 0.02) 2px,
+            rgba(125, 90, 59, 0.02) 3px
+        );
+    border: 4px solid var(--vintage-brown);
+    box-shadow: 
+        var(--shadow-deep),
+        inset 0 0 20px rgba(125, 90, 59, 0.05);
+    padding: 0;
+    margin-bottom: 2rem;
+    position: relative;
+}
+
+.retro-card::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    border: 2px solid var(--vintage-tan);
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.retro-card-header {
+    background: linear-gradient(180deg, var(--vintage-brown) 0%, var(--vintage-dark-brown) 100%);
+    color: var(--vintage-cream);
+    padding: 1.25rem 1.75rem;
+    border-bottom: 3px solid var(--vintage-gold);
+    position: relative;
+}
+
+.retro-card-header::after {
+    content: '';
+    position: absolute;
+    bottom: -3px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: repeating-linear-gradient(
+        90deg,
+        var(--vintage-gold) 0px,
+        var(--vintage-gold) 5px,
+        var(--vintage-brown) 5px,
+        var(--vintage-brown) 10px
+    );
+}
+
+.retro-card-title {
+    font-family: 'Noto Serif', 'Merriweather', serif !important;
+    font-size: 1.5rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin: 0;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.retro-card-body {
+    padding: 1.75rem;
+    background: var(--vintage-off-white);
+    font-family: 'Merriweather', Georgia, serif;
+    position: relative;
+}
+
+.retro-card-footer {
+    padding: 1.25rem 1.75rem;
+    background: var(--vintage-beige);
+    border-top: 2px solid var(--vintage-tan);
+    font-size: 0.95rem;
+}
+
+/* ==========================================
+   ALERTS & MESSAGES - Vintage Notice Style
+   ========================================== */
+.retro-alert {
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+    border: 3px double var(--vintage-brown);
+    background: var(--vintage-cream);
+    font-family: 'Noto Sans', 'Segoe UI', 'Roboto', Arial, sans-serif;
+    position: relative;
+}
+
+.retro-alert::before {
+    content: '⚠';
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.5rem;
+}
+
+.retro-alert-content {
+    margin-left: 2rem;
+}
+
+.retro-alert-success {
+    background: #e8f4d8;
+    border-color: var(--vintage-olive);
+}
+
+.retro-alert-success::before {
+    content: '✓';
+    color: var(--vintage-olive);
+}
+
+.retro-alert-danger {
+    background: #f4d8d8;
+    border-color: var(--vintage-burgundy);
+}
+
+.retro-alert-danger::before {
+    content: '✗';
+    color: var(--vintage-burgundy);
+}
+
+.retro-alert-warning {
+    background: #f4ead8;
+    border-color: var(--vintage-gold);
+}
+
+.retro-alert-warning::before {
+    content: '!';
+    color: var(--vintage-gold);
+}
+
+.retro-alert-info {
+    background: #d8e8f4;
+    border-color: #5a7a8b;
+}
+
+.retro-alert-info::before {
+    content: 'ℹ';
+    color: #5a7a8b;
+}
+
+/* ==========================================
+   BADGES & LABELS - Vintage Tags
+   ========================================== */
+.retro-badge {
+    display: inline-block;
+    padding: 0.35rem 0.75rem;
+    font-family: 'Merriweather', Georgia, serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--vintage-cream);
+    background: var(--vintage-brown);
+    border: 2px solid var(--vintage-dark-brown);
+}
+
+.retro-badge-success {
+    background: var(--vintage-olive);
+    border-color: #4a5f15;
+}
+
+.retro-badge-danger {
+    background: var(--vintage-burgundy);
+    border-color: #4a1820;
+}
+
+.retro-badge-warning {
+    background: var(--vintage-gold);
+    border-color: #8b6914;
+    color: var(--vintage-dark-brown);
+}
+
+/* ==========================================
+   PAGINATION - Vintage Book Style
+   ========================================== */
+.retro-pagination {
+    display: flex;
+    list-style: none;
+    gap: 0.5rem;
+    justify-content: center;
+    margin: 2rem 0;
+    padding: 0;
+}
+
+.retro-pagination-item {
+    display: block;
+}
+
+.retro-pagination-link {
+    display: block;
+    padding: 0.5rem 1rem;
+    font-family: 'Merriweather', Georgia, serif;
+    font-weight: 700;
+    color: var(--vintage-brown);
+    background: var(--vintage-cream);
+    border: 2px solid var(--vintage-brown);
+    transition: all 0.2s ease;
+}
+
+.retro-pagination-link:hover {
+    background: var(--vintage-brown);
+    color: var(--vintage-cream);
+    text-decoration: none;
+}
+
+.retro-pagination-link.active {
+    background: var(--vintage-rust);
+    color: var(--vintage-white);
+    border-color: var(--vintage-rust);
+}
+
+/* ==========================================
+   FOOTER - Vintage Newspaper Style
+   ========================================== */
+.retro-footer {
+    background: var(--vintage-dark-brown);
+    color: var(--vintage-cream);
+    padding: 2rem;
+    border-top: 5px solid var(--vintage-gold);
+    margin-top: 3rem;
+    text-align: center;
+    font-family: 'Merriweather', Georgia, serif;
+}
+
+.retro-footer p {
+    margin: 0.5rem 0;
+}
+
+.retro-footer a {
+    color: var(--vintage-gold);
+}
+
+.retro-footer a:hover {
+    color: var(--vintage-cream);
+}
+
+/* ==========================================
+   DECORATIVE ELEMENTS (Enhanced)
+   ========================================== */
+.vintage-ornament {
+    text-align: center;
+    margin: 2rem 0;
+    position: relative;
+}
+
+.vintage-ornament::before {
+    content: '◆';
+    color: var(--vintage-brown);
+    font-size: 1.2rem;
+    margin: 0 1.5rem;
+    opacity: 0.6;
+}
+
+.vintage-ornament::after {
+    content: '◆';
+    color: var(--vintage-brown);
+    font-size: 1.2rem;
+    margin: 0 1.5rem;
+    opacity: 0.6;
+}
+
+.vintage-divider {
+    height: 3px;
+    background: repeating-linear-gradient(
+        90deg,
+        var(--vintage-brown) 0px,
+        var(--vintage-brown) 10px,
+        transparent 10px,
+        transparent 20px
+    );
+    margin: 2rem 0;
+    position: relative;
+}
+
+.vintage-divider::before,
+.vintage-divider::after {
+    content: '◆';
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--vintage-brown);
+    font-size: 1rem;
+    background: var(--vintage-cream);
+    padding: 0 0.5rem;
+}
+
+.vintage-divider::before {
+    left: 0;
+}
+
+.vintage-divider::after {
+    right: 0;
+}
+
+/* Corner decorations for boxes */
+.corner-decorated {
+    position: relative;
+}
+
+.corner-decorated::before,
+.corner-decorated::after {
+    content: '';
+    position: absolute;
+    width: 25px;
+    height: 25px;
+    border: 3px solid var(--vintage-gold);
+    z-index: 10;
+}
+
+.corner-decorated::before {
+    top: -3px;
+    left: -3px;
+    border-right: none;
+    border-bottom: none;
+}
+
+.corner-decorated::after {
+    bottom: -3px;
+    right: -3px;
+    border-left: none;
+    border-top: none;
+}
+
+/* Vintage stamp effect */
+.vintage-stamp {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border: 3px dashed var(--vintage-burgundy);
+    background: rgba(124, 45, 55, 0.1);
+    font-family: 'Merriweather', Georgia, serif;
+    font-weight: 700;
+    color: var(--vintage-burgundy);
+    text-transform: uppercase;
+    transform: rotate(-5deg);
+    letter-spacing: 1px;
+}
+
+/* Loading spinner - vintage style */
+.retro-spinner {
+    display: inline-block;
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--vintage-tan);
+    border-top-color: var(--vintage-brown);
+    border-radius: 50%;
+    animation: retro-spin 1s linear infinite;
+}
+
+@keyframes retro-spin {
+    to { transform: rotate(360deg); }
+}
+
+.retro-loading {
+    text-align: center;
+    padding: 2rem;
+    font-family: 'Merriweather', Georgia, serif;
+    color: var(--vintage-brown);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+/* ==========================================
+   UTILITY CLASSES (Enhanced)
+   ========================================== */
+.text-center {
+    text-align: center;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.text-left {
+    text-align: left;
+}
+
+.mt-1 { margin-top: 0.5rem; }
+.mt-2 { margin-top: 1rem; }
+.mt-3 { margin-top: 1.5rem; }
+.mt-4 { margin-top: 2rem; }
+.mt-5 { margin-top: 3rem; }
+
+.mb-1 { margin-bottom: 0.5rem; }
+.mb-2 { margin-bottom: 1rem; }
+.mb-3 { margin-bottom: 1.5rem; }
+.mb-4 { margin-bottom: 2rem; }
+.mb-5 { margin-bottom: 3rem; }
+
+.p-1 { padding: 0.5rem; }
+.p-2 { padding: 1rem; }
+.p-3 { padding: 1.5rem; }
+.p-4 { padding: 2rem; }
+.p-5 { padding: 3rem; }
+
+.d-flex {
+    display: flex;
+}
+
+.d-block {
+    display: block;
+}
+
+.d-inline-block {
+    display: inline-block;
+}
+
+.justify-content-between {
+    justify-content: space-between;
+}
+
+.justify-content-center {
+    justify-content: center;
+}
+
+.align-items-center {
+    align-items: center;
+}
+
+.gap-1 { gap: 0.5rem; }
+.gap-2 { gap: 1rem; }
+.gap-3 { gap: 1.5rem; }
+
+.w-100 { width: 100%; }
+.w-75 { width: 75%; }
+.w-50 { width: 50%; }
+.w-25 { width: 25%; }
+
+/* Vintage-specific utilities */
+.vintage-border {
+    border: 2px solid var(--vintage-brown);
+    padding: 1rem;
+}
+
+.vintage-shadow {
+    box-shadow: var(--shadow-vintage);
+}
+
+.vintage-shadow-deep {
+    box-shadow: var(--shadow-deep);
+}
+
+/* ==========================================
+   MODALS - Vintage Popup Style
+   ========================================== */
+.modal-content {
+    background: var(--vintage-white);
+    border: 4px solid var(--vintage-brown);
+    box-shadow: 0 10px 40px rgba(74, 53, 38, 0.4);
+    border-radius: 0;
+}
+
+.modal-header {
+    background: linear-gradient(180deg, var(--vintage-brown) 0%, var(--vintage-dark-brown) 100%);
+    color: var(--vintage-cream);
+    border-bottom: 3px solid var(--vintage-gold);
+    padding: 1.25rem 1.5rem;
+}
+
+.modal-title {
+    font-family: 'Noto Serif', 'Merriweather', serif !important;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+}
+
+.modal-body {
+    background: var(--vintage-off-white);
+    padding: 1.75rem;
+    font-family: 'Merriweather', Georgia, serif;
+}
+
+.modal-footer {
+    background: var(--vintage-beige);
+    border-top: 2px solid var(--vintage-tan);
+    padding: 1rem 1.5rem;
+}
+
+.btn-close {
+    background: transparent;
+    border: 2px solid var(--vintage-cream);
+    opacity: 0.8;
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+.btn-close:hover {
+    opacity: 1;
+}
+
+/* ==========================================
+   BREADCRUMBS - Vintage Navigation Trail
+   ========================================== */
+.breadcrumb {
+    background: var(--vintage-beige);
+    padding: 0.75rem 1.25rem;
+    border: 2px solid var(--vintage-brown);
+    margin-bottom: 1.5rem;
+    font-family: 'Merriweather', Georgia, serif;
+}
+
+.breadcrumb-item {
+    color: var(--vintage-brown);
+}
+
+.breadcrumb-item + .breadcrumb-item::before {
+    content: '»';
+    color: var(--vintage-rust);
+    padding: 0 0.5rem;
+}
+
+.breadcrumb-item.active {
+    color: var(--vintage-dark-brown);
+    font-weight: bold;
+}
+
+/* ==========================================
+   TOOLTIPS - Vintage Note Style
+   ========================================== */
+.tooltip {
+    font-family: 'Merriweather', Georgia, serif;
+}
+
+.tooltip-inner {
+    background: var(--vintage-dark-brown);
+    color: var(--vintage-cream);
+    border: 2px solid var(--vintage-gold);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+}
+
+/* Override for code/monospace elements */
+code, pre, kbd, samp {
+    font-family: 'Courier New', Consolas, monospace;
+}
+
+/* ==========================================
+   RESPONSIVE DESIGN (Enhanced)
+   ========================================== */
+@media (max-width: 768px) {
+    /* Navigation */
+    .retro-nav {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .retro-brand {
+        font-size: 1.5rem;
+        letter-spacing: 1px;
+    }
+    
+    .retro-nav-links {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .retro-nav-link {
+        text-align: center;
+        padding: 0.65rem 1rem;
+        font-size: 0.9rem;
+    }
+    
+    /* Container */
+    .container {
+        padding: 1.25rem;
+        margin: 0.5rem;
+    }
+    
+    /* Typography */
+    h1 {
+        font-size: 1.5rem;
+        letter-spacing: 1px;
+    }
+    
+    h2 {
+        font-size: 1.35rem;
+    }
+    
+    h3 {
+        font-size: 1.15rem;
+    }
+    
+    /* Tables */
+    .retro-table {
+        font-size: 0.8rem;
+        display: block;
+        overflow-x: auto;
+    }
+    
+    .retro-table thead th,
+    .retro-table tbody td {
+        padding: 0.5rem;
+        white-space: nowrap;
+    }
+    
+    /* Buttons */
+    .btn,
+    .btn-retro {
+        width: 100%;
+        text-align: center;
+        padding: 0.6rem 1rem;
+        font-size: 0.85rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .btn-sm,
+    .btn-retro-sm {
+        padding: 0.4rem 0.75rem;
+        font-size: 0.75rem;
+    }
+    
+    .table-actions {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .table-actions .btn {
+        width: 100%;
+    }
+    
+    /* Cards */
+    .retro-card {
+        margin-bottom: 1.25rem;
+    }
+    
+    .retro-card-header {
+        padding: 1rem;
+    }
+    
+    .retro-card-title {
+        font-size: 1.2rem;
+        letter-spacing: 1px;
+    }
+    
+    .retro-card-body {
+        padding: 1rem;
+    }
+    
+    /* Forms */
+    .form-control,
+    .form-select,
+    input,
+    textarea,
+    select {
+        font-size: 0.95rem;
+    }
+    
+    /* Modals */
+    .modal-dialog {
+        margin: 0.5rem;
+    }
+    
+    .modal-body {
+        padding: 1rem;
+    }
+    
+    /* Utilities */
+    .d-md-none {
+        display: block !important;
+    }
+    
+    .d-md-flex {
+        display: none !important;
+    }
+}
+
+@media (max-width: 576px) {
+    /* Extra small devices */
+    .container {
+        padding: 1rem;
+    }
+    
+    h1 {
+        font-size: 1.3rem;
+    }
+    
+    .retro-brand {
+        font-size: 1.3rem;
+    }
+    
+    .btn,
+    .btn-retro {
+        padding: 0.55rem 0.85rem;
+        font-size: 0.8rem;
+        letter-spacing: 0.5px;
+    }
+    
+    .retro-table {
+        font-size: 0.75rem;
+    }
+}
+
+/* ==========================================
+   PRINT STYLES - Vintage Document
+   ========================================== */
+@media print {
+    body {
+        background: white;
+        color: black;
+    }
+    
+    .retro-nav,
+    .retro-footer,
+    .btn-retro,
+    .table-actions {
+        display: none;
+    }
+    
+    .retro-table {
+        border: 2px solid black;
+    }
+    
+    .retro-card {
+        border: 2px solid black;
+        box-shadow: none;
+    }
+}

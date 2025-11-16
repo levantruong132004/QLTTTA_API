@@ -1,0 +1,176 @@
+@model IEnumerable<QLTTTA_WEB.Models.AdminClassItem>
+@{
+    ViewData["Title"] = "Quản lý lớp học";
+}
+<div class="retro-card">
+    <div class="retro-card-header">
+        <h2 class="retro-title"><i class="fas fa-chalkboard"></i> Quản lý lớp học</h2>
+    </div>
+    <div class="retro-card-body">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success">@TempData["SuccessMessage"]</div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+        }
+            <div class="row g-2 mb-3 align-items-end">
+                <form asp-action="Classes" method="get" class="col-md-8 row g-2">
+                    <div class="col-md-3">
+                        <input name="courseId" class="form-control" placeholder="Lọc theo ID khóa học" value="@ViewBag.CourseId" />
+                    </div>
+                    <div class="col-md-4">
+                        <input name="search" class="form-control" placeholder="Tìm lớp (mã hoặc tên)" value="@ViewBag.Search" />
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-primary w-100"><i class="fas fa-search"></i> Tìm</button>
+                    </div>
+                </form>
+                <div class="col-md-4">
+                    @if (Model != null && Model.Any())
+                    {
+                        var top3 = Model.OrderByDescending(c => c.ApprovedCount).ThenBy(c => c.ClassName).Take(3).ToList();
+                        <div class="retro-subcard p-2">
+                            <h6 class="mb-2"><i class="fas fa-crown text-warning"></i> Top 3 lớp theo sĩ số đã thanh toán</h6>
+                            <ul class="list-unstyled mb-0 small">
+                                @foreach (var t in top3)
+                                {
+                                    <li>
+                                        <strong>@t.ClassName</strong> <span class="text-muted">(@t.ClassCode)</span>
+                                        <span class="badge bg-success">@t.ApprovedCount/@t.MaxSize</span>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    }
+                </div>
+            </div>
+
+        <form asp-action="CreateClass" method="post" class="row g-2">
+            <div class="col-md-2"><input name="classCode" class="form-control" placeholder="Mã lớp" required /></div>
+            <div class="col-md-3"><input name="className" class="form-control" placeholder="Tên lớp" required /></div>
+            <div class="col-md-2"><input name="startDate" type="date" class="form-control" required /></div>
+            <div class="col-md-2"><input name="endDate" type="date" class="form-control" required /></div>
+            <div class="col-md-1"><input name="maxSize" type="number" class="form-control" placeholder="Sĩ số"
+                    required /></div>
+            <div class="col-md-1"><input name="courseId" type="number" class="form-control" placeholder="Khóa"
+                    required /></div>
+            <div class="col-md-1"><input name="teacherId" type="number" class="form-control" placeholder="GV"
+                    required /></div>
+            <div class="col-md-1"><button type="submit" class="btn btn-success w-100">Thêm</button></div>
+        </form>
+
+        <div class="vintage-divider"></div>
+
+                <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Mã</th>
+                    <th>Tên</th>
+                    <th>Khóa</th>
+                    <th>Ngày</th>
+                    <th>Sĩ số</th>
+                                        <th>Đã TT</th>
+                    <th>Trạng thái</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model != null)
+                {
+                    foreach (var c in Model)
+                    {
+                        <tr>
+                            <td>@c.ClassCode</td>
+                            <td>@c.ClassName</td>
+                            <td>@c.CourseId</td>
+                            <td>@(c.StartDate?.ToString("dd/MM/yyyy")) - @(c.EndDate?.ToString("dd/MM/yyyy"))</td>
+                                                        <td>@c.MaxSize</td>
+                                                        <td>
+                                                                <span class="badge bg-success">@c.ApprovedCount</span>
+                                                        </td>
+                            <td>@(c.Status ?? "-")</td>
+                            <td class="text-nowrap">
+                                <a class="btn btn-sm btn-primary" asp-action="EditClassPage" asp-route-id="@c.ClassId">Sửa</a>
+                                                                <a class="btn btn-sm btn-info text-white" href="#" data-class-id="@c.ClassId" data-class-name="@c.ClassName" onclick="loadRoster(this)">Học viên</a>
+                                <form asp-action="DeleteClass" method="post" class="d-inline"
+                                    onsubmit="return confirm('Xóa lớp này?');">
+                                    <input type="hidden" name="classId" value="@c.ClassId" />
+                                    <input type="hidden" name="courseId" value="@ViewBag.CourseId" />
+                                    <button class="btn btn-sm btn-danger">Xóa</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal roster -->
+<div class="modal fade" id="rosterModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-users"></i> Danh sách học viên đã thanh toán</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="rosterLoading" class="text-center py-3" style="display:none;">
+                        <div class="spinner-border text-primary"></div>
+                </div>
+                <div id="rosterError" class="alert alert-danger d-none"></div>
+                <table class="table table-sm" id="rosterTable" style="display:none;">
+                    <thead>
+                        <tr>
+                            <th>ID</th><th>Mã HV</th><th>Họ tên</th><th>Giới tính</th><th>Ngày sinh</th><th>Điện thoại</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function loadRoster(el){
+    const classId = el.getAttribute('data-class-id');
+    const className = el.getAttribute('data-class-name');
+    const modalEl = document.getElementById('rosterModal');
+    modalEl.querySelector('.modal-title').innerHTML = `<i class="fas fa-users"></i> Học viên lớp: ${className}`;
+    const rosterLoading = document.getElementById('rosterLoading');
+    const rosterError = document.getElementById('rosterError');
+    const rosterTable = document.getElementById('rosterTable');
+    rosterError.classList.add('d-none');
+    rosterTable.style.display='none';
+    rosterLoading.style.display='block';
+    const bsModal = new bootstrap.Modal(modalEl); bsModal.show();
+    try{
+        const res = await fetch(`/api/classes/${classId}/paid-roster`, { headers: { 'X-Requested-With':'fetch' } });
+        if(!res.ok){ throw new Error('HTTP '+res.status); }
+        const data = await res.json();
+        // If API returns array directly
+        const arr = Array.isArray(data) ? data : (Array.isArray(data.data)? data.data : []);
+        const tbody = rosterTable.querySelector('tbody');
+        tbody.innerHTML='';
+        arr.forEach(s=>{
+            tbody.innerHTML += `<tr><td>${s.studentId}</td><td>${s.studentCode??''}</td><td>${s.fullName??''}</td><td>${s.sex??''}</td><td>${s.dateOfBirth? new Date(s.dateOfBirth).toLocaleDateString('vi-VN'):''}</td><td>${s.phoneNumber??''}</td></tr>`;
+        });
+        rosterLoading.style.display='none';
+        rosterTable.style.display='table';
+        if(arr.length===0){ rosterError.textContent='Chưa có học viên đã thanh toán.'; rosterError.classList.remove('d-none'); }
+    }catch(err){
+        rosterLoading.style.display='none';
+        rosterError.textContent='Lỗi tải danh sách: '+err.message;
+        rosterError.classList.remove('d-none');
+    }
+}
+</script>
+
+@* Dynamic helper functions removed after strong typing *@

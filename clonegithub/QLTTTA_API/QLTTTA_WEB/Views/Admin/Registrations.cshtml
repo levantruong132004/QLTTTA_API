@@ -1,0 +1,108 @@
+@model IEnumerable<QLTTTA_WEB.Models.AdminRegistrationItem>
+@{
+    ViewData["Title"] = "Duyệt đơn đăng ký";
+    var registrationList = Model?.ToList() ?? new List<QLTTTA_WEB.Models.AdminRegistrationItem>();
+    var registrationCount = registrationList.Count;
+}
+<div class="retro-card">
+    <div class="retro-card-header d-flex justify-content-between align-items-center">
+        <h2 class="retro-title"><i class="fas fa-clipboard-check"></i> Duyệt đơn đăng ký</h2>
+        <a asp-controller="Manage" asp-action="QrLookup"
+           asp-route-returnUrl="@Url.Action("Registrations","Manage", new { status = (string?)ViewBag.CurrentStatus, classCode = (string?)ViewBag.CurrentClassCode })"
+           class="btn btn-outline-primary">
+            <i class="fas fa-qrcode"></i> Quét/Tra cứu QR
+        </a>
+    </div>
+    <div class="retro-card-body">
+        @* HIỂN THỊ THÔNG BÁO *@
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i> @TempData["ErrorMessage"]
+            </div>
+        }
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle"></i> @TempData["SuccessMessage"]
+            </div>
+        }
+
+        @* Form lọc nhanh *@
+        <form asp-action="Registrations" method="get" class="row g-2 align-items-end mb-3">
+            <div class="col-auto">
+                <label class="form-label">Trạng thái</label>
+                <select name="status" class="form-select">
+                    <option value="Chờ duyệt" selected>Chờ duyệt</option>
+                    <option value="Đã duyệt">Đã duyệt</option>
+                    <option value="Đã từ chối">Đã từ chối</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <label class="form-label">Mã lớp</label>
+                <input type="text" name="classCode" class="form-control" placeholder="Ví dụ: LH00001" value="@((string?)ViewBag.CurrentClassCode ?? "")" />
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-filter"></i> Lọc</button>
+                <a asp-action="Registrations" class="btn btn-secondary"><i class="fas fa-undo"></i> Mặc định</a>
+            </div>
+        </form>
+
+        @if (registrationCount > 0)
+        {
+            <div class="alert alert-info mb-3">
+                <i class="fas fa-bell"></i> <strong>Bạn có @registrationCount đơn đăng ký đang cần phê duyệt</strong>
+            </div>
+
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Học viên</th>
+                        <th>Lớp</th>
+                        <th>Khóa học</th>
+                        <th>Trạng thái</th>
+                        <th>Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in registrationList)
+                    {
+                        <tr>
+                            <td>@r.RegistrationId</td>
+                            <td>ID: @r.StudentId</td>
+                            <td>@(r.ClassName ?? (r.ClassId > 0 ? ("Lớp #" + r.ClassId) : "-"))</td>
+                            <td>@(r.CourseName ?? "-")</td>
+                            <td><span class="badge bg-warning text-dark">@r.Status</span></td>
+                            <td>
+                                <form asp-action="ApproveRegistration" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@r.RegistrationId" />
+                                    <input type="number" name="classId" placeholder="ID Lớp" value="@r.ClassId" class="form-control d-inline me-1" style="width:100px;" />
+                                    <button type="submit" class="btn btn-sm btn-success">
+                                        <i class="fas fa-check"></i> Duyệt
+                                    </button>
+                                </form>
+                                <form asp-action="RejectRegistration" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@r.RegistrationId" />
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Bạn có chắc muốn từ chối đơn này?');">
+                                        <i class="fas fa-times"></i> Từ chối
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <div class="text-center text-muted py-5">
+                <i class="fas fa-check-circle fa-3x mb-3" style="color: #28a745;"></i>
+                <p class="fs-5">Hiện tại không có đơn đăng ký nào cần phê duyệt</p>
+                <p>Thử nhấn "Quét/Tra cứu QR" để tìm nhanh theo mã đơn hoặc theo mã lớp (nhập <code>CLASS:GT_TEST</code>).</p>
+            </div>
+        }
+    </div>
+</div>

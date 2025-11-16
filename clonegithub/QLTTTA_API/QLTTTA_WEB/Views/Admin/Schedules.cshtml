@@ -1,0 +1,71 @@
+@model IEnumerable<QLTTTA_WEB.Models.ScheduleItem>
+@{
+    ViewData["Title"] = "Quản lý lịch học";
+}
+<div class="retro-card">
+    <div class="retro-card-header">
+        <h2 class="retro-title"><i class="fas fa-calendar"></i> Quản lý lịch học</h2>
+    </div>
+    <div class="retro-card-body">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success">@TempData["SuccessMessage"]</div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+        }
+
+        <form asp-action="CreateSchedule" method="post" class="row g-2">
+            <input type="hidden" name="classId" value="@ViewBag.ClassId" />
+            <div class="col-md-2"><input name="dayOfWeek" type="number" min="2" max="8" class="form-control"
+                    placeholder="Thứ" required /></div>
+            <div class="col-md-3"><input name="startTime" type="time" class="form-control" required /></div>
+            <div class="col-md-3"><input name="endTime" type="time" class="form-control" required /></div>
+            <div class="col-md-2"><button type="submit" class="btn btn-success w-100">Thêm</button></div>
+        </form>
+
+        <div class="vintage-divider"></div>
+
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Thứ</th>
+                    <th>Bắt đầu</th>
+                    <th>Kết thúc</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model != null)
+                {
+                    foreach (var s in Model)
+                    {
+                        <tr>
+                            <td>@s.DayOfWeek</td>
+                            <td>@s.StartTime</td>
+                            <td>@s.EndTime</td>
+                            <td class="text-nowrap">
+                                <form asp-action="EditSchedule" method="post" class="d-inline">
+                                    <input type="hidden" name="scheduleId" value="@s.ScheduleId" />
+                                    <input type="hidden" name="classId" value="@ViewBag.ClassId" />
+                                    <input type="number" name="dayOfWeek" value="@s.DayOfWeek" class="form-control d-inline" style="width:80px;display:inline-block;" />
+                                    <input type="text" name="startTime" value="@s.StartTime" class="form-control d-inline" style="width:100px;display:inline-block;" />
+                                    <input type="text" name="endTime" value="@s.EndTime" class="form-control d-inline" style="width:100px;display:inline-block;" />
+                                    <button class="btn btn-sm btn-primary">Lưu</button>
+                                </form>
+                                <form asp-action="DeleteSchedule" method="post" class="d-inline" onsubmit="return confirm('Xóa lịch này?');">
+                                    <input type="hidden" name="scheduleId" value="@s.ScheduleId" />
+                                    <input type="hidden" name="classId" value="@ViewBag.ClassId" />
+                                    <button class="btn btn-sm btn-danger">Xóa</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@* Dynamic helper functions removed after strong typing *@

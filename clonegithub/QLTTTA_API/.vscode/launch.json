@@ -1,0 +1,27 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Flutter: Run on Phone",
+      "type": "dart",
+      "request": "launch",
+      "program": "qlttta_app_mobile/lib/main.dart",
+      "cwd": "${workspaceFolder}",
+      "deviceId": "Z5ZLJRF6W8DETGTS",
+      "toolArgs": [
+        "--dart-define", "API_BASE_URL=http://192.168.1.212:7158/api"
+      ]
+    },
+    {
+      "name": "Flutter: Run via Tunnel (edit URL)",
+      "type": "dart",
+      "request": "launch",
+      "program": "qlttta_app_mobile/lib/main.dart",
+      "cwd": "${workspaceFolder}",
+      "deviceId": "Z5ZLJRF6W8DETGTS",
+      "toolArgs": [
+        "--dart-define", "API_BASE_URL=https://<your-trycloudflare-url>/api"
+      ]
+    }
+  ]
+}
