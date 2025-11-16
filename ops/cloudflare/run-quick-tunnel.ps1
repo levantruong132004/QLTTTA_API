@@ -1,5 +1,8 @@
 param(
-    [int]$Port = 5165
+    [int]$Port = 5165,
+    [string]$AppSettingsPath = "..\..\QLTTTA_WEB\appsettings.Development.json",
+    [switch]$UpdateConfig,
+    [switch]$AutoRedirectDev
 )
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -32,9 +35,55 @@ if (-not $cloudflaredPath) {
 
 Write-Host "Using: $cloudflaredPath" -ForegroundColor Green
 
-# Run cloudflared; this will block and print the public URL in the console
+<#
+    Enhanced quick tunnel script:
+    - Captures the first generated trycloudflare URL.
+    - Optionally updates PublicBaseUrl in appsettings.Development.json (use -UpdateConfig).
+    - Optionally injects ForceTunnelRedirect=true (use -AutoRedirectDev) so Program.cs can redirect in Development.
+
+    Usage examples:
+        ./run-quick-tunnel.ps1 -UpdateConfig -AutoRedirectDev
+        ./run-quick-tunnel.ps1 -Port 5165 -UpdateConfig
+#>
+
+$cloudUrl = $null
+$regex = 'https://[a-z0-9-]+\.trycloudflare\.com'
+
+# Stream output line by line so we can parse and update config early.
 try {
-    & $cloudflaredPath tunnel --url "http://localhost:$Port"
+    & $cloudflaredPath tunnel --url "http://localhost:$Port" 2>&1 | ForEach-Object {
+        Write-Host $_
+        if (-not $cloudUrl -and $_ -match $regex) {
+            $cloudUrl = $Matches[0]
+            Write-Host "Detected Cloudflare URL: $cloudUrl" -ForegroundColor Green
+            if ($UpdateConfig) {
+                $fullPath = Resolve-Path -Path $AppSettingsPath -ErrorAction SilentlyContinue
+                if ($null -eq $fullPath) {
+                    Write-Host "Cannot resolve appsettings path: $AppSettingsPath" -ForegroundColor Yellow
+                }
+                else {
+                    try {
+                        $jsonText = Get-Content $fullPath -Raw -ErrorAction Stop
+                        $cfg = $jsonText | ConvertFrom-Json
+                        $cfg.PublicBaseUrl = $cloudUrl
+                        if ($AutoRedirectDev) {
+                            # Add flag if absent
+                            if (-not ($cfg.PSObject.Properties.Name -contains 'ForceTunnelRedirect')) {
+                                Add-Member -InputObject $cfg -NotePropertyName ForceTunnelRedirect -NotePropertyValue $true
+                            } else { $cfg.ForceTunnelRedirect = $true }
+                        }
+                        $newJson = $cfg | ConvertTo-Json -Depth 10
+                        $newJson | Set-Content $fullPath -Encoding UTF8
+                        Write-Host "Updated PublicBaseUrl in $fullPath" -ForegroundColor Cyan
+                        if ($AutoRedirectDev) { Write-Host "ForceTunnelRedirect set to true." -ForegroundColor Cyan }
+                    }
+                    catch {
+                        Write-Host "Failed updating config: $($_.Exception.Message)" -ForegroundColor Red
+                    }
+                }
+            }
+        }
+    }
 }
 catch {
     Write-Host "Failed to run cloudflared: $($_.Exception.Message)" -ForegroundColor Red
