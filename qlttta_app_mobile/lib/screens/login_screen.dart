@@ -66,312 +66,318 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: RetroColors.vintageCream,
       body: Container(
-        // Removed SVG data-URI background that caused runtime errors on Android.
-        // If a patterned background is desired, consider using an asset image
-        // with AssetImage and declare it in pubspec.yaml, or use flutter_svg
-        // to render an SVG widget behind the content.
-        decoration: const BoxDecoration(
-          color: RetroColors.vintageCream,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color(0xFF8B4513),
+              const Color(0xFFD2691E),
+              const Color(0xFFF4A460),
+            ],
+          ),
         ),
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 32.0),
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 400),
-              decoration: BoxDecoration(
-                color: RetroColors.vintageWhite,
-                border: Border.all(color: RetroColors.vintageBrown, width: 4),
-                boxShadow: [
-                  BoxShadow(
-                    color: RetroColors.vintageDarkBrown.withOpacity(0.3),
-                    offset: const Offset(8, 8),
-                    blurRadius: 0,
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Header
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          RetroColors.vintageBrown,
-                          RetroColors.vintageDarkBrown
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 400),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 30,
+                      offset: const Offset(0, 15),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(32),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xFF8B4513),
+                            const Color(0xFFD2691E),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                      ),
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Icon(
+                              Icons.school_rounded,
+                              size: 56,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'HỆ THỐNG QUẢN LÝ',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              letterSpacing: 1.5,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '~ TIẾNG ANH ~',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontStyle: FontStyle.italic,
+                              color: Colors.white.withOpacity(0.9),
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
                         ],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                      border: const Border(
-                        bottom: BorderSide(
-                            color: RetroColors.vintageGold, width: 3),
                       ),
                     ),
-                    child: const Column(
-                      children: [
-                        Icon(
-                          Icons.school,
-                          size: 48,
-                          color: RetroColors.vintageCream,
-                        ),
-                        SizedBox(height: 12),
-                        Text(
-                          'HỆ THỐNG QUẢN LÝ',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: RetroColors.vintageCream,
-                            letterSpacing: 2,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          '~ TIẾNG ANH ~',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontStyle: FontStyle.italic,
-                            color: RetroColors.vintageGold,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Form Body
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: const BoxDecoration(
-                      color: RetroColors.vintageOffWhite,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const Text(
-                          'ĐĂNG NHẬP',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: RetroColors.vintageDarkBrown,
-                            letterSpacing: 2,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 20),
-                        // Username field
-                        const Text(
-                          'TÊN ĐĂNG NHẬP',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: RetroColors.vintageDarkBrown,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                                color: RetroColors.vintageBrown, width: 2),
-                            color: RetroColors.vintageWhite,
-                          ),
-                          child: TextField(
-                            controller: _usernameController,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: RetroColors.vintageDarkBrown,
+                    // Form Body
+                    Padding(
+                      padding: const EdgeInsets.all(28),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Text(
+                            'ĐĂNG NHẬP',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1a1a1a),
+                              letterSpacing: 1.2,
                             ),
-                            decoration: const InputDecoration(
-                              hintText: 'Nhập tên đăng nhập...',
-                              hintStyle: TextStyle(
-                                fontStyle: FontStyle.italic,
-                                color: RetroColors.vintageGray,
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 28),
+                          // Username field
+                          Text(
+                            'TÊN ĐĂNG NHẬP',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade700,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey.shade200),
+                            ),
+                            child: TextField(
+                              controller: _usernameController,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                color: Color(0xFF1a1a1a),
                               ),
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.all(12),
-                              prefixIcon: Icon(Icons.person,
-                                  color: RetroColors.vintageBrown),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        // Password field
-                        const Text(
-                          'MẬT KHẨU',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: RetroColors.vintageDarkBrown,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                                color: RetroColors.vintageBrown, width: 2),
-                            color: RetroColors.vintageWhite,
-                          ),
-                          child: TextField(
-                            controller: _passwordController,
-                            obscureText: true,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: RetroColors.vintageDarkBrown,
-                            ),
-                            decoration: const InputDecoration(
-                              hintText: 'Nhập mật khẩu...',
-                              hintStyle: TextStyle(
-                                fontStyle: FontStyle.italic,
-                                color: RetroColors.vintageGray,
-                              ),
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.all(12),
-                              prefixIcon: Icon(Icons.lock,
-                                  color: RetroColors.vintageBrown),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-                        // Login button
-                        _isLoading
-                            ? const Center(
-                                child: CircularProgressIndicator(
-                                  color: RetroColors.vintageBrown,
+                              decoration: InputDecoration(
+                                hintText: 'Nhập tên đăng nhập...',
+                                hintStyle: TextStyle(
+                                  fontStyle: FontStyle.italic,
+                                  color: Colors.grey.shade400,
+                                  fontSize: 14,
                                 ),
-                              )
-                            : Container(
-                                decoration: BoxDecoration(
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: RetroColors.vintageDarkBrown
-                                          .withOpacity(1),
-                                      offset: const Offset(4, 4),
-                                      blurRadius: 0,
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.all(16),
+                                prefixIcon: Icon(Icons.person_rounded,
+                                    color: const Color(0xFF8B4513), size: 22),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          // Password field
+                          Text(
+                            'MẬT KHẨU',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade700,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey.shade200),
+                            ),
+                            child: TextField(
+                              controller: _passwordController,
+                              obscureText: true,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                color: Color(0xFF1a1a1a),
+                              ),
+                              decoration: InputDecoration(
+                                hintText: 'Nhập mật khẩu...',
+                                hintStyle: TextStyle(
+                                  fontStyle: FontStyle.italic,
+                                  color: Colors.grey.shade400,
+                                  fontSize: 14,
+                                ),
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.all(16),
+                                prefixIcon: Icon(Icons.lock_rounded,
+                                    color: const Color(0xFF8B4513), size: 22),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 32),
+                          // Login button
+                          _isLoading
+                              ? const Center(
+                                  child: CircularProgressIndicator(
+                                    color: Color(0xFF8B4513),
+                                  ),
+                                )
+                              : Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        const Color(0xFF8B4513),
+                                        const Color(0xFFD2691E),
+                                      ],
                                     ),
-                                  ],
-                                ),
-                                child: ElevatedButton(
-                                  onPressed: _login,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: RetroColors.vintageBrown,
-                                    foregroundColor: RetroColors.vintageCream,
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 16),
-                                    shape: const RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.zero,
-                                      side: BorderSide(
-                                        color: RetroColors.vintageDarkBrown,
-                                        width: 3,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFF8B4513).withOpacity(0.3),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 6),
+                                      ),
+                                    ],
+                                  ),
+                                  child: ElevatedButton(
+                                    onPressed: _login,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.transparent,
+                                      foregroundColor: Colors.white,
+                                      shadowColor: Colors.transparent,
+                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
                                     ),
-                                  ),
-                                  child: const Text(
-                                    'ĐĂNG NHẬP',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 2,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                        const SizedBox(height: 24),
-                        // Removed QR-login helper button from login screen to keep UI minimal.
-                        const SizedBox(height: 16),
-                        // Register link
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: RetroColors.vintageBrown.withOpacity(0.3),
-                              width: 1,
-                            ),
-                          ),
-                          child: Column(
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(
-                                    Icons.info_outline,
-                                    size: 18,
-                                    color: RetroColors.vintageGray,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Text(
-                                    'Chưa có tài khoản? ',
-                                    style: TextStyle(
-                                      color: RetroColors.vintageGray,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  GestureDetector(
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              const RegisterScreen(),
-                                        ),
-                                      );
-                                    },
                                     child: const Text(
-                                      'Đăng ký ngay',
+                                      'ĐĂNG NHẬP',
                                       style: TextStyle(
-                                        color: RetroColors.vintageRust,
-                                        fontSize: 14,
+                                        fontSize: 16,
                                         fontWeight: FontWeight.bold,
-                                        decoration: TextDecoration.underline,
+                                        letterSpacing: 1.5,
                                       ),
                                     ),
                                   ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              GestureDetector(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const ForgotPasswordScreen(),
-                                    ),
-                                  );
-                                },
-                                child: Row(
+                                ),
+                          const SizedBox(height: 28),
+                          // Register link
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
+                              children: [
+                                Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
-                                  children: const [
+                                  children: [
                                     Icon(
-                                      Icons.lock_reset_rounded,
+                                      Icons.info_outline_rounded,
                                       size: 18,
-                                      color: RetroColors.vintageGold,
+                                      color: Colors.grey.shade600,
                                     ),
-                                    SizedBox(width: 8),
+                                    const SizedBox(width: 8),
                                     Text(
-                                      'Quên mật khẩu?',
+                                      'Chưa có tài khoản? ',
                                       style: TextStyle(
-                                        color: RetroColors.vintageGold,
+                                        color: Colors.grey.shade600,
                                         fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                        decoration: TextDecoration.underline,
+                                      ),
+                                    ),
+                                    GestureDetector(
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                const RegisterScreen(),
+                                          ),
+                                        );
+                                      },
+                                      child: const Text(
+                                        'Đăng ký ngay',
+                                        style: TextStyle(
+                                          color: Color(0xFF8B4513),
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          decoration: TextDecoration.underline,
+                                        ),
                                       ),
                                     ),
                                   ],
                                 ),
-                              ),
-                            ],
+                                const SizedBox(height: 12),
+                                GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const ForgotPasswordScreen(),
+                                      ),
+                                    );
+                                  },
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.lock_reset_rounded,
+                                        size: 18,
+                                        color: const Color(0xFFD2691E),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Text(
+                                        'Quên mật khẩu?',
+                                        style: TextStyle(
+                                          color: Color(0xFFD2691E),
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          decoration: TextDecoration.underline,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

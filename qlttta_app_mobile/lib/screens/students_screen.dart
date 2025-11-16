@@ -13,32 +13,110 @@ class StudentsScreen extends StatefulWidget {
 
 class _StudentsScreenState extends State<StudentsScreen> {
   final StudentService _studentService = StudentService();
-  late Future<List<Student>> _studentsFuture;
+  late Future<void> _loadFuture;
+  final List<Student> _students = [];
+  int _totalStudents = 0;
+  int _pageNumber = 1;
+  final int _pageSize = 50;
+  // _isLoadingMore no longer needed; removed.
+  bool _hasMore = true;
+  String _search = '';
 
   @override
   void initState() {
     super.initState();
-    _studentsFuture = _studentService.getStudents();
+    _loadFuture = _initialLoad();
+  }
+
+  Future<void> _initialLoad() async {
+    try {
+      // Ưu tiên endpoint staff/students để đồng bộ như web
+      final staffList = await _studentService.getStaffStudents();
+      setState(() {
+        _students.clear();
+        _students.addAll(staffList);
+        _totalStudents = staffList.length;
+        _hasMore = false; // đã tải hết
+      });
+    } catch (_) {
+      // Fallback: dùng endpoint Students phân trang
+      _totalStudents = await _studentService.getStudentsCount();
+      await _loadPage(reset: true);
+    }
+  }
+
+  Future<void> _loadPage({bool reset = false}) async {
+    if (reset) {
+      _students.clear();
+      _pageNumber = 1;
+      _hasMore = true;
+    }
+    if (!_hasMore) return;
+    final (list, total) = await _studentService.getStudents(pageNumber: _pageNumber, pageSize: _pageSize, search: _search.isEmpty ? null : _search);
+    if (reset && _totalStudents == 0) _totalStudents = total; // fallback nếu count endpoint lỗi
+    setState(() {
+      _students.addAll(list);
+      _pageNumber++;
+      _hasMore = _students.length < (_totalStudents == 0 ? total : _totalStudents);
+    });
+  }
+
+  Future<void> _onRefresh() async {
+    _totalStudents = await _studentService.getStudentsCount();
+    await _loadPage(reset: true);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: RetroColors.vintageCream,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('📋 DANH SÁCH HỌC VIÊN'),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.people_rounded, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Danh sách học viên',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  Text(
+                    _totalStudents > 0 ? '$_totalStudents học viên' : 'Đang tải...',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
       body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: NetworkImage(
-                'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9InBhdHRlcm4iIHBhdHRlcm5Vbml0cz0idXNlclNwYWNlT25Vc2UiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjZjRlYWQ1Ii8+PHBhdGggZD0iTTAgMGgyMHYyMEgweiIgZmlsbD0iI2U4ZGNjNCIgb3BhY2l0eT0iMC4zIi8+PHBhdGggZD0iTTIwIDIwaDIwdjIwSDIweiIgZmlsbD0iI2U4ZGNjNCIgb3BhY2l0eT0iMC4zIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI3BhdHRlcm4pIi8+PC9zdmc+'),
-            repeat: ImageRepeat.repeat,
-            opacity: 0.3,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color(0xFF8B4513).withOpacity(0.85),
+              const Color(0xFFD2691E).withOpacity(0.75),
+              const Color(0xFFF4A460).withOpacity(0.65),
+            ],
           ),
         ),
-        child: FutureBuilder<List<Student>>(
-          future: _studentsFuture,
+        child: FutureBuilder<void>(
+          future: _loadFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(
@@ -71,7 +149,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                   ),
                 ),
               );
-            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            } else if (_students.isEmpty) {
               return Center(
                 child: Container(
                   margin: const EdgeInsets.all(20),
@@ -98,102 +176,147 @@ class _StudentsScreenState extends State<StudentsScreen> {
               );
             }
 
-            final students = snapshot.data!;
-            return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: students.length,
+            return RefreshIndicator(
+              onRefresh: _onRefresh,
+              color: Colors.white,
+              child: ListView.builder(
+              padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 80, 16, 16),
+              itemCount: _students.length + (_hasMore ? 1 : 0),
               itemBuilder: (context, index) {
-                final student = students[index];
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: RetroColors.vintageWhite,
-                    border:
-                        Border.all(color: RetroColors.vintageBrown, width: 3),
-                    boxShadow: [
-                      BoxShadow(
-                        color: RetroColors.vintageDarkBrown.withOpacity(0.3),
-                        offset: const Offset(4, 4),
-                        blurRadius: 0,
-                      ),
-                    ],
-                  ),
-                  child: ListTile(
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    leading: Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: RetroColors.vintageBrown,
-                        border: Border.all(
-                            color: RetroColors.vintageDarkBrown, width: 2),
-                      ),
-                      child: Center(
-                        child: Text(
-                          student.hoTen.isNotEmpty
-                              ? student.hoTen[0].toUpperCase()
-                              : '?',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: RetroColors.vintageCream,
+                if (index >= _students.length) {
+                  _loadPage();
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(child: CircularProgressIndicator(color: Colors.white)),
+                  );
+                }
+                final student = _students[index];
+                return AnimatedOpacity(
+                  opacity: 1.0,
+                  duration: Duration(milliseconds: 300 + (index % 5) * 50),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => StudentProfileScreen(
+                                  studentId: student.studentId),
+                            ),
+                          );
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            children: [
+                              Hero(
+                                tag: 'student_avatar_${student.studentId}',
+                                child: Container(
+                                  width: 56,
+                                  height: 56,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        const Color(0xFF8B4513),
+                                        const Color(0xFFD2691E),
+                                      ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(16),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFF8B4513).withOpacity(0.3),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      student.hoTen.isNotEmpty
+                                          ? student.hoTen[0].toUpperCase()
+                                          : '?',
+                                      style: const TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      student.hoTen,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF1a1a1a),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF8B4513).withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        student.maHocVien,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF8B4513),
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF8B4513).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.arrow_forward_ios_rounded,
+                                  color: Color(0xFF8B4513),
+                                  size: 18,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                     ),
-                    title: Text(
-                      student.hoTen,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: RetroColors.vintageDarkBrown,
-                      ),
-                    ),
-                    subtitle: Container(
-                      margin: const EdgeInsets.only(top: 4),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: RetroColors.vintageBrown,
-                        border: Border.all(
-                            color: RetroColors.vintageDarkBrown, width: 2),
-                      ),
-                      child: Text(
-                        student.maHocVien,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: RetroColors.vintageCream,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                    ),
-                    trailing: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: RetroColors.vintageOlive,
-                        border: Border.all(
-                            color: RetroColors.vintageDarkGray, width: 2),
-                      ),
-                      child: const Icon(
-                        Icons.arrow_forward,
-                        color: RetroColors.vintageWhite,
-                        size: 20,
-                      ),
-                    ),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => StudentProfileScreen(
-                              studentId: student.studentId),
-                        ),
-                      );
-                    },
                   ),
                 );
               },
-            );
+            ));
           },
         ),
       ),

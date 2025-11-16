@@ -42,7 +42,7 @@
     box-sizing: border-box;
 }
 
-/* Set Merriweather for all input text content - elegant Vietnamese support */
+/* Set Noto Serif for all input text content - excellent Vietnamese support */
 input[type="text"],
 input[type="email"],
 input[type="password"],
@@ -55,11 +55,11 @@ textarea,
 select,
 .form-control,
 .form-select {
-    font-family: 'Merriweather', Georgia, serif !important;
+    font-family: 'Noto Serif', Georgia, serif !important;
 }
 
 body {
-    font-family: 'Merriweather', Georgia, serif;
+    font-family: 'Noto Serif', Georgia, serif;
     background-color: var(--vintage-cream);
     background-image: 
         /* Subtle paper texture */
@@ -91,7 +91,7 @@ body {
 
 /* Retro Typography - Elegant Noto Serif for headings */
 h1, h2, h3, h4, h5, h6 {
-    font-family: 'Noto Serif', 'Merriweather', serif !important;
+    font-family: 'Noto Serif', Georgia, serif !important;
     font-weight: 700;
     color: var(--vintage-brown);
     text-transform: uppercase;
@@ -119,7 +119,7 @@ h3 {
 p {
     margin-bottom: 1rem;
     font-size: 1rem;
-    font-family: 'Merriweather', Georgia, serif;
+    font-family: 'Noto Serif', Georgia, serif;
     line-height: 1.8;
 }
 
@@ -226,7 +226,7 @@ a:hover {
 }
 
 .retro-brand {
-    font-family: 'Noto Serif', 'Merriweather', serif !important;
+    font-family: 'Noto Serif', Georgia, serif !important;
     font-size: 2rem;
     font-weight: 700;
     color: var(--vintage-cream);
@@ -263,7 +263,7 @@ a:hover {
     display: block;
     padding: 0.75rem 1.25rem;
     color: var(--vintage-cream);
-    font-family: 'Merriweather', Georgia, serif !important;
+    font-family: 'Noto Serif', Georgia, serif !important;
     font-size: 0.95rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -314,7 +314,7 @@ a:hover {
 }
 
 .dropdown-item {
-    font-family: 'Merriweather', Georgia, serif !important;
+    font-family: 'Noto Serif', Georgia, serif !important;
     color: var(--vintage-dark-brown);
     padding: 0.6rem 1.25rem;
     transition: all 0.2s ease;
@@ -365,7 +365,7 @@ input[type="submit"],
 input[type="button"] {
     display: inline-block;
     padding: 0.75rem 1.75rem;
-    font-family: 'Noto Serif', 'Merriweather', serif !important;
+    font-family: 'Noto Serif', Georgia, serif !important;
     font-size: 0.9rem;
     font-weight: 600;
     text-transform: uppercase;
@@ -798,7 +798,7 @@ button[type="button"]:disabled {
 button,
 [role="button"],
 .button {
-    font-family: 'Noto Serif', 'Merriweather', serif !important;
+    font-family: 'Noto Serif', Georgia, serif !important;
 }
 
 /* Ensure text inputs in tables and forms get proper styling */
@@ -811,7 +811,7 @@ button,
     padding: 0.5rem;
     border: 2px solid var(--vintage-brown);
     background: var(--vintage-white);
-    font-family: 'Merriweather', Georgia, serif !important;
+    font-family: 'Noto Serif', Georgia, serif !important;
 }
 
 /* ==========================================
@@ -853,7 +853,7 @@ button,
 .form-label-retro,
 label {
     display: block;
-    font-family: 'Noto Serif', 'Merriweather', serif !important;
+    font-family: 'Noto Serif', Georgia, serif !important;
     font-weight: 600;
     font-size: 0.95rem;
     color: var(--vintage-dark-brown);
@@ -877,7 +877,7 @@ textarea,
 select {
     width: 100%;
     padding: 0.65rem 1rem;
-    font-family: 'Times New Roman', Times, serif !important;
+    font-family: 'Noto Serif', Georgia, serif !important;
     font-size: 1rem;
     color: var(--vintage-dark-brown);
     background: var(--vintage-white);
@@ -909,7 +909,7 @@ textarea.form-control,
 textarea.form-control-retro {
     resize: vertical;
     min-height: 120px;
-    font-family: 'Times New Roman', Times, serif !important;
+    font-family: 'Noto Serif', Georgia, serif !important;
 }
 
 select.form-control,
@@ -992,7 +992,7 @@ select.form-control-retro,
 
 .retro-table thead th {
     padding: 1rem;
-    font-family: 'Noto Serif', 'Merriweather', serif !important;
+    font-family: 'Noto Serif', Georgia, serif !important;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0px !important;
@@ -1022,7 +1022,7 @@ select.form-control-retro,
     padding: 0.875rem 1rem;
     border-right: 1px solid var(--vintage-tan);
     border-bottom: 1px solid var(--vintage-tan);
-    font-family: 'Merriweather', Georgia, serif !important;
+    font-family: 'Noto Serif', Georgia, serif !important;
     letter-spacing: 0px !important;
 }
 
@@ -1099,7 +1099,7 @@ select.form-control-retro,
 }
 
 .retro-card-title {
-    font-family: 'Noto Serif', 'Merriweather', serif !important;
+    font-family: 'Noto Serif', Georgia, serif !important;
     font-size: 1.5rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -1111,7 +1111,7 @@ select.form-control-retro,
 .retro-card-body {
     padding: 1.75rem;
     background: var(--vintage-off-white);
-    font-family: 'Merriweather', Georgia, serif;
+    font-family: 'Noto Serif', Georgia, serif;
     position: relative;
 }
 
@@ -1130,7 +1130,7 @@ select.form-control-retro,
     margin-bottom: 1.5rem;
     border: 3px double var(--vintage-brown);
     background: var(--vintage-cream);
-    font-family: 'Noto Sans', 'Segoe UI', 'Roboto', Arial, sans-serif;
+    font-family: 'Noto Serif', Georgia, serif;
     position: relative;
 }
 
@@ -1193,7 +1193,7 @@ select.form-control-retro,
 .retro-badge {
     display: inline-block;
     padding: 0.35rem 0.75rem;
-    font-family: 'Merriweather', Georgia, serif;
+    font-family: 'Noto Serif', Georgia, serif;
     font-size: 0.75rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -1238,7 +1238,7 @@ select.form-control-retro,
 .retro-pagination-link {
     display: block;
     padding: 0.5rem 1rem;
-    font-family: 'Merriweather', Georgia, serif;
+    font-family: 'Noto Serif', Georgia, serif;
     font-weight: 700;
     color: var(--vintage-brown);
     background: var(--vintage-cream);
@@ -1268,7 +1268,7 @@ select.form-control-retro,
     border-top: 5px solid var(--vintage-gold);
     margin-top: 3rem;
     text-align: center;
-    font-family: 'Merriweather', Georgia, serif;
+    font-family: 'Noto Serif', Georgia, serif;
 }
 
 .retro-footer p {
@@ -1376,7 +1376,7 @@ select.form-control-retro,
     padding: 0.5rem 1rem;
     border: 3px dashed var(--vintage-burgundy);
     background: rgba(124, 45, 55, 0.1);
-    font-family: 'Merriweather', Georgia, serif;
+    font-family: 'Noto Serif', Georgia, serif;
     font-weight: 700;
     color: var(--vintage-burgundy);
     text-transform: uppercase;
@@ -1402,7 +1402,7 @@ select.form-control-retro,
 .retro-loading {
     text-align: center;
     padding: 2rem;
-    font-family: 'Merriweather', Georgia, serif;
+    font-family: 'Noto Serif', Georgia, serif;
     color: var(--vintage-brown);
     text-transform: uppercase;
     letter-spacing: 2px;
@@ -1506,7 +1506,7 @@ select.form-control-retro,
 }
 
 .modal-title {
-    font-family: 'Noto Serif', 'Merriweather', serif !important;
+    font-family: 'Noto Serif', Georgia, serif !important;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 1.5px;
@@ -1515,7 +1515,7 @@ select.form-control-retro,
 .modal-body {
     background: var(--vintage-off-white);
     padding: 1.75rem;
-    font-family: 'Merriweather', Georgia, serif;
+    font-family: 'Noto Serif', Georgia, serif;
 }
 
 .modal-footer {
@@ -1544,7 +1544,7 @@ select.form-control-retro,
     padding: 0.75rem 1.25rem;
     border: 2px solid var(--vintage-brown);
     margin-bottom: 1.5rem;
-    font-family: 'Merriweather', Georgia, serif;
+    font-family: 'Noto Serif', Georgia, serif;
 }
 
 .breadcrumb-item {
@@ -1566,7 +1566,7 @@ select.form-control-retro,
    TOOLTIPS - Vintage Note Style
    ========================================== */
 .tooltip {
-    font-family: 'Merriweather', Georgia, serif;
+    font-family: 'Noto Serif', Georgia, serif;
 }
 
 .tooltip-inner {

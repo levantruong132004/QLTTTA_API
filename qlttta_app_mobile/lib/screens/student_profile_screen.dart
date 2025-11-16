@@ -25,17 +25,36 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: RetroColors.vintageCream,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('📘 CHI TIẾT HỌC VIÊN'),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        leading: IconButton(
+          icon: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.arrow_back_rounded, size: 20),
+          ),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text(
+          'Chi tiết học viên',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+        ),
       ),
       body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: NetworkImage(
-                'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9InBhdHRlcm4iIHBhdHRlcm5Vbml0cz0idXNlclNwYWNlT25Vc2UiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjZjRlYWQ1Ii8+PHBhdGggZD0iTTAgMGgyMHYyMEgweiIgZmlsbD0iI2U4ZGNjNCIgb3BhY2l0eT0iMC4zIi8+PHBhdGggZD0iTTIwIDIwaDIwdjIwSDIweiIgZmlsbD0iI2U4ZGNjNCIgb3BhY2l0eT0iMC4zIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI3BhdHRlcm4pIi8+PC9zdmc+'),
-            repeat: ImageRepeat.repeat,
-            opacity: 0.3,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color(0xFF8B4513).withOpacity(0.85),
+              const Color(0xFFD2691E).withOpacity(0.75),
+              const Color(0xFFF4A460).withOpacity(0.65),
+            ],
           ),
         ),
         child: FutureBuilder<Student?>(
@@ -102,48 +121,47 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
             final student = snapshot.data!;
 
             return SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: RetroColors.vintageWhite,
-                  border: Border.all(color: RetroColors.vintageBrown, width: 4),
-                  boxShadow: [
-                    BoxShadow(
-                      color: RetroColors.vintageDarkBrown.withOpacity(0.3),
-                      offset: const Offset(8, 8),
-                      blurRadius: 0,
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    // Header
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 80, 20, 20),
+              child: Column(
+                children: [
+                  // Header Card
+                  Hero(
+                    tag: 'student_avatar_${student.studentId}',
+                    child: Container(
+                      padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            RetroColors.vintageBrown,
-                            RetroColors.vintageDarkBrown
-                          ],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                        border: const Border(
-                          bottom: BorderSide(
-                              color: RetroColors.vintageGold, width: 3),
-                        ),
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.15),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
                       ),
                       child: Column(
                         children: [
                           Container(
-                            width: 80,
-                            height: 80,
+                            width: 100,
+                            height: 100,
                             decoration: BoxDecoration(
-                              color: RetroColors.vintageCream,
-                              border: Border.all(
-                                  color: RetroColors.vintageGold, width: 3),
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  const Color(0xFF8B4513),
+                                  const Color(0xFFD2691E),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF8B4513).withOpacity(0.4),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
                             ),
                             child: Center(
                               child: Text(
@@ -151,71 +169,80 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                                     ? student.hoTen[0].toUpperCase()
                                     : '?',
                                 style: const TextStyle(
-                                  fontSize: 40,
+                                  fontSize: 48,
                                   fontWeight: FontWeight.bold,
-                                  color: RetroColors.vintageBrown,
+                                  color: Colors.white,
                                 ),
                               ),
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 20),
                           Text(
                             student.hoTen,
                             style: const TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
-                              color: RetroColors.vintageCream,
+                              color: Color(0xFF1a1a1a),
                             ),
                             textAlign: TextAlign.center,
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 12),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
+                                horizontal: 16, vertical: 8),
                             decoration: BoxDecoration(
-                              color: RetroColors.vintageBrown,
-                              border: Border.all(
-                                  color: RetroColors.vintageGold, width: 2),
+                              color: const Color(0xFF8B4513).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              'Mã: ${student.maHocVien}',
+                              student.maHocVien,
                               style: const TextStyle(
                                 fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: RetroColors.vintageCream,
-                                letterSpacing: 2,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF8B4513),
+                                letterSpacing: 1.2,
                               ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    // Body
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: const BoxDecoration(
-                        color: RetroColors.vintageOffWhite,
-                      ),
-                      child: Column(
-                        children: [
-                          _buildProfileItem(
-                              Icons.person, 'Mã HỌC VIÊN', student.maHocVien),
-                          _buildProfileItem(
-                              Icons.badge, 'HỌ TÊN', student.hoTen),
-                          _buildProfileItem(Icons.phone, 'SỐ ĐIỆN THOẠI',
-                              student.soDienThoai ?? 'Không có'),
-                          _buildProfileItem(
-                              Icons.cake,
-                              'NGÀY SINH',
-                              DateFormat('dd/MM/yyyy')
-                                  .format(student.ngaySinh)),
-                          _buildProfileItem(Icons.home, 'ĐỊA CHỈ',
-                              student.diaChi ?? 'Không có'),
-                        ],
-                      ),
+                  ),
+                  const SizedBox(height: 20),
+                  // Info Cards
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                    child: Column(
+                      children: [
+                        _buildModernProfileItem(
+                            Icons.badge_rounded, 'Mã học viên', student.maHocVien, true),
+                        _buildModernProfileItem(
+                            Icons.person_rounded, 'Họ tên', student.hoTen, false),
+                        _buildModernProfileItem(Icons.phone_rounded, 'Số điện thoại',
+                            student.soDienThoai ?? 'Chưa cập nhật', false),
+                        _buildModernProfileItem(
+                            Icons.cake_rounded,
+                            'Ngày sinh',
+                            student.ngaySinh != null
+                                ? DateFormat('dd/MM/yyyy')
+                                    .format(student.ngaySinh!)
+                                : 'Chưa cập nhật', false),
+                        _buildModernProfileItem(Icons.home_rounded, 'Địa chỉ',
+                            student.diaChi ?? 'Chưa cập nhật', false, isLast: true),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             );
           },
@@ -224,45 +251,41 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
     );
   }
 
-  Widget _buildProfileItem(IconData icon, String label, String value) {
+  Widget _buildModernProfileItem(IconData icon, String label, String value, bool isFirst, {bool isLast = false}) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: RetroColors.vintageWhite,
-        border: Border.all(color: RetroColors.vintageBrown, width: 2),
+        border: Border(
+          top: isFirst ? BorderSide.none : BorderSide(color: Colors.grey.shade200, width: 1),
+        ),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 50,
-            height: 50,
-            decoration: const BoxDecoration(
-              color: RetroColors.vintageBrown,
-              border: Border(
-                right:
-                    BorderSide(color: RetroColors.vintageDarkBrown, width: 2),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF8B4513).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                color: const Color(0xFF8B4513),
+                size: 24,
               ),
             ),
-            child: Icon(
-              icon,
-              color: RetroColors.vintageCream,
-              size: 24,
-            ),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
+            const SizedBox(width: 16),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     label,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: RetroColors.vintageDarkBrown,
-                      letterSpacing: 1,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey.shade600,
+                      letterSpacing: 0.3,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -270,14 +293,15 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                     value,
                     style: const TextStyle(
                       fontSize: 16,
-                      color: RetroColors.vintageDarkBrown,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1a1a1a),
                     ),
                   ),
                 ],
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

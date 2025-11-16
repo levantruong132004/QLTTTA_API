@@ -5,11 +5,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class DashboardService {
   final ApiService _apiService = ApiService();
+  int? _currentRoleId;
 
   Future<DashboardStats> getStats() async {
     // Get role-specific stats
     final prefs = await SharedPreferences.getInstance();
     final roleId = prefs.getInt('roleId') ?? 1;
+    _currentRoleId = roleId;
     
     if (roleId == 1) {
       // Student: get my registrations and invoices count
@@ -17,6 +19,9 @@ class DashboardService {
     } else if (roleId == 3) {
       // Accountant: get pending payments and accountant registrations count
       return await _getAccountantStats();
+    } else if (roleId == 4) {
+      // Academic staff
+      return await _getGeneralStats(forceStaffStudentCount: true);
     } else {
       // Admin, Teacher, Staff: get general stats
       return await _getGeneralStats();
@@ -176,7 +181,7 @@ class DashboardService {
     }
   }
 
-  Future<DashboardStats> _getGeneralStats() async {
+  Future<DashboardStats> _getGeneralStats({bool forceStaffStudentCount = false}) async {
     try {
       int totalCourses = 0;
       int totalStudents = 0;
@@ -196,20 +201,34 @@ class DashboardService {
         print('Error fetching courses: $e');
       }
       
-      // Students endpoint
+      // Students count endpoint (chính xác và nhẹ)
       try {
-        final studentsResponse = await _apiService.get('Students');
-        if (studentsResponse.statusCode == 200) {
-          final body = jsonDecode(studentsResponse.body);
-          if (body is Map && body['data'] != null) {
-            final List<dynamic> studentData = body['data'];
-            totalStudents = studentData.length;
-          } else if (body is List) {
-            totalStudents = body.length;
+        final countResponse = await _apiService.get('Students/count');
+        if (countResponse.statusCode == 200) {
+          final body = jsonDecode(countResponse.body);
+          final count = body['Count'] ?? body['count'];
+          if (count is int) {
+            totalStudents = count;
+          } else if (count is String) {
+            totalStudents = int.tryParse(count) ?? 0;
+          }
+        } else {
+          // Fallback: lấy trang đầu nếu count thất bại
+          final studentsResponse = await _apiService.get('Students?pageNumber=1&pageSize=100');
+          if (studentsResponse.statusCode == 200) {
+            final body = jsonDecode(studentsResponse.body);
+            if (body is Map) {
+              final dataField = body['data'] ?? body['Data'];
+              if (dataField is List) totalStudents = dataField.length; // chỉ trang đầu
+              final totalRecords = body['TotalRecords'] ?? body['totalRecords'];
+              if (totalRecords is int) totalStudents = totalRecords; // ưu tiên totalRecords nếu có
+            } else if (body is List) {
+              totalStudents = body.length;
+            }
           }
         }
       } catch (e) {
-        print('Error fetching students: $e');
+        print('Error fetching students count: $e');
       }
       
       // Classes endpoint
@@ -240,6 +259,13 @@ class DashboardService {
       } catch (e) {
         print('Error fetching registrations: $e');
       }
+
+      if (forceStaffStudentCount || (_currentRoleId == 4 && totalStudents == 0)) {
+        final staffCount = await _countStudentsViaStaffEndpoint();
+        if (staffCount > 0) {
+          totalStudents = staffCount;
+        }
+      }
       
       return DashboardStats(
         totalCourses: totalCourses,
@@ -251,6 +277,21 @@ class DashboardService {
       print('Error fetching general stats: $e');
       return DashboardStats.empty();
     }
+  }
+
+  Future<int> _countStudentsViaStaffEndpoint() async {
+    try {
+      final response = await _apiService.get('staff/students');
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        final data = body is Map ? (body['data'] ?? body['Data']) : null;
+        if (data is List) return data.length;
+        if (body is List) return body.length;
+      }
+    } catch (e) {
+      print('Error counting staff students: $e');
+    }
+    return 0;
   }
 
   Future<List<Course>> getCourses() async {
