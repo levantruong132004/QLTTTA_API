@@ -92,6 +92,14 @@ namespace QLTTTA_API.Models.DTOs
     }
 
     // Registration DTOs
+    public class EnrollClassRequest
+    {
+        [Required(ErrorMessage = "Lớp học là bắt buộc")]
+        public int ClassId { get; set; }
+
+        public string? Note { get; set; }
+    }
+
     public class RegistrationCreateDto
     {
         [Required(ErrorMessage = "Học viên là bắt buộc")]

@@ -17,14 +17,16 @@ namespace QLTTTA_API.Controllers
             _logger = logger;
         }
 
+        /// <summary>
+        /// Lấy danh sách tất cả khóa học - Công khai cho tất cả người dùng (học viên, nhân viên, kế toán)
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> GetCourses()
         {
             try
             {
-                // Dùng service để hưởng per-user connection
                 var list = await _courseService.GetAllCoursesAsync();
-                // Trả đầy đủ field để phía quản trị sử dụng (bao gồm cả CourseCode, StandardFee)
+                // Trả đầy đủ field để phía quản trị sử dụng
                 var shaped = list.Select(c => new
                 {
                     c.CourseId,
@@ -42,6 +44,9 @@ namespace QLTTTA_API.Controllers
             }
         }
 
+        /// <summary>
+        /// Lấy chi tiết khóa học theo ID - Công khai cho tất cả người dùng
+        /// </summary>
         [HttpGet("{id}")]
         public async Task<IActionResult> GetCourseById(int id)
         {
@@ -59,6 +64,10 @@ namespace QLTTTA_API.Controllers
         }
 
         // =============== STAFF-ONLY OPERATIONS (enforced by DB privileges) ===============
+        
+        /// <summary>
+        /// Tạo khóa học mới - Chỉ dành cho nhân viên (DB sẽ kiểm tra quyền)
+        /// </summary>
         [HttpPost]
         public async Task<IActionResult> CreateCourse([FromBody] Models.DTOs.CourseCreateDto dto)
         {
@@ -80,6 +89,9 @@ namespace QLTTTA_API.Controllers
             }
         }
 
+        /// <summary>
+        /// Cập nhật khóa học - Chỉ dành cho nhân viên
+        /// </summary>
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateCourse(int id, [FromBody] Models.DTOs.CourseUpdateDto dto)
         {
@@ -104,6 +116,9 @@ namespace QLTTTA_API.Controllers
             }
         }
 
+        /// <summary>
+        /// Xóa khóa học - Chỉ dành cho nhân viên
+        /// </summary>
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteCourse(int id)
         {

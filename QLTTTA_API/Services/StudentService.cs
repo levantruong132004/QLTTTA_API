@@ -21,6 +21,8 @@ namespace QLTTTA_API.Services
         Task<ApiResponse<bool>> DeleteStudentAsync(int id);
         /// <summary>Tìm kiếm nhanh học viên theo tên hoặc mã.</summary>
         Task<List<Student>> SearchStudentsAsync(string keyword);
+        /// <summary>Đồng bộ một học viên vào bảng legacy HOC_VIEN nếu thiếu.</summary>
+        Task<bool> SyncLegacyHocVienAsync(int studentId);
     }
 
     /// <summary>
@@ -28,8 +30,8 @@ namespace QLTTTA_API.Services
     /// </summary>
     public class StudentService : BaseService, IStudentService
     {
-        public StudentService(IConfiguration configuration, ILogger<StudentService> logger, IOracleConnectionProvider userConnProvider)
-            : base(configuration, logger, userConnProvider) { }
+        public StudentService(IConfiguration configuration, ILogger<StudentService> logger, IOracleConnectionProvider userConnProvider, IHttpContextAccessor httpContextAccessor)
+            : base(configuration, logger, userConnProvider, httpContextAccessor) { }
 
         /// <summary>
         /// Lấy danh sách học viên phân trang. Hiện tại đơn giản là SELECT toàn bộ rồi thực hiện Skip/Take ở memory.
@@ -92,10 +94,43 @@ namespace QLTTTA_API.Services
         /// </summary>
         public async Task<Student?> GetStudentByIdAsync(int id)
         {
+            // Thử lấy từ bảng chuẩn mới STUDENTS
             var sql = @"SELECT s.* FROM QLTT_ADMIN.STUDENTS s
                         INNER JOIN QLTT_ADMIN.ACCOUNTS a ON a.USER_ID = s.STUDENT_ID
                         WHERE s.STUDENT_ID = :id AND a.IS_ACTIVE = 1";
-            return await ExecuteQuerySingleAsync<Student>(sql, new { id });
+            var student = await ExecuteQuerySingleAsync<Student>(sql, new { id });
+            if (student != null) return student;
+
+            // Fallback: lấy từ bảng legacy HOC_VIEN (nếu hệ thống cũ chưa migrate hoàn toàn)
+            try
+            {
+                var legacySql = @"SELECT hv.ID_HOC_VIEN, hv.HO_TEN, hv.MA_HOC_VIEN, hv.GIOI_TINH, hv.NGAY_SINH, hv.SO_DIEN_THOAI, hv.DIA_CHI
+                                   FROM HOC_VIEN hv
+                                   JOIN TAI_KHOAN tk ON tk.ID_NGUOI_DUNG = hv.ID_HOC_VIEN AND tk.IS_ACTIVE = 1
+                                   WHERE hv.ID_HOC_VIEN = :id";
+                using var conn = await GetConnectionAsync();
+                using var cmd = new OracleCommand(legacySql, conn) { BindByName = true };
+                cmd.Parameters.Add(":id", OracleDbType.Int32).Value = id;
+                using var reader = await cmd.ExecuteReaderAsync();
+                if (await reader.ReadAsync())
+                {
+                    return new Student
+                    {
+                        StudentId = reader.GetInt32(0),
+                        FullName = reader.IsDBNull(1) ? null : reader.GetString(1),
+                        StudentCode = reader.IsDBNull(2) ? null : reader.GetString(2),
+                        Sex = reader.IsDBNull(3) ? null : reader.GetString(3),
+                        DateOfBirth = reader.IsDBNull(4) ? null : reader.GetDateTime(4),
+                        PhoneNumber = reader.IsDBNull(5) ? null : reader.GetString(5),
+                        Address = reader.IsDBNull(6) ? null : reader.GetString(6)
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Fallback HOC_VIEN load failed for student {StudentId}", id);
+            }
+            return null;
         }
 
         /// <summary>
@@ -223,6 +258,35 @@ namespace QLTTTA_API.Services
                         }
                     }
 
+                    // 7. Đồng bộ sang bảng legacy HOC_VIEN nếu chưa có
+                    if (newStudent != null)
+                    {
+                        try
+                        {
+                            using var checkHV = new OracleCommand("SELECT COUNT(*) FROM HOC_VIEN WHERE ID_HOC_VIEN = :id", connection);
+                            checkHV.Parameters.Add(":id", OracleDbType.Int32).Value = newStudent.StudentId;
+                            var existHV = Convert.ToInt32(await checkHV.ExecuteScalarAsync());
+                            if (existHV == 0)
+                            {
+                                using var insHV = new OracleCommand(@"INSERT INTO HOC_VIEN (ID_HOC_VIEN, HO_TEN, MA_HOC_VIEN, GIOI_TINH, NGAY_SINH, SO_DIEN_THOAI, DIA_CHI)
+                                                                     VALUES (:id, :hoten, :ma, :sex, :dob, :phone, :addr)", connection);
+                                insHV.Parameters.Add(":id", OracleDbType.Int32).Value = newStudent.StudentId;
+                                insHV.Parameters.Add(":hoten", OracleDbType.NVarchar2).Value = (object?)newStudent.FullName ?? DBNull.Value;
+                                insHV.Parameters.Add(":ma", OracleDbType.Varchar2).Value = (object?)newStudent.StudentCode ?? $"STU_{newStudent.StudentId}";
+                                insHV.Parameters.Add(":sex", OracleDbType.NVarchar2).Value = (object?)newStudent.Sex ?? DBNull.Value;
+                                insHV.Parameters.Add(":dob", OracleDbType.Date).Value = (object?)newStudent.DateOfBirth ?? DBNull.Value;
+                                insHV.Parameters.Add(":phone", OracleDbType.Varchar2).Value = (object?)newStudent.PhoneNumber ?? DBNull.Value;
+                                insHV.Parameters.Add(":addr", OracleDbType.NVarchar2).Value = (object?)newStudent.Address ?? DBNull.Value;
+                                await insHV.ExecuteNonQueryAsync();
+                                _logger.LogInformation("Synced new student {StudentId} into HOC_VIEN", newStudent.StudentId);
+                            }
+                        }
+                        catch (Exception syncEx)
+                        {
+                            _logger.LogWarning(syncEx, "Cannot sync student {StudentId} to HOC_VIEN", newStudent.StudentId);
+                        }
+                    }
+
                     return new ApiResponse<Student>
                     {
                         Success = true,
@@ -247,7 +311,6 @@ namespace QLTTTA_API.Services
                 return new ApiResponse<Student>
                 {
                     Success = false,
-                    //Message = "Có lỗi xảy ra khi tạo học viên"
                     Message = "Lỗi: " + ex.Message
                 };
             }
@@ -377,6 +440,39 @@ namespace QLTTTA_API.Services
                           AND (UPPER(s.FULL_NAME) LIKE UPPER(:keyword) OR UPPER(s.STUDENT_CODE) LIKE UPPER(:keyword))
                         ORDER BY s.FULL_NAME";
             return await ExecuteQueryAsync<Student>(sql, new { keyword = $"%{keyword}%" });
+        }
+
+        /// <summary>
+        /// Đồng bộ một học viên vào bảng legacy HOC_VIEN nếu thiếu.
+        /// </summary>
+        public async Task<bool> SyncLegacyHocVienAsync(int studentId)
+        {
+            try
+            {
+                var stu = await GetStudentByIdAsync(studentId);
+                if (stu == null) return false;
+                using var conn = await GetConnectionAsync();
+                using var chk = new OracleCommand("SELECT COUNT(*) FROM HOC_VIEN WHERE ID_HOC_VIEN = :id", conn) { BindByName = true };
+                chk.Parameters.Add(":id", OracleDbType.Int32).Value = studentId;
+                var cnt = Convert.ToInt32(await chk.ExecuteScalarAsync());
+                if (cnt > 0) return true; // đã có
+                using var ins = new OracleCommand(@"INSERT INTO HOC_VIEN (ID_HOC_VIEN, HO_TEN, MA_HOC_VIEN, GIOI_TINH, NGAY_SINH, SO_DIEN_THOAI, DIA_CHI)
+                                                   VALUES (:id,:hoten,:ma,:sex,:dob,:phone,:addr)", conn) { BindByName = true };
+                ins.Parameters.Add(":id", OracleDbType.Int32).Value = stu.StudentId;
+                ins.Parameters.Add(":hoten", OracleDbType.NVarchar2).Value = (object?)stu.FullName ?? DBNull.Value;
+                ins.Parameters.Add(":ma", OracleDbType.Varchar2).Value = (object?)stu.StudentCode ?? $"STU_{stu.StudentId}";
+                ins.Parameters.Add(":sex", OracleDbType.NVarchar2).Value = (object?)stu.Sex ?? DBNull.Value;
+                ins.Parameters.Add(":dob", OracleDbType.Date).Value = (object?)stu.DateOfBirth ?? DBNull.Value;
+                ins.Parameters.Add(":phone", OracleDbType.Varchar2).Value = (object?)stu.PhoneNumber ?? DBNull.Value;
+                ins.Parameters.Add(":addr", OracleDbType.NVarchar2).Value = (object?)stu.Address ?? DBNull.Value;
+                await ins.ExecuteNonQueryAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "SyncLegacyHocVienAsync failed for {StudentId}", studentId);
+                return false;
+            }
         }
     }
 }

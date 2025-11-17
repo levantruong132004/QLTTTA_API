@@ -40,6 +40,7 @@
                     @Html.DropDownList(
                         "classId",
                         new Microsoft.AspNetCore.Mvc.Rendering.SelectList(Model.Classes, nameof(QLTTTA_WEB.Models.AdminClassItem.ClassId), nameof(QLTTTA_WEB.Models.AdminClassItem.ClassName), Model.SelectedClassId),
+                        "-- Tất cả lớp --",
                         new { @class = "form-select", onchange = "this.form.submit()" }
                     )
                 }
@@ -124,7 +125,7 @@
                                 @if (string.Equals(r.Status, "Đã duyệt", StringComparison.OrdinalIgnoreCase))
                                 {
                                     <a class="btn btn-sm btn-success" asp-controller="Accountant" asp-action="Invoice" asp-route-id="@r.RegistrationId">
-                                        <i class="fas fa-file-invoice"></i> Xuất hóa đơn
+                                        <i class="fas fa-file-invoice"></i> Tạo hóa đơn
                                     </a>
                                 }
                                 else
@@ -137,13 +138,12 @@
                             <td>
                                 @if (string.Equals(r.Status, "Đã duyệt", StringComparison.OrdinalIgnoreCase) && r.InvoiceId.HasValue)
                                 {
-                                    <form method="post" asp-controller="Accountant" asp-action="PrintAndEmailInvoice" style="display: inline;">
-                                        <input type="hidden" name="invoiceId" value="@r.InvoiceId" />
-                                        <button type="submit" class="btn btn-sm btn-primary" title="In hóa đơn và gửi PDF qua email cho học viên" 
-                                                onclick="return confirm('Bạn có chắc muốn in hóa đơn và gửi PDF qua email cho học viên @r.StudentName?')">
-                                            <i class="fas fa-print"></i> In hóa đơn
-                                        </button>
-                                    </form>
+                                    @* Nút Ký số và In (tự động ký nếu chưa ký, hoặc in lại nếu đã ký) *@
+                                    <button type="button" class="btn btn-sm btn-primary" 
+                                            onclick="showSignAndPrintModal(@r.InvoiceId, '@r.StudentName', '@(r.InvoiceCode ?? "HD_" + r.InvoiceId)')"
+                                            title="Ký số (nếu chưa ký) và in hóa đơn với giao diện đẹp">
+                                        <i class="fas fa-signature"></i> Ký số & In
+                                    </button>
                                 }
                                 else if (string.Equals(r.Status, "Đã duyệt", StringComparison.OrdinalIgnoreCase))
                                 {
@@ -170,3 +170,60 @@
         </div>
     </div>
 </div>
+
+@* Modal Ký số và In hóa đơn *@
+<div class="modal fade" id="signAndPrintModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-signature"></i> Ký số và In hóa đơn</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="signAndPrintForm" method="post" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <input type="hidden" id="modalInvoiceId" name="invoiceId" />
+                    <input type="hidden" id="modalAccountantId" name="accountantId" value="@Context.Session.GetString("UserId")" />
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> 
+                        <strong>Học viên:</strong> <span id="modalStudentName"></span><br/>
+                        <strong>Mã hóa đơn:</strong> <span id="modalInvoiceCode"></span>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label"><i class="fas fa-key"></i> Chọn file Private Key (.pem)</label>
+                        <input type="file" name="privateKey" class="form-control" accept=".pem,.key,.txt" required />
+                        <div class="form-text">File private key để ký số hóa đơn</div>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i> 
+                        Sau khi ký số, hệ thống sẽ tự động tạo PDF với giao diện đẹp và gửi qua email cho học viên.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times"></i> Hủy
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-signature"></i> Ký số và In
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function showSignAndPrintModal(invoiceId, studentName, invoiceCode) {
+    document.getElementById('modalInvoiceId').value = invoiceId;
+    document.getElementById('modalStudentName').textContent = studentName;
+    document.getElementById('modalInvoiceCode').textContent = invoiceCode;
+    
+    // Set form action to API endpoint
+    document.getElementById('signAndPrintForm').action = '@Url.Action("SignAndPrintInvoice", "Accountant")';
+    
+    var modal = new bootstrap.Modal(document.getElementById('signAndPrintModal'));
+    modal.show();
+}
+</script>

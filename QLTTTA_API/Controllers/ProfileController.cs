@@ -130,5 +130,12 @@ namespace QLTTTA_API.Controllers
                 return StatusCode(500, new { Success = false, Message = "Có lỗi xảy ra khi tải thông tin đăng ký" });
             }
         }
+
+        [HttpGet("debug")]
+        public async Task<IActionResult> Debug()
+        {
+            var dbg = await _profileService.DebugProfileAsync();
+            return Ok(dbg);
+        }
     }
 }

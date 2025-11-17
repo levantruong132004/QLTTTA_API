@@ -51,7 +51,7 @@
                 <div class="retro-alert retro-alert-info">
                     <div class="retro-alert-content">
                         <i class="fas fa-check-circle"></i> Đã có hóa đơn: <strong>@Model.Invoice.InvoiceCode</strong>
-                        <button class="btn btn-sm btn-primary float-end" onclick="printInvoice()"><i class="fas fa-print"></i> In hóa đơn</button>
+                        @* <button class="btn btn-sm btn-primary float-end" onclick="printInvoice()"><i class="fas fa-print"></i> In hóa đơn</button> *@
                     </div>
                 </div>
                 <div class="retro-card">
@@ -98,7 +98,7 @@
                                     </div>
                                     <div class="col-md-6"><strong>Người ký:</strong> @Model.Signature.SignedBy</div>
                                     <div class="col-md-6"><strong>Ngày ký:</strong> @Model.Signature.SignedDate?.ToString("dd/MM/yyyy HH:mm")</div>
-                                    <div class="col-md-6"><strong>Thuật toán:</strong> @Model.Signature.Algorithm</div>
+                                    @* <div class="col-md-6"><strong>Thuật toán:</strong> @Model.Signature.Algorithm</div> *@
                                     <div class="col-md-6"><strong>Trạng thái:</strong> 
                                         <span class="badge @(Model.Signature.IsValid ? "bg-success" : "bg-danger")">
                                             @(Model.Signature.IsValid ? "Hợp lệ" : "Không hợp lệ")
@@ -245,8 +245,5 @@ function printInvoice() {
         window.onload = function(){ window.print(); }
       <\/script>
     </body>
-    </html>`;
-    w.document.write(html);
-    w.document.close();
-}
+    </html>
 </script>

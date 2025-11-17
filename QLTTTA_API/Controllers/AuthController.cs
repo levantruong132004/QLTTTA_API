@@ -154,5 +154,83 @@ namespace QLTTTA_API.Controllers
             var valid = await _authService.CheckSessionAsync(username, sessionId, deviceType);
             return Ok(new { status = valid ? "valid" : "invalid" });
         }
+
+        [HttpGet("debug-session")]
+        public async Task<IActionResult> DebugSession([FromQuery] string? username, [FromQuery] string? sessionId, [FromQuery] string? deviceType)
+        {
+            var headerSession = Request.Headers["X-Session-Id"].FirstOrDefault();
+            var cookieSession = Request.Cookies["SessionId"];
+            var hdrDevice = Request.Headers["X-Device-Type"].FirstOrDefault();
+            deviceType = (deviceType ?? hdrDevice ?? "pc").Trim().ToLowerInvariant();
+            if (deviceType != "pc" && deviceType != "mobile") deviceType = "pc";
+            string? resolvedUsername = null;
+            int? userId = null;
+            string? dbSidPc = null;
+            string? dbSidMobile = null;
+            bool? isActive = null;
+            try
+            {
+                using var conn = new Oracle.ManagedDataAccess.Client.OracleConnection(_authService is AuthService svc ? svc.GetType().GetField("_connectionString", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(svc)?.ToString() : null);
+                if (!string.IsNullOrEmpty(conn.ConnectionString))
+                {
+                    await conn.OpenAsync();
+                    // Ưu tiên tra theo username; nếu không có thì tra theo sessionId cung cấp hoặc header/cookie
+                    if (!string.IsNullOrWhiteSpace(username))
+                    {
+                        using var cmd = new Oracle.ManagedDataAccess.Client.OracleCommand(@"SELECT ID_NGUOI_DUNG, TEN_DANG_NHAP, SESSION_ID_PC, SESSION_ID_MOBILE, TRANG_THAI_KICH_HOAT FROM TAI_KHOAN WHERE UPPER(TEN_DANG_NHAP)=UPPER(:u)", conn) { BindByName = true };
+                        cmd.Parameters.Add(":u", Oracle.ManagedDataAccess.Client.OracleDbType.Varchar2).Value = username;
+                        using var rdr = await cmd.ExecuteReaderAsync(System.Data.CommandBehavior.SingleRow);
+                        if (await rdr.ReadAsync())
+                        {
+                            userId = rdr.IsDBNull(0) ? null : (int?)rdr.GetInt32(0);
+                            resolvedUsername = rdr.IsDBNull(1) ? null : rdr.GetString(1);
+                            dbSidPc = rdr.IsDBNull(2) ? null : rdr.GetString(2);
+                            dbSidMobile = rdr.IsDBNull(3) ? null : rdr.GetString(3);
+                            isActive = !rdr.IsDBNull(4) && rdr.GetInt32(4) == 1;
+                        }
+                    }
+                    else
+                    {
+                        var sidSearch = sessionId ?? headerSession ?? cookieSession;
+                        if (!string.IsNullOrWhiteSpace(sidSearch))
+                        {
+                            using var cmd = new Oracle.ManagedDataAccess.Client.OracleCommand(@"SELECT ID_NGUOI_DUNG, TEN_DANG_NHAP, SESSION_ID_PC, SESSION_ID_MOBILE, TRANG_THAI_KICH_HOAT FROM TAI_KHOAN WHERE SESSION_ID_PC=:sid OR SESSION_ID_MOBILE=:sid", conn) { BindByName = true };
+                            cmd.Parameters.Add(":sid", Oracle.ManagedDataAccess.Client.OracleDbType.Varchar2).Value = sidSearch;
+                            using var rdr = await cmd.ExecuteReaderAsync(System.Data.CommandBehavior.SingleRow);
+                            if (await rdr.ReadAsync())
+                            {
+                                userId = rdr.IsDBNull(0) ? null : (int?)rdr.GetInt32(0);
+                                resolvedUsername = rdr.IsDBNull(1) ? null : rdr.GetString(1);
+                                dbSidPc = rdr.IsDBNull(2) ? null : rdr.GetString(2);
+                                dbSidMobile = rdr.IsDBNull(3) ? null : rdr.GetString(3);
+                                isActive = !rdr.IsDBNull(4) && rdr.GetInt32(4) == 1;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "DebugSession error");
+                return StatusCode(500, new { error = ex.Message });
+            }
+            return Ok(new
+            {
+                ProvidedQueryUsername = username,
+                ProvidedQuerySessionId = sessionId,
+                HeaderSessionId = headerSession,
+                CookieSessionId = cookieSession,
+                DeviceType = deviceType,
+                ResolvedUsername = resolvedUsername,
+                UserId = userId,
+                DbSessionPc = dbSidPc,
+                DbSessionMobile = dbSidMobile,
+                MatchesHeader = !string.IsNullOrEmpty(headerSession) && (headerSession == dbSidPc || headerSession == dbSidMobile),
+                MatchesCookie = !string.IsNullOrEmpty(cookieSession) && (cookieSession == dbSidPc || cookieSession == dbSidMobile),
+                IsActive = isActive,
+                Source = !string.IsNullOrWhiteSpace(username) ? "BY_USERNAME" : "BY_SESSION",
+                Note = "Dùng để đối chiếu vì sao profile rỗng"
+            });
+        }
     }
 }

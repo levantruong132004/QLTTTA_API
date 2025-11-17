@@ -41,6 +41,13 @@ grant select on qltt_admin.lop_hoc to role_ketoan;
 grant select on qltt_admin.hoc_vien to role_ketoan;
 grant select on qltt_admin.tai_khoan to role_ketoan;
 grant select on qltt_admin.don_dang_ky to role_ketoan;
+grant role_ketoan to THAITHUAN;
+alter user thaithuan default role all;
+grant select on qltt_admin.khoa_hoc to role_ketoan;
+grant select on qltt_admin.lop_hoc to role_ketoan;
+grant select on qltt_admin.hoc_vien to role_ketoan;
+grant select on qltt_admin.tai_khoan to role_ketoan;
+grant select on qltt_admin.don_dang_ky to role_ketoan;
 --Tạo view tối giản:
 CREATE OR REPLACE VIEW qltt_admin.KE_TOAN_PUB AS SELECT ID_KE_TOAN, HO_TEN, KHOA_CONG_PEM FROM qltt_admin.KE_TOAN;
 --Cấp quyền cho các role đang dùng web:

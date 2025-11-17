@@ -16,8 +16,8 @@ namespace QLTTTA_API.Services
 
     public class ClassService : BaseService, IClassService
     {
-        public ClassService(IConfiguration configuration, ILogger<ClassService> logger, IOracleConnectionProvider userConnProvider)
-            : base(configuration, logger, userConnProvider) { }
+        public ClassService(IConfiguration configuration, ILogger<ClassService> logger, IOracleConnectionProvider userConnProvider, IHttpContextAccessor httpContextAccessor)
+            : base(configuration, logger, userConnProvider, httpContextAccessor) { }
 
         public async Task<List<Class>> GetClassesAsync(int? courseId = null, string? search = null)
         {

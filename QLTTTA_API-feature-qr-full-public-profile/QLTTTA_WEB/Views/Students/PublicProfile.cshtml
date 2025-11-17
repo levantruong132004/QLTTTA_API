@@ -1,0 +1,28 @@
+@model QLTTTA_WEB.Controllers.PublicStudentViewModel
+@{
+    ViewData["Title"] = "Hồ sơ học viên";
+}
+
+<style>
+    .public-card { max-width: 480px; margin: 40px auto; background: var(--vintage-cream); border: 3px solid var(--vintage-brown); box-shadow: 8px 8px 0 var(--vintage-dark-brown); padding: 24px; }
+    .public-title { text-align:center; font-family:'Times New Roman', serif; text-transform:uppercase; color:var(--vintage-brown); margin-bottom:16px; }
+    .public-row { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--vintage-tan); }
+    .public-row:last-child { border-bottom:none; }
+    .label { font-weight:bold; color:var(--vintage-brown); }
+    .value { color:var(--vintage-dark-brown); }
+    .note { margin-top:14px; color:#666; font-size:.95rem; text-align:center; }
+    .btn-back { display:block; text-align:center; margin-top:18px; text-decoration:none; border:3px solid var(--vintage-brown); padding:10px 16px; color:var(--vintage-cream); background:var(--vintage-brown); box-shadow:4px 4px 0 var(--vintage-dark-brown); }
+    .btn-back:hover { transform: translate(2px,2px); box-shadow:2px 2px 0 var(--vintage-dark-brown); }
+</style>
+
+<div class="public-card">
+    <h2 class="public-title">Hồ sơ học viên</h2>
+    <div class="public-row"><span class="label">Họ tên</span><span class="value">@Model.FullName</span></div>
+    <div class="public-row"><span class="label">Mã học viên</span><span class="value">@Model.StudentCode</span></div>
+    <div class="public-row"><span class="label">Giới tính</span><span class="value">@(!string.IsNullOrEmpty(Model.Sex) ? Model.Sex : "Chưa cập nhật")</span></div>
+    <div class="public-row"><span class="label">Ngày sinh</span><span class="value">@(Model.DateOfBirth.HasValue ? Model.DateOfBirth.Value.ToString("dd/MM/yyyy") : "Chưa cập nhật")</span></div>
+    <div class="public-row"><span class="label">Số điện thoại</span><span class="value">@(string.IsNullOrWhiteSpace(Model.PhoneNumber) ? "Chưa cập nhật" : Model.PhoneNumber)</span></div>
+    <div class="public-row"><span class="label">Địa chỉ</span><span class="value">@(string.IsNullOrWhiteSpace(Model.Address) ? "Chưa cập nhật" : Model.Address)</span></div>
+    <div class="note">Trang công khai hiển thị đầy đủ thông tin hồ sơ để tra cứu.</div>
+    <a class="btn-back" href="/">Về trang chủ</a>
+    </div>

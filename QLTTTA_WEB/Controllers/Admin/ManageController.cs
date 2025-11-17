@@ -336,18 +336,35 @@ namespace QLTTTA_WEB.Controllers.Admin
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> GenerateCenterKeyPair(string centerName, string? address, string? phone, int accountantId)
+        public async Task<IActionResult> GenerateCenterKeyPair(string centerName, string? address, string? phone)
         {
             if (!IsStaff()) return RedirectToAction("Invoices");
             try
             {
-                var payload = new { AccountantId = accountantId, CenterName = centerName, Address = address, Phone = phone };
+                // Bỏ AccountantId - không cần chọn kế toán nữa
+                var payload = new { CenterName = centerName, Address = address, Phone = phone };
                 var res = await _http.PostAsync("api/digitalsignature/generate-center-keypair/save",
                     new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json"));
                 var body = await res.Content.ReadAsStringAsync();
+                
                 if (res.IsSuccessStatusCode)
                 {
-                    TempData["SuccessMessage"] = "Đã tạo và lưu public key trung tâm. Private key đã được gửi email cho kế toán.";
+                    // Parse response để lấy private key
+                    using var doc = JsonDocument.Parse(body);
+                    if (doc.RootElement.TryGetProperty("data", out var data))
+                    {
+                        var privateKey = data.GetProperty("privateKey").GetString();
+                        var publicKey = data.GetProperty("publicKey").GetString();
+                        
+                        // Lưu vào TempData để View có thể download
+                        TempData["PrivateKey"] = privateKey;
+                        TempData["PublicKey"] = publicKey;
+                        TempData["SuccessMessage"] = "Đã tạo cặp khóa thành công! Private key sẽ được tự động download. Vui lòng lưu file và trao tận tay cho kế toán.";
+                    }
+                    else
+                    {
+                        TempData["SuccessMessage"] = "Đã tạo và lưu public key trung tâm thành công.";
+                    }
                 }
                 else
                 {

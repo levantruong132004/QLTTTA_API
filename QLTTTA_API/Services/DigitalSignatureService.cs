@@ -16,6 +16,7 @@ namespace QLTTTA_API.Services
         Task<RSAKeyPairResult> GenerateCenterKeyPairAndSaveAsync(int accountantId, string centerName, string address, string phone);
         Task<SignInvoiceResult> SignInvoiceWithPrivateKeyContentAsync(int invoiceId, string privateKeyPem, int accountantId);
         Task<VerifySignatureResult> VerifyPdfSignatureAsync(byte[] pdfBytes);
+        Task<VerifySignatureResult> VerifyPdfIntegrityByHashAsync(int invoiceId, byte[] pdfBytes);
     }
 
     public class DigitalSignatureService : BaseService, IDigitalSignatureService
@@ -240,11 +241,40 @@ namespace QLTTTA_API.Services
 
                 // Xác thực chữ ký bằng public key từ bảng TTTA vào RSA object
                 using var rsa = RSA.Create();
-                rsa.ImportRSAPublicKey(Convert.FromBase64String(
-                    centerInfo.PublicKeyPem.Replace("-----BEGIN RSA PUBLIC KEY-----", "")
-                               .Replace("-----END RSA PUBLIC KEY-----", "")
-                               .Replace("\n", "").Replace("\r", "")
-                ), out _);
+                
+                // Clean public key
+                var cleanPublicKey = centerInfo.PublicKeyPem
+                    .Replace("-----BEGIN RSA PUBLIC KEY-----", "")
+                    .Replace("-----END RSA PUBLIC KEY-----", "")
+                    .Replace("-----BEGIN PUBLIC KEY-----", "")
+                    .Replace("-----END PUBLIC KEY-----", "")
+                    .Replace("\n", "")
+                    .Replace("\r", "")
+                    .Replace(" ", "")
+                    .Trim();
+                
+                try
+                {
+                    rsa.ImportRSAPublicKey(Convert.FromBase64String(cleanPublicKey), out _);
+                }
+                catch
+                {
+                    try
+                    {
+                        rsa.ImportSubjectPublicKeyInfo(Convert.FromBase64String(cleanPublicKey), out _);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Không thể import public key từ TTTA");
+                        return new VerifySignatureResult
+                        {
+                            Success = false,
+                            IsValidSignature = false,
+                            Message = "Lỗi import public key: " + ex.Message
+                        };
+                    }
+                }
+                
                 // Xác thực chữ ký                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
                 var signature = Convert.FromBase64String(invoice.SignatureBase64);
                 var isValid = rsa.VerifyData(dataBytes, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
@@ -267,6 +297,489 @@ namespace QLTTTA_API.Services
                     Success = false,
                     IsValidSignature = false,
                     Message = "Lỗi xác thực chữ ký: " + ex.Message
+                };
+            }
+        }
+
+        public async Task<VerifySignatureResult> VerifyPdfSignatureAsync(byte[] pdfBytes)
+        {
+            try
+            {
+                var publicKeyPem = await GetCenterPublicKeyAdminAsync();
+                if (string.IsNullOrEmpty(publicKeyPem))
+                    return new VerifySignatureResult { Success = false, Message = "Chưa thiết lập public key trung tâm" };
+
+                // Extract embedded signature data from PDF content
+                var content = System.Text.Encoding.UTF8.GetString(pdfBytes);
+                
+                // Tìm kiếm signature data với format mới (PDF hash signature)
+                var hashDataTag = "--BEGIN-LDA-INVOICE-HASH--";
+                var hashEndTag = "--END-LDA-INVOICE-HASH--";
+                
+                // Tìm kiếm PDF hash signature trước (Version 2.0)
+                var hashStartIdx = content.LastIndexOf(hashDataTag);
+                var hashEndIdx = content.LastIndexOf(hashEndTag);
+                
+                if (hashStartIdx >= 0 && hashEndIdx >= 0 && hashEndIdx > hashStartIdx)
+                {
+                    // XÁC THỰC PDF HASH SIGNATURE (VERSION 2.0) - Từng byte PDF
+                    return await VerifyPdfHashSignatureAsync(pdfBytes, hashStartIdx, hashEndIdx, publicKeyPem);
+                }
+                
+                // Fallback: Tìm kiếm signature data cũ
+                var dataTag = "--BEGIN-LDA-INVOICE--";
+                var endTag = "--END-LDA-INVOICE--";
+                
+                var startIdx = content.LastIndexOf(dataTag);
+                var endIdx = content.LastIndexOf(endTag);
+                
+                if (startIdx < 0 || endIdx < 0 || endIdx <= startIdx)
+                {
+                    startIdx = content.IndexOf(dataTag);
+                    endIdx = content.IndexOf(endTag);
+                }
+                
+                if (startIdx < 0 || endIdx < 0 || endIdx <= startIdx)
+                    return new VerifySignatureResult 
+                    { 
+                        Success = false, 
+                        Message = "❌ Không tìm thấy dữ liệu chữ ký trong PDF.\n\nFile này có thể:\n• Không phải là hóa đơn từ hệ thống LDA\n• Chưa được ký số\n• Đã bị thay đổi sau khi ký" 
+                    };
+                
+                // XÁC THỰC SIGNATURE CŨ (VERSION 1.0) - Chỉ metadata
+                return await VerifyLegacySignatureAsync(content, startIdx, endIdx, dataTag, publicKeyPem);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "VerifyPdfSignatureAsync general error");
+                return new VerifySignatureResult 
+                { 
+                    Success = false, 
+                    Message = $"❌ Lỗi hệ thống khi xác thực chữ ký:\n{ex.Message}\n\nVui lòng thử lại hoặc liên hệ hỗ trợ kỹ thuật." 
+                };
+            }
+        }
+
+        public async Task<VerifySignatureResult> VerifyPdfIntegrityByHashAsync(int invoiceId, byte[] pdfBytes)
+        {
+            try
+            {
+                using var conn = await GetAdminConnectionAsync();
+                var sql = @"SELECT SIGNED_PDF_HASH, SIGNED_PDF_VERSION, SIGNED_PDF_PATH, NGAY_KY
+                              FROM HOA_DON WHERE ID_HOA_DON = :id";
+                using var cmd = new OracleCommand(sql, conn) { BindByName = true };
+                cmd.Parameters.Add(":id", OracleDbType.Int32).Value = invoiceId;
+                using var reader = await cmd.ExecuteReaderAsync();
+                if (!await reader.ReadAsync())
+                {
+                    return new VerifySignatureResult { Success = false, Message = "Không tìm thấy hóa đơn" };
+                }
+
+                var storedHash = reader.IsDBNull(0) ? null : reader.GetString(0);
+                if (string.IsNullOrEmpty(storedHash))
+                {
+                    return new VerifySignatureResult { Success = false, Message = "Hóa đơn chưa có mã băm đã lưu" };
+                }
+
+                var version = reader.IsDBNull(1) ? "UNKNOWN" : reader.GetString(1);
+                var path = reader.IsDBNull(2) ? string.Empty : reader.GetString(2);
+                var signedDate = reader.IsDBNull(3) ? (DateTime?)null : reader.GetDateTime(3);
+
+                var uploadedHash = Convert.ToHexString(SHA256.HashData(pdfBytes));
+                var match = string.Equals(uploadedHash, storedHash, StringComparison.OrdinalIgnoreCase);
+
+                var payload = JsonSerializer.Serialize(new
+                {
+                    storedHash,
+                    uploadedHash,
+                    version,
+                    filePath = path
+                });
+
+                return new VerifySignatureResult
+                {
+                    Success = true,
+                    IsValidSignature = match,
+                    Message = match ? "✅ File PDF trùng khớp mã băm đã lưu" : "❌ Mã băm của file không trùng với dữ liệu đã lưu",
+                    SignedDate = signedDate,
+                    SignedBy = version,
+                    InvoiceData = payload
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "VerifyPdfIntegrityByHashAsync error for {InvoiceId}", invoiceId);
+                return new VerifySignatureResult { Success = false, Message = $"Lỗi kiểm tra mã băm: {ex.Message}" };
+            }
+        }
+
+        /// <summary>
+        /// Xác thực PDF Hash Signature - Kiểm tra từng byte của PDF
+        /// </summary>
+        private async Task<VerifySignatureResult> VerifyPdfHashSignatureAsync(byte[] pdfBytes, int hashStartIdx, int hashEndIdx, string publicKeyPem)
+        {
+            try
+            {
+                var content = System.Text.Encoding.UTF8.GetString(pdfBytes);
+                var hashDataTag = "--BEGIN-LDA-INVOICE-HASH--";
+                var embedded = content.Substring(hashStartIdx + hashDataTag.Length, hashEndIdx - (hashStartIdx + hashDataTag.Length));
+                
+                // Parse signature data
+                string? base64Data = null, base64Sig = null, timestamp = null, algorithm = null, hashMethod = null, issuer = null, version = null;
+                var lines = embedded.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                
+                foreach (var line in lines)
+                {
+                    var trimmed = line.Trim();
+                    if (string.IsNullOrEmpty(trimmed)) continue;
+                    
+                    if (trimmed.StartsWith("Data:", StringComparison.OrdinalIgnoreCase)) 
+                        base64Data = trimmed.Substring(5).Trim();
+                    else if (trimmed.StartsWith("Signature:", StringComparison.OrdinalIgnoreCase)) 
+                        base64Sig = trimmed.Substring(10).Trim();
+                    else if (trimmed.StartsWith("Timestamp:", StringComparison.OrdinalIgnoreCase))
+                        timestamp = trimmed.Substring(10).Trim();
+                    else if (trimmed.StartsWith("Algorithm:", StringComparison.OrdinalIgnoreCase))
+                        algorithm = trimmed.Substring(10).Trim();
+                    else if (trimmed.StartsWith("HashMethod:", StringComparison.OrdinalIgnoreCase))
+                        hashMethod = trimmed.Substring(11).Trim();
+                    else if (trimmed.StartsWith("Issuer:", StringComparison.OrdinalIgnoreCase))
+                        issuer = trimmed.Substring(7).Trim();
+                    else if (trimmed.StartsWith("Version:", StringComparison.OrdinalIgnoreCase))
+                        version = trimmed.Substring(8).Trim();
+                }
+                
+                if (string.IsNullOrEmpty(base64Data) || string.IsNullOrEmpty(base64Sig))
+                    return new VerifySignatureResult 
+                    { 
+                        Success = false, 
+                        Message = "❌ Dữ liệu chữ ký PDF hash không đầy đủ.\n\nFile có thể đã bị hư hại hoặc thay đổi." 
+                    };
+
+                // 1. Lấy phần PDF thuần (không có signature metadata)
+                var signatureStart = content.IndexOf("%%LDA-SIGNATURE-BOUNDARY-START%%");
+                if (signatureStart < 0)
+                {
+                    // Fallback: Thử tìm marker cũ
+                    signatureStart = content.IndexOf("%%LDA-PDF-HASH-SIGNATURE-START%%");
+                    if (signatureStart < 0)
+                    {
+                        return new VerifySignatureResult 
+                        { 
+                            Success = false, 
+                            Message = "❌ Không tìm thấy vị trí bắt đầu signature trong PDF" 
+                        };
+                    }
+                }
+
+                var purePdfContent = content.Substring(0, signatureStart);
+                var purePdfBytes = System.Text.Encoding.UTF8.GetBytes(purePdfContent);
+
+                // 2. Giải mã signature data để lấy hash gốc
+                var dataBytes = Convert.FromBase64String(base64Data);
+                var signatureDataJson = System.Text.Encoding.UTF8.GetString(dataBytes);
+                
+                var signatureInfo = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(signatureDataJson);
+                if (signatureInfo == null)
+                {
+                    return new VerifySignatureResult 
+                    { 
+                        Success = false, 
+                        Message = "❌ Không thể parse thông tin signature data" 
+                    };
+                }
+
+                // 3. Tính hash của PDF hiện tại (không có signature metadata)
+                using var sha256 = System.Security.Cryptography.SHA256.Create();
+                var currentPdfHash = sha256.ComputeHash(purePdfBytes);
+                var currentPdfHashHex = Convert.ToHexString(currentPdfHash);
+
+                // 4. So sánh hash của PDF
+                string expectedPdfHash = "";
+                if (signatureInfo.TryGetValue("SignedPdfHash", out var signedHashObj))
+                {
+                    expectedPdfHash = signedHashObj?.ToString() ?? "";
+                }
+                else if (signatureInfo.TryGetValue("OriginalPdfHash", out var origHashObj))
+                {
+                    expectedPdfHash = origHashObj?.ToString() ?? "";
+                }
+
+                var isPdfIntegrityValid = string.Equals(currentPdfHashHex, expectedPdfHash, StringComparison.OrdinalIgnoreCase);
+
+                // 5. Xác thực chữ ký RSA
+                var signature = Convert.FromBase64String(base64Sig);
+                using var rsa = RSA.Create();
+                
+                // Clean public key - xử lý cả format có và không có xuống dòng
+                var cleanPublicKey = publicKeyPem
+                    .Replace("-----BEGIN RSA PUBLIC KEY-----", "")
+                    .Replace("-----END RSA PUBLIC KEY-----", "")
+                    .Replace("-----BEGIN PUBLIC KEY-----", "")
+                    .Replace("-----END PUBLIC KEY-----", "")
+                    .Replace("\n", "")
+                    .Replace("\r", "")
+                    .Replace(" ", "")
+                    .Trim();
+                
+                try
+                {
+                    // Thử import RSA Public Key format trước
+                    rsa.ImportRSAPublicKey(Convert.FromBase64String(cleanPublicKey), out _);
+                }
+                catch
+                {
+                    // Nếu thất bại, thử SubjectPublicKeyInfo format
+                    try
+                    {
+                        rsa.ImportSubjectPublicKeyInfo(Convert.FromBase64String(cleanPublicKey), out _);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Không thể import public key. Key length: {Length}", cleanPublicKey.Length);
+                        return new VerifySignatureResult
+                        {
+                            Success = false,
+                            Message = $"❌ Lỗi import public key: {ex.Message}\n\nPublic key có thể bị hỏng hoặc sai format."
+                        };
+                    }
+                }
+                
+                var isSignatureValid = rsa.VerifyData(dataBytes, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+
+                // 6. Kết quả tổng hợp
+                var isOverallValid = isPdfIntegrityValid && isSignatureValid;
+
+                // 7. Tạo thông tin hiển thị chi tiết
+                string displayInfo = "THÔNG TIN HÓA ĐƠN:\n";
+                foreach (var kvp in signatureInfo)
+                {
+                    if (kvp.Key.EndsWith("Hash")) continue; // Skip hash fields để không làm rối
+
+                    var displayName = kvp.Key switch
+                    {
+                        "InvoiceCode" => "Mã hóa đơn",
+                        "StudentName" => "Học viên", 
+                        "CourseName" => "Khóa học",
+                        "ClassName" => "Lớp học",
+                        "Amount" => "Số tiền",
+                        "CreatedDate" => "Ngày tạo",
+                        "DueDate" => "Hạn thanh toán",
+                        "Status" => "Trạng thái",
+                        "RegistrationId" => "ID đăng ký",
+                        _ => $"• {kvp.Key}"
+                    };
+                    
+                    var value = kvp.Value?.ToString() ?? "N/A";
+                    if (kvp.Key == "Amount" && int.TryParse(value, out var amount))
+                        value = $"{amount:N0} VNĐ";
+                        
+                    displayInfo += $"{displayName}: {value}\n";
+                }
+
+                // 8. Tạo message kết quả chi tiết
+                var resultMessage = isOverallValid 
+                    ? $"CHỮ KÝ VÀ PDF HOÀN TOÀN HỢP LỆ\n\n{displayInfo}\n" +
+                      $"CHI TIẾT XÁC THỰC:\n" +
+                      $"Chữ ký RSA: {(isSignatureValid ? "Hợp lệ" : "Không hợp lệ")}\n" +
+                      $"Tính toàn vẹn PDF: {(isPdfIntegrityValid ? "Không bị thay đổi" : "Đã bị thay đổi")}\n" +
+                      $"Thời gian ký: {timestamp ?? "Không xác định"}\n" +
+                      $"Thuật toán: {algorithm ?? "RSA-SHA256"} + {hashMethod ?? "SHA256"}\n" +
+                      $"Đơn vị phát hành: {issuer ?? "Trung tâm Tin học LDA"}\n" +
+                      $"Version: {version ?? "2.0"}\n" +
+                      $"File PDF này là tài liệu chính thức, an toàn và chưa bị chỉnh sửa"
+                    : $"CHỮ KÝ HOẶC PDF KHÔNG HỢP LỆ - CẢNH BÁO BẢO MẬT\n\n" +
+                      $"Chi tiết vấn đề:\n" +
+                      $"Chữ ký RSA: {(isSignatureValid ? "Hợp lệ" : "Không hợp lệ - Private key không khớp")}\n" +
+                      $"Tính toàn vẹn PDF: {(isPdfIntegrityValid ? "Không đổi" : "Đã thay đổi - Nội dung bị sửa đổi")}\n" +
+                      $"Expected PDF Hash: {expectedPdfHash[..16]}...\n" +
+                      $"Current PDF Hash:  {currentPdfHashHex[..16]}...\n\n" +
+                      $"{displayInfo}\n" +
+                      $"Chi tiết kỹ thuật:\n" +
+                      $"Thời gian ký: {timestamp ?? "Không xác định"}\n" +
+                      $"Thuật toán: {algorithm ?? "RSA-SHA256"}\n" +
+                      $"KHÔNG SỬ DỤNG FILE NÀY CHO CÁC GIAO DỊCH CHÍNH THỨC";
+
+                return new VerifySignatureResult 
+                { 
+                    Success = true, 
+                    IsValidSignature = isOverallValid,
+                    Message = resultMessage,
+                    SignedBy = issuer ?? "Trung tâm Tin học LDA",
+                    SignedDate = DateTime.TryParse(timestamp, out var parsedTime) ? parsedTime : null,
+                    InvoiceData = signatureDataJson
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "VerifyPdfHashSignatureAsync error");
+                return new VerifySignatureResult 
+                { 
+                    Success = false, 
+                    Message = $"Lỗi xác thực PDF hash signature:\n{ex.Message}" 
+                };
+            }
+        }
+
+        /// <summary>
+        /// Xác thực signature cũ (Version 1.0) - Chỉ metadata
+        /// </summary>
+        private async Task<VerifySignatureResult> VerifyLegacySignatureAsync(string content, int startIdx, int endIdx, string dataTag, string publicKeyPem)
+        {
+            try
+            {
+                var embedded = content.Substring(startIdx + dataTag.Length, endIdx - (startIdx + dataTag.Length));
+                
+                // Parse signature data với error handling tốt hơn
+                string? base64Data = null, base64Sig = null, timestamp = null, algorithm = null, issuer = null;
+                var lines = embedded.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                
+                foreach (var line in lines)
+                {
+                    var trimmed = line.Trim();
+                    if (string.IsNullOrEmpty(trimmed)) continue;
+                    
+                    if (trimmed.StartsWith("Data:", StringComparison.OrdinalIgnoreCase)) 
+                        base64Data = trimmed.Substring(5).Trim();
+                    else if (trimmed.StartsWith("Signature:", StringComparison.OrdinalIgnoreCase)) 
+                        base64Sig = trimmed.Substring(10).Trim();
+                    else if (trimmed.StartsWith("Timestamp:", StringComparison.OrdinalIgnoreCase))
+                        timestamp = trimmed.Substring(10).Trim();
+                    else if (trimmed.StartsWith("Algorithm:", StringComparison.OrdinalIgnoreCase))
+                        algorithm = trimmed.Substring(10).Trim();
+                    else if (trimmed.StartsWith("Issuer:", StringComparison.OrdinalIgnoreCase))
+                        issuer = trimmed.Substring(7).Trim();
+                }
+                
+                if (string.IsNullOrEmpty(base64Data) || string.IsNullOrEmpty(base64Sig))
+                    return new VerifySignatureResult 
+                    { 
+                        Success = false, 
+                        Message = "❌ Dữ liệu chữ ký không đầy đủ trong PDF.\n\nThiếu thông tin:\n" + 
+                                 (string.IsNullOrEmpty(base64Data) ? "• Dữ liệu hóa đơn\n" : "") +
+                                 (string.IsNullOrEmpty(base64Sig) ? "• Chữ ký số\n" : "") +
+                                 "\nFile có thể đã bị hư hại hoặc thay đổi." 
+                    };
+
+                try
+                {
+                    var dataBytes = Convert.FromBase64String(base64Data);
+                    var signature = Convert.FromBase64String(base64Sig);
+
+                    // Verify signature với public key từ TTTA
+                    using var rsa = RSA.Create();
+                    rsa.ImportRSAPublicKey(Convert.FromBase64String(
+                        publicKeyPem.Replace("-----BEGIN RSA PUBLIC KEY-----", "")
+                                   .Replace("-----END RSA PUBLIC KEY-----", "")
+                                   .Replace("\n", "").Replace("\r", "")
+                    ), out _);
+                    
+                    var isValid = rsa.VerifyData(dataBytes, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+
+                    // Parse invoice data để hiển thị thông tin chi tiết
+                    var invoiceDataJson = System.Text.Encoding.UTF8.GetString(dataBytes);
+                    string displayInfo = "";
+                    
+                    try
+                    {
+                        var invoiceInfo = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(invoiceDataJson);
+                        if (invoiceInfo != null)
+                        {
+                            displayInfo = "📄 THÔNG TIN HÓA ĐƠN:\n";
+                            foreach (var kvp in invoiceInfo)
+                            {
+                                var displayName = kvp.Key switch
+                                {
+                                    "InvoiceCode" => "Mã hóa đơn",
+                                    "StudentName" => "Học viên", 
+                                    "CourseName" => "Khóa học",
+                                    "ClassName" => "Lớp học",
+                                    "Amount" => "Số tiền",
+                                    "CreatedDate" => "Ngày tạo",
+                                    "DueDate" => "Hạn thanh toán",
+                                    "Status" => "Trạng thái",
+                                    "RegistrationId" => "ID đăng ký",
+                                    _ => $"• {kvp.Key}"
+                                };
+                                
+                                var value = kvp.Value?.ToString() ?? "N/A";
+                                if (kvp.Key == "Amount" && int.TryParse(value, out var amount))
+                                    value = $"{amount:N0} VNĐ";
+                                    
+                                displayInfo += $"{displayName}: {value}\n";
+                            }
+                        }
+                    }
+                    catch (Exception parseEx)
+                    {
+                        _logger.LogWarning(parseEx, "Failed to parse legacy invoice data JSON");
+                        displayInfo = $"Dữ liệu hóa đơn gốc:\n{invoiceDataJson}\n";
+                    }
+
+                    var resultMessage = isValid 
+                        ? $"CHỮ KÝ HỢP LỆ - HÓA ĐƠN CHÍNH THỨC (Version 1.0)\n\n{displayInfo}\n" +
+                          $"THÔNG TIN XÁC THỰC:\n" +
+                          $"Thời gian ký: {timestamp ?? "Không xác định"}\n" +
+                          $"Thuật toán: {algorithm ?? "RSA-SHA256"}\n" +
+                          $"Đơn vị phát hành: {issuer ?? "Trung tâm Tin học LDA"}\n" +
+                          $"Version: 1.0 (Legacy)\n" +
+                          $"Lưu ý: File này sử dụng định dạng cũ - chỉ xác thực metadata, không bảo vệ toàn vẹn PDF"
+                        : $"CHỮ KÝ KHÔNG HỢP LỆ - CẢNH BÁO BẢO MẬT\n\n" +
+                          $"File PDF này có thể:\n" +
+                          $"• Đã bị thay đổi sau khi ký\n" +
+                          $"• Không phải từ hệ thống chính thức\n" +
+                          $"• Bị hư hại trong quá trình truyền tải\n\n" +
+                          $"{displayInfo}\n" +
+                          $"Chi tiết kỹ thuật:\n" +
+                          $"Thời gian ký ghi nhận: {timestamp ?? "Không xác định"}\n" +
+                          $"Thuật toán: {algorithm ?? "RSA-SHA256"}\n" +
+                          $"Version: 1.0 (Legacy)\n" +
+                          $"KHÔNG SỬ DỤNG FILE NÀY CHO CÁC GIAO DỊCH CHÍNH THỨC";
+
+                    return new VerifySignatureResult 
+                    { 
+                        Success = true, 
+                        IsValidSignature = isValid,
+                        Message = resultMessage,
+                        SignedBy = issuer ?? "Trung tâm Tin học LDA",
+                        SignedDate = DateTime.TryParse(timestamp, out var parsedTime) ? parsedTime : null,
+                        InvoiceData = invoiceDataJson
+                    };
+                }
+                catch (FormatException)
+                {
+                    return new VerifySignatureResult 
+                    { 
+                        Success = false, 
+                        Message = "Dữ liệu chữ ký bị hư hại.\n\nKhông thể giải mã Base64 data hoặc signature.\nFile PDF có thể đã bị thay đổi hoặc hư hại." 
+                    };
+                }
+                catch (CryptographicException cryptoEx)
+                {
+                    _logger.LogError(cryptoEx, "Cryptographic error during legacy PDF signature verification");
+                    return new VerifySignatureResult 
+                    { 
+                        Success = false, 
+                        Message = $"Lỗi mật mã học khi xác thực:\n{cryptoEx.Message}\n\nPublic key có thể không khớp hoặc signature format không đúng." 
+                    };
+                }
+                catch (Exception parseEx)
+                {
+                    _logger.LogError(parseEx, "Error parsing legacy signature data from PDF");
+                    return new VerifySignatureResult 
+                    { 
+                        Success = false, 
+                        Message = $"Lỗi phân tích dữ liệu chữ ký:\n{parseEx.Message}\n\nFile PDF có thể không đúng định dạng." 
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "VerifyLegacySignatureAsync error");
+                return new VerifySignatureResult 
+                { 
+                    Success = false, 
+                    Message = $"Lỗi xác thực chữ ký legacy:\n{ex.Message}" 
                 };
             }
         }
@@ -312,7 +825,7 @@ namespace QLTTTA_API.Services
             if (string.IsNullOrWhiteSpace(centerName)) return new RSAKeyPairResult { Success = false, Message = "Thiếu tên trung tâm" };
             try
             {
-                using var conn = await GetAdminConnectionAsync(); // dùng kết nối admin để đảm bảo quyền/scheme
+                using var conn = await GetAdminConnectionAsync();
                 await EnsureTttaRowAsync(conn);
 
                 var existing = await GetCenterPublicKeyAsync(conn);
@@ -325,21 +838,19 @@ namespace QLTTTA_API.Services
                 var publicKeyPem = rsa.ExportRSAPublicKeyPem();
                 var privateKeyPem = rsa.ExportRSAPrivateKeyPem();
 
-                // Save center info + public key
+                // Save center info + public key to database
                 await UpdateCenterInfoAndPublicKeyAsync(conn, centerName, address, phone, publicKeyPem);
 
-                // Email private key to accountant (lấy email qua kết nối admin để tránh thiếu quyền)
-                var email = await GetAccountantEmailAsync(conn, accountantId);
-                if (!string.IsNullOrWhiteSpace(email))
-                {
-                    var att = new List<(string fileName, byte[] content, string contentType)>
-                    {
-                        ($"private_key_{DateTime.UtcNow:yyyyMMddHHmmss}.pem", Encoding.UTF8.GetBytes(privateKeyPem), "application/x-pem-file")
-                    };
-                    await _emailService.SendAsync(email, "Private Key Trung Tâm - LDA", "<p>Đây là private key của trung tâm. Vui lòng lưu trữ an toàn và không chia sẻ.</p>", att);
-                }
+                // KHÔNG gửi email private key nữa - Trả về để admin download file
+                // Private key sẽ được trả về trong response để admin có thể download và trao tận tay cho kế toán
 
-                return new RSAKeyPairResult { Success = true, PublicKeyPem = publicKeyPem, PrivateKeyPem = privateKeyPem, Message = "Đã tạo và lưu public key trung tâm. Private key đã gửi email cho kế toán." };
+                return new RSAKeyPairResult 
+                { 
+                    Success = true, 
+                    PublicKeyPem = publicKeyPem, 
+                    PrivateKeyPem = privateKeyPem, 
+                    Message = "Đã tạo và lưu public key trung tâm thành công. Vui lòng lưu private key xuống máy và trao trực tiếp cho kế toán." 
+                };
             }
             catch (Exception ex)
             {
@@ -381,69 +892,18 @@ namespace QLTTTA_API.Services
                 // Update invoice signature
                 await UpdateInvoiceSignatureAsync(conn, invoiceId, signatureBase64, accountantId);
 
-                // Generate PDF and send to student
-                var studentEmail = await GetStudentEmailByInvoiceAsync(conn, invoiceId);
-                var pdfBytes = await GenerateInvoicePdfAsync(conn, invoiceId, invoiceData, signatureBase64);
-                if (!string.IsNullOrWhiteSpace(studentEmail))
-                {
-                    await _emailService.SendAsync(studentEmail, "Hóa đơn đã ký số - Trung tâm LDA",
-                        "<p>Đính kèm là hóa đơn đã ký số của bạn.</p>", new[] { ($"hoa_don_{invoice.InvoiceCode}.pdf", pdfBytes, "application/pdf") });
-                }
-
-                return new SignInvoiceResult { Success = true, Message = "Ký hóa đơn thành công và đã gửi email cho học viên", SignatureBase64 = signatureBase64, InvoiceData = invoiceData };
+                return new SignInvoiceResult 
+                { 
+                    Success = true, 
+                    Message = "Ký hóa đơn thành công.", 
+                    SignatureBase64 = signatureBase64, 
+                    InvoiceData = invoiceData 
+                };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "SignInvoiceWithPrivateKeyContentAsync error for {InvoiceId}", invoiceId);
                 return new SignInvoiceResult { Success = false, Message = "Lỗi ký hóa đơn: " + ex.Message };
-            }
-        }
-
-        public async Task<VerifySignatureResult> VerifyPdfSignatureAsync(byte[] pdfBytes)
-        {
-            try
-            {
-                var publicKeyPem = await GetCenterPublicKeyAdminAsync();
-                if (string.IsNullOrEmpty(publicKeyPem))
-                    return new VerifySignatureResult { Success = false, Message = "Chưa thiết lập public key trung tâm" };
-
-                // Extract embedded data and signature from PDF text content
-                var content = Encoding.UTF8.GetString(pdfBytes);
-                var dataTag = "--BEGIN-LDA-INVOICE--";
-                var endTag = "--END-LDA-INVOICE--";
-                var startIdx = content.IndexOf(dataTag);
-                var endIdx = content.IndexOf(endTag);
-                if (startIdx < 0 || endIdx < 0 || endIdx <= startIdx)
-                    return new VerifySignatureResult { Success = false, Message = "Không tìm thấy dữ liệu chữ ký trong PDF" };
-                var embedded = content.Substring(startIdx + dataTag.Length, endIdx - (startIdx + dataTag.Length));
-                // Parse simple lines
-                string? base64Data = null; string? base64Sig = null;
-                foreach (var line in embedded.Split('\n'))
-                {
-                    var t = line.Trim();
-                    if (t.StartsWith("Data:", StringComparison.OrdinalIgnoreCase)) base64Data = t.Substring(5).Trim();
-                    if (t.StartsWith("Signature:", StringComparison.OrdinalIgnoreCase)) base64Sig = t.Substring(10).Trim();
-                }
-                if (string.IsNullOrEmpty(base64Data) || string.IsNullOrEmpty(base64Sig))
-                    return new VerifySignatureResult { Success = false, Message = "Thiếu dữ liệu/ chữ ký trong PDF" };
-
-                var dataBytes = Convert.FromBase64String(base64Data);
-                var signature = Convert.FromBase64String(base64Sig);
-
-                using var rsa = RSA.Create();
-                rsa.ImportRSAPublicKey(Convert.FromBase64String(
-                    publicKeyPem.Replace("-----BEGIN RSA PUBLIC KEY-----", "")
-                               .Replace("-----END RSA PUBLIC KEY-----", "")
-                               .Replace("\n", "").Replace("\r", "")
-                ), out _);
-                var ok = rsa.VerifyData(dataBytes, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-
-                return new VerifySignatureResult { Success = true, IsValidSignature = ok, Message = ok ? "Chữ ký hợp lệ" : "Chữ ký không hợp lệ", InvoiceData = Encoding.UTF8.GetString(dataBytes) };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "VerifyPdfSignatureAsync error");
-                return new VerifySignatureResult { Success = false, Message = "Lỗi xác thực chữ ký: " + ex.Message };
             }
         }
 

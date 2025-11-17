@@ -14,8 +14,8 @@ namespace QLTTTA_API.Services
 
     public class ScheduleService : BaseService, IScheduleService
     {
-        public ScheduleService(IConfiguration configuration, ILogger<ScheduleService> logger, IOracleConnectionProvider userConnProvider)
-            : base(configuration, logger, userConnProvider) { }
+        public ScheduleService(IConfiguration configuration, ILogger<ScheduleService> logger, IOracleConnectionProvider userConnProvider, IHttpContextAccessor httpContextAccessor)
+            : base(configuration, logger, userConnProvider, httpContextAccessor) { }
 
         public async Task<List<Schedule>> GetByClassAsync(int classId)
         {

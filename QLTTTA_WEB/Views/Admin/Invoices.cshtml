@@ -18,35 +18,78 @@
         <div class="retro-card">
             <div class="retro-card-header"><strong><i class="fas fa-key"></i> Tạo khóa chữ ký số Trung tâm (TTTA)</strong></div>
             <div class="retro-card-body">
-                <p class="text-muted">Tạo khóa RSA 2048 cho TTTA. Public key sẽ lưu cố định vào Oracle (bảng TTTA). Private key được gửi về email của tài khoản kế toán đã chọn.</p>
+                <p class="text-muted">
+                    <i class="fas fa-info-circle"></i> Tạo khóa RSA 2048 cho TTTA. 
+                    <strong>Public key</strong> sẽ lưu cố định vào Oracle (bảng TTTA). 
+                    <strong>Private key</strong> sẽ được tự động download về máy Admin - vui lòng trao tận tay cho Kế toán.
+                </p>
                 <form asp-controller="Manage" asp-action="GenerateCenterKeyPair" method="post">
+                    @Html.AntiForgeryToken()
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label">Tên Trung tâm</label>
-                            <input name="centerName" type="text" class="form-control" placeholder="Trung tâm LDA" required />
+                            <label class="form-label"><i class="fas fa-building"></i> Tên Trung tâm <span class="text-danger">*</span></label>
+                            <input name="centerName" type="text" class="form-control" placeholder="Trung tâm Tin học LDA" required />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Số điện thoại</label>
+                            <label class="form-label"><i class="fas fa-phone"></i> Số điện thoại</label>
                             <input name="phone" type="text" class="form-control" placeholder="0123456789" />
                         </div>
                         <div class="col-md-12">
-                            <label class="form-label">Địa chỉ</label>
+                            <label class="form-label"><i class="fas fa-map-marker-alt"></i> Địa chỉ</label>
                             <input name="address" type="text" class="form-control" placeholder="Số nhà, đường, quận/huyện, tỉnh/thành" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">ID tài khoản kế toán nhận private key</label>
-                            <input name="accountantId" type="number" min="1" class="form-control" placeholder="Ví dụ: 5" required />
-                            <div class="form-text">Hệ thống sẽ gửi private key tới email của tài khoản này trong bảng TAI_KHOAN.</div>
                         </div>
                     </div>
                     <div class="mt-3">
-                        <button class="btn btn-primary"><i class="fas fa-lock"></i> Tạo khóa TTTA</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-lock"></i> Tạo cặp khóa TTTA
+                        </button>
                     </div>
                 </form>
+                
                 <div class="retro-alert retro-alert-warning mt-3">
-                    <div class="retro-alert-content"><i class="fas fa-exclamation-triangle"></i> Khóa TTTA chỉ được tạo một lần và không thể thay đổi.</div>
+                    <div class="retro-alert-content">
+                        <i class="fas fa-exclamation-triangle"></i> 
+                        <strong>Lưu ý quan trọng:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Khóa TTTA chỉ được tạo <strong>một lần duy nhất</strong> và không thể thay đổi</li>
+                            <li>File <code>private_key.pem</code> sẽ tự động download về máy bạn</li>
+                            <li>Vui lòng <strong>trao tận tay</strong> file này cho Kế toán và yêu cầu bảo mật cẩn thận</li>
+                            <li><strong>KHÔNG</strong> gửi private key qua email hay bất kỳ phương tiện nào khác</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+@* JavaScript để tự động download private key *@
+@if (TempData["PrivateKey"] != null)
+{
+    <script>
+        (function() {
+            // Lấy private key từ TempData
+            var privateKey = @Html.Raw(Json.Serialize(TempData["PrivateKey"]));
+            var centerName = "center"; // Có thể lấy từ TempData nếu cần
+            
+            // Tạo blob từ private key
+            var blob = new Blob([privateKey], { type: 'text/plain' });
+            
+            // Tạo link download
+            var link = document.createElement('a');
+            link.href = window.URL.createObjectURL(blob);
+            link.download = 'private_key_' + new Date().getTime() + '.pem';
+            
+            // Tự động click để download
+            document.body.appendChild(link);
+            link.click();
+            
+            // Cleanup
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(link.href);
+            
+            // Hiển thị thông báo
+            alert('✅ File private key đã được tự động download!\n\n📁 Tên file: ' + link.download + '\n\n⚠️ Vui lòng:\n1. Kiểm tra file trong thư mục Downloads\n2. Lưu file vào nơi an toàn\n3. Trao tận tay cho Kế toán\n4. KHÔNG gửi qua email hoặc tin nhắn');
+        })();
+    </script>
+}

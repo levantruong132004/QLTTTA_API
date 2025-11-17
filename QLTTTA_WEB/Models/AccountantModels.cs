@@ -14,6 +14,8 @@ namespace QLTTTA_WEB.Models
         public string? CourseName { get; set; }
         public int StandardFee { get; set; }
         public int? InvoiceId { get; set; } // Thêm để kiểm tra có hóa đơn hay không
+        public string? InvoiceCode { get; set; } // Mã hóa đơn
+        public bool IsSigned { get; set; } // Đã ký số chưa
     }
 
     public class AccountantHomeViewModel

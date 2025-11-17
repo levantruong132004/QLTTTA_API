@@ -29,8 +29,8 @@ namespace QLTTTA_API.Services
     /// </summary>
     public class CourseService : BaseService, ICourseService
     {
-        public CourseService(IConfiguration configuration, ILogger<CourseService> logger, IOracleConnectionProvider userConnProvider)
-            : base(configuration, logger, userConnProvider) { }
+        public CourseService(IConfiguration configuration, ILogger<CourseService> logger, IOracleConnectionProvider userConnProvider, IHttpContextAccessor httpContextAccessor)
+            : base(configuration, logger, userConnProvider, httpContextAccessor) { }
 
         /// <summary>
         /// Lấy danh sách khóa học phân trang. Có hỗ trợ tìm kiếm theo COURSE_NAME hoặc COURSE_CODE (không phân biệt hoa thường).

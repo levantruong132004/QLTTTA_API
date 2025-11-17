@@ -16,11 +16,11 @@ try
             opts.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase;
         });
 
-    // Đăng ký services
+    // Services registration
     builder.Services.AddHttpContextAccessor();
-    builder.Services.AddSingleton<IUserCredentialCache, InMemoryUserCredentialCache>();
-    builder.Services.AddSingleton<IOtpStore, InMemoryOtpStore>();
-    builder.Services.AddSingleton<IEmailService, MailKitEmailService>();
+    builder.Services.AddScoped<IUserCredentialCache, InMemoryUserCredentialCache>();
+    builder.Services.AddScoped<IOtpStore, InMemoryOtpStore>();
+    builder.Services.AddScoped<IEmailService, MailKitEmailService>();
     builder.Services.AddScoped<IOracleConnectionProvider, OracleUserConnectionProvider>();
     builder.Services.AddScoped<IAuthService, AuthService>();
     builder.Services.AddScoped<IStudentService, StudentService>();
@@ -31,7 +31,8 @@ try
     builder.Services.AddScoped<IRegistrationService, RegistrationService>();
     builder.Services.AddScoped<IInvoiceService, InvoiceService>();
     builder.Services.AddScoped<IPaymentService, PaymentService>();
-    builder.Services.AddScoped<IDigitalSignatureService, DigitalSignatureService>(); // Thêm service chữ ký số
+    builder.Services.AddScoped<IDigitalSignatureService, DigitalSignatureService>();
+    builder.Services.AddScoped<IPdfSignatureService, PdfSignatureService>();
 
     // Add CORS
     builder.Services.AddCors(options =>

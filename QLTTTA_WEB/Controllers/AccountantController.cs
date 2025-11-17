@@ -20,7 +20,7 @@ namespace QLTTTA_WEB.Controllers
         public async Task<IActionResult> Index(int? courseId, int? classId)
         {
             // Require login
-            if (HttpContext.Session.GetString("UserId") == null)
+            if (HttpContext?.Session?.GetString("UserId") == null)
                 return RedirectToAction("Login", "Account");
 
             var vm = new AccountantHomeViewModel
@@ -39,8 +39,9 @@ namespace QLTTTA_WEB.Controllers
                     vm.Courses = JsonSerializer.Deserialize<List<SimpleCourseViewModel>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
                 }
                 // Default select first course if none
-                if (!vm.SelectedCourseId.HasValue && vm.Courses.Any())
-                    vm.SelectedCourseId = vm.Courses.First().CourseId;
+                // (removed) Show all approved registrations by default without forcing a course filter
+                // if (!vm.SelectedCourseId.HasValue && vm.Courses.Any())
+                //     vm.SelectedCourseId = vm.Courses.First().CourseId;
 
                 // Load classes of selected course
                 if (vm.SelectedCourseId.HasValue)
@@ -53,8 +54,9 @@ namespace QLTTTA_WEB.Controllers
                     }
                 }
                 // Default select first class if none
-                if (!vm.SelectedClassId.HasValue && vm.Classes.Any())
-                    vm.SelectedClassId = vm.Classes.First().ClassId;
+                // (removed) Don't force default class selection
+                // if (!vm.SelectedClassId.HasValue && vm.Classes.Any())
+                //     vm.SelectedClassId = vm.Classes.First().ClassId;
 
                 // Load registrations for accountant
                 var url = new StringBuilder("api/registrations/accountant");
@@ -87,7 +89,7 @@ namespace QLTTTA_WEB.Controllers
         [HttpGet]
         public async Task<IActionResult> Invoice(int id)
         {
-            if (HttpContext.Session.GetString("UserId") == null)
+            if (HttpContext?.Session?.GetString("UserId") == null)
                 return RedirectToAction("Login", "Account");
 
             var page = new AccountantInvoicePageViewModel();
@@ -105,24 +107,49 @@ namespace QLTTTA_WEB.Controllers
                 int? invoiceId = null;
                 var invByReg = await _httpClient.GetAsync($"api/invoices/by-registration/{id}");
                 var invByRegBody = await invByReg.Content.ReadAsStringAsync();
+                
+                // SỬA LẠI: Chỉ xử lý khi API trả về success (200) và có data
                 if (invByReg.IsSuccessStatusCode)
                 {
-                    using var invDoc = JsonDocument.Parse(invByRegBody);
-                    if (invDoc.RootElement.TryGetProperty("data", out var invData) && invData.TryGetProperty("invoiceId", out var iid))
+                    try
                     {
-                        invoiceId = iid.GetInt32();
+                        using var invDoc = JsonDocument.Parse(invByRegBody);
+                        // Kiểm tra có success = true và data.invoice.invoiceId
+                        if (invDoc.RootElement.TryGetProperty("success", out var success) && 
+                            success.GetBoolean() && 
+                            invDoc.RootElement.TryGetProperty("data", out var invData) &&
+                            invData.TryGetProperty("invoice", out var invoiceData) &&
+                            invoiceData.TryGetProperty("invoiceId", out var iid))
+                        {
+                            invoiceId = iid.GetInt32();
+                        }
                     }
+                    catch (JsonException ex)
+                    {
+                        _logger.LogWarning(ex, "Invalid JSON response from GetByRegistration for {RegistrationId}: {Response}", id, invByRegBody);
+                        // Không có hóa đơn - tiếp tục bình thường
+                    }
+                }
+                else if (invByReg.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    // 404 = Chưa có hóa đơn cho đơn này - đây là trường hợp bình thường
+                    // Không cần hiển thị lỗi
                 }
                 else
                 {
-                    // Cho hiển thị lỗi cụ thể (kể cả lỗi Oracle)
+                    // Lỗi khác (500, 400, etc.) - hiển thị thông báo lỗi
                     try
                     {
                         using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(invByRegBody) ? "{}" : invByRegBody);
                         if (doc.RootElement.TryGetProperty("message", out var m) && !string.IsNullOrWhiteSpace(m.GetString()))
-                            TempData["ErrorMessage"] = m.GetString();
+                            TempData["ErrorMessage"] = "Lỗi khi kiểm tra hóa đơn: " + m.GetString();
+                        else
+                            TempData["ErrorMessage"] = "Lỗi khi kiểm tra hóa đơn: " + invByRegBody;
                     }
-                    catch { TempData["ErrorMessage"] = invByRegBody; }
+                    catch 
+                    { 
+                        TempData["ErrorMessage"] = "Không thể kiểm tra trạng thái hóa đơn";
+                    }
                 }
 
                 // 2) Nếu có invoiceId thì lấy chi tiết kèm trạng thái chữ ký
@@ -197,7 +224,7 @@ namespace QLTTTA_WEB.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateInvoice(int registrationId, DateTime dueDate, int amount)
         {
-            if (HttpContext.Session.GetString("UserId") == null)
+            if (HttpContext?.Session?.GetString("UserId") == null)
                 return RedirectToAction("Login", "Account");
 
             try
@@ -249,12 +276,12 @@ namespace QLTTTA_WEB.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SignInvoiceUpload(int invoiceId, IFormFile privateKey)
         {
-            if (HttpContext.Session.GetString("UserId") == null)
+            if (HttpContext?.Session?.GetString("UserId") == null)
                 return RedirectToAction("Login", "Account");
 
             try
             {
-                var userIdStr = HttpContext.Session.GetString("UserId");
+                var userIdStr = HttpContext?.Session?.GetString("UserId");
                 if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out int accountantId))
                 {
                     TempData["ErrorMessage"] = "Không xác định được kế toán. Vui lòng đăng nhập lại.";
@@ -281,7 +308,7 @@ namespace QLTTTA_WEB.Controllers
                 var body = await res.Content.ReadAsStringAsync();
                 if (res.IsSuccessStatusCode)
                 {
-                    TempData["SuccessMessage"] = "Ký hóa đơn thành công và đã gửi email cho học viên.";
+                    TempData["SuccessMessage"] = "Ký hóa đơn thành công .";
                 }
                 else
                 {
@@ -322,7 +349,7 @@ namespace QLTTTA_WEB.Controllers
         [HttpGet]
         public async Task<IActionResult> PendingPayments()
         {
-            if (HttpContext.Session.GetString("UserId") == null)
+            if (HttpContext?.Session?.GetString("UserId") == null)
                 return RedirectToAction("Login", "Account");
 
             var pendingList = new List<PendingPaymentViewModel>();
@@ -360,12 +387,12 @@ namespace QLTTTA_WEB.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ConfirmPayment(int invoiceId)
         {
-            if (HttpContext.Session.GetString("UserId") == null)
+            if (HttpContext?.Session?.GetString("UserId") == null)
                 return RedirectToAction("Login", "Account");
 
             try
             {
-                var userIdStr = HttpContext.Session.GetString("UserId");
+                var userIdStr = HttpContext?.Session?.GetString("UserId");
                 if (!int.TryParse(userIdStr, out int accountantId))
                 {
                     TempData["ErrorMessage"] = "Không xác định được kế toán";
@@ -411,12 +438,12 @@ namespace QLTTTA_WEB.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> PrintAndEmailInvoice(int invoiceId)
         {
-            if (HttpContext.Session.GetString("UserId") == null)
+            if (HttpContext?.Session?.GetString("UserId") == null)
                 return RedirectToAction("Login", "Account");
 
             try
             {
-                var userIdStr = HttpContext.Session.GetString("UserId");
+                var userIdStr = HttpContext?.Session?.GetString("UserId");
                 if (!int.TryParse(userIdStr, out int accountantId))
                 {
                     TempData["ErrorMessage"] = "Không xác định được kế toán";
@@ -453,6 +480,79 @@ namespace QLTTTA_WEB.Controllers
             {
                 _logger.LogError(ex, "PrintAndEmailInvoice failed for invoice {InvoiceId}", invoiceId);
                 TempData["ErrorMessage"] = "Có lỗi xảy ra khi in hóa đơn";
+            }
+
+            return RedirectToAction("Index");
+        }
+
+        // Ký số và In hóa đơn (upload private key, ký số, tạo PDF đẹp, gửi email)
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SignAndPrintInvoice(int invoiceId, int accountantId, IFormFile privateKey)
+        {
+            if (HttpContext?.Session?.GetString("UserId") == null)
+                return RedirectToAction("Login", "Account");
+
+            try
+            {
+                if (privateKey == null || privateKey.Length == 0)
+                {
+                    TempData["ErrorMessage"] = "Vui lòng chọn file private key";
+                    return RedirectToAction("Index");
+                }
+
+                // Gọi API print-sign-email (ký số + tạo PDF đẹp + gửi email)
+                using var content = new MultipartFormDataContent();
+                content.Add(new StringContent(invoiceId.ToString()), "invoiceId");
+                content.Add(new StringContent(accountantId.ToString()), "accountantId");
+                
+                using var stream = privateKey.OpenReadStream();
+                using var ms = new MemoryStream();
+                await stream.CopyToAsync(ms);
+                var fileContent = new ByteArrayContent(ms.ToArray());
+                fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/x-pem-file");
+                content.Add(fileContent, "privateKey", privateKey.FileName);
+
+                var res = await _httpClient.PostAsync("api/invoices/print-sign-email", content);
+                
+                if (res.IsSuccessStatusCode)
+                {
+                    // Kiểm tra header để biết đã gửi email chưa
+                    var emailSent = res.Headers.TryGetValues("X-Email-Sent", out var emailValues) && 
+                                   emailValues.FirstOrDefault() == "true";
+                    var alreadySigned = res.Headers.TryGetValues("X-Already-Signed", out var signedValues) && 
+                                       signedValues.FirstOrDefault() == "true";
+                    
+                    if (alreadySigned)
+                    {
+                        TempData["SuccessMessage"] = "✅ Hóa đơn đã được ký số trước đó. Đã tạo PDF với giao diện đẹp" + 
+                                                    (emailSent ? " và gửi email thành công!" : "!");
+                    }
+                    else
+                    {
+                        TempData["SuccessMessage"] = "✅ Đã ký số hóa đơn thành công! PDF với giao diện đẹp" + 
+                                                    (emailSent ? " đã được gửi qua email cho học viên." : " đã được tạo.");
+                    }
+                }
+                else
+                {
+                    var body = await res.Content.ReadAsStringAsync();
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(body);
+                        var msg = doc.RootElement.TryGetProperty("message", out var m) ? m.GetString() : "Ký số và in hóa đơn thất bại";
+                        TempData["ErrorMessage"] = msg;
+                    }
+                    catch
+                    {
+                        TempData["ErrorMessage"] = "Ký số và in hóa đơn thất bại: " + body;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "SignAndPrintInvoice failed for invoice {InvoiceId}", invoiceId);
+                TempData["ErrorMessage"] = "Có lỗi xảy ra khi ký số và in hóa đơn: " + ex.Message;
             }
 
             return RedirectToAction("Index");

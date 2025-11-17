@@ -11,16 +11,33 @@ namespace QLTTTA_API.Services
         Task<Registration?> GetByIdAsync(int id);
         Task<ApiResponse<bool>> ApproveAsync(int registrationId, int? newClassId = null);
         Task<ApiResponse<bool>> RejectAsync(int registrationId);
+        Task<ApiResponse<bool>> CreateRegistrationAsync(int classId, string? note = null);
         Task<List<Registration>> GetMyRegistrationsAsync();
         Task<List<AccountantRegDetail>> GetAccountantRegistrationsAsync(int? courseId = null, int? classId = null);
         Task<AccountantRegDetail?> GetAccountantRegistrationByIdAsync(int registrationId);
+        Task<DebugRegistrationCheckResult> DebugCheckAsync(int classId);
+    }
+
+    public class DebugRegistrationCheckResult
+    {
+        public string? SessionId { get; set; }
+        public string DeviceType { get; set; } = "pc";
+        public int? ResolvedAccountUserId { get; set; }
+        public bool HasHocVienRow { get; set; }
+        public bool HasStudentsRow { get; set; }
+        public bool AutoCreatedHocVien { get; set; }
+        public bool ClassExists { get; set; }
+        public string? ClassStatus { get; set; }
+        public int? ClassMaxSize { get; set; }
+        public int? ApprovedCount { get; set; }
+        public string Message { get; set; } = string.Empty;
     }
 
     public class RegistrationService : BaseService, IRegistrationService
     {
         private readonly IHttpContextAccessor _httpContextAccessor;
         public RegistrationService(IConfiguration configuration, ILogger<RegistrationService> logger, IOracleConnectionProvider userConnProvider, IHttpContextAccessor httpContextAccessor)
-            : base(configuration, logger, userConnProvider) { _httpContextAccessor = httpContextAccessor; }
+            : base(configuration, logger, userConnProvider, httpContextAccessor) { _httpContextAccessor = httpContextAccessor; }
 
         public async Task<List<Registration>> GetRegistrationsAsync(string? status = null, int? classId = null)
         {
@@ -314,6 +331,175 @@ namespace QLTTTA_API.Services
             }
         }
 
+        public async Task<ApiResponse<bool>> CreateRegistrationAsync(int classId, string? note = null)
+        {
+            try
+            {
+                using var conn = await GetAdminConnectionAsync();
+                
+                // Xác định học viên theo session per-device từ header
+                int studentId = 0;
+                var sid = _httpContextAccessor.HttpContext?.Request?.Headers["X-Session-Id"].FirstOrDefault();
+                var deviceType = _httpContextAccessor.HttpContext?.Request?.Headers["X-Device-Type"].FirstOrDefault()?.Trim().ToLowerInvariant() ?? "pc";
+                if (deviceType != "pc" && deviceType != "mobile") deviceType = "pc";
+                
+                _logger.LogInformation("CreateRegistrationAsync - SessionId: {SessionId}, DeviceType: {DeviceType}, ClassId: {ClassId}", sid ?? "NULL", deviceType, classId);
+                
+                var columnName = deviceType == "mobile" ? "SESSION_ID_MOBILE" : "SESSION_ID_PC";
+                using (var cmd = new OracleCommand($"SELECT ID_NGUOI_DUNG FROM TAI_KHOAN WHERE {columnName} = :sid", conn) { BindByName = true })
+                {
+                    cmd.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sid ?? string.Empty;
+                    var scalar = await cmd.ExecuteScalarAsync();
+                    if (scalar == null || scalar == DBNull.Value)
+                    {
+                        _logger.LogWarning("CreateRegistrationAsync - No user found for session {SessionId} on device {DeviceType}", sid ?? "NULL", deviceType);
+                        throw new UnauthorizedAccessException("Phiên đăng nhập không hợp lệ hoặc đã hết hạn");
+                    }
+                    studentId = Convert.ToInt32(scalar);
+                }
+                
+                // Kiểm tra xem học viên có tồn tại trong bảng HOC_VIEN không
+                bool autoCreated = false;
+                using (var checkStudent = new OracleCommand("SELECT COUNT(*) FROM HOC_VIEN WHERE ID_HOC_VIEN = :id", conn) { BindByName = true })
+                {
+                    checkStudent.Parameters.Add(":id", OracleDbType.Int32).Value = studentId;
+                    var count = Convert.ToInt32(await checkStudent.ExecuteScalarAsync());
+                    if (count == 0)
+                    {
+                        // Thử lấy từ bảng STUDENTS (mô hình mới)
+                        using var chkStu = new OracleCommand("SELECT FULL_NAME, STUDENT_CODE, SEX, DATE_OF_BIRTH, PHONE_NUMBER, ADDRESS FROM QLTT_ADMIN.STUDENTS WHERE STUDENT_ID = :id", conn) { BindByName = true };
+                        chkStu.Parameters.Add(":id", OracleDbType.Int32).Value = studentId;
+                        using var rStu = await chkStu.ExecuteReaderAsync();
+                        if (await rStu.ReadAsync())
+                        {
+                            var fullName = rStu.IsDBNull(0) ? null : rStu.GetString(0);
+                            var studentCode = rStu.IsDBNull(1) ? null : rStu.GetString(1);
+                            var sex = rStu.IsDBNull(2) ? null : rStu.GetString(2);
+                            var dob = rStu.IsDBNull(3) ? (DateTime?)null : rStu.GetDateTime(3);
+                            var phone = rStu.IsDBNull(4) ? null : rStu.GetString(4);
+                            var address = rStu.IsDBNull(5) ? null : rStu.GetString(5);
+
+                            // Tạo bản ghi HOC_VIEN tương ứng
+                            using var insHV = new OracleCommand(@"INSERT INTO HOC_VIEN (ID_HOC_VIEN, HO_TEN, MA_HOC_VIEN, GIOI_TINH, NGAY_SINH, SO_DIEN_THOAI, DIA_CHI)
+                                                                   VALUES (:id, :hoten, :ma, :sex, :dob, :phone, :addr)", conn) { BindByName = true };
+                            insHV.Parameters.Add(":id", OracleDbType.Int32).Value = studentId;
+                            insHV.Parameters.Add(":hoten", OracleDbType.NVarchar2).Value = (object?)fullName ?? DBNull.Value;
+                            insHV.Parameters.Add(":ma", OracleDbType.Varchar2).Value = (object?)studentCode ?? $"STU_{studentId}";
+                            insHV.Parameters.Add(":sex", OracleDbType.NVarchar2).Value = (object?)sex ?? DBNull.Value;
+                            insHV.Parameters.Add(":dob", OracleDbType.Date).Value = (object?)dob ?? DBNull.Value;
+                            insHV.Parameters.Add(":phone", OracleDbType.Varchar2).Value = (object?)phone ?? DBNull.Value;
+                            insHV.Parameters.Add(":addr", OracleDbType.NVarchar2).Value = (object?)address ?? DBNull.Value;
+                            await insHV.ExecuteNonQueryAsync();
+                            autoCreated = true;
+                        }
+                        else
+                        {
+                            return new ApiResponse<bool> { Success = false, Message = "Tài khoản chưa có hồ sơ học viên (không tồn tại HOC_VIEN/STUDENTS)" };
+                        }
+                    }
+                }
+                
+                // Kiểm tra lớp học có tồn tại và còn mở đăng ký không
+                string className = string.Empty;
+                string classStatus = string.Empty;
+                int maxSize = 0;
+                using (var checkClass = new OracleCommand("SELECT TEN_LOP_HOC, TRANG_THAI, SI_SO_TOI_DA FROM LOP_HOC WHERE ID_LOP_HOC = :id", conn) { BindByName = true })
+                {
+                    checkClass.Parameters.Add(":id", OracleDbType.Int32).Value = classId;
+                    using var reader = await checkClass.ExecuteReaderAsync();
+                    if (await reader.ReadAsync())
+                    {
+                        className = reader.IsDBNull(0) ? string.Empty : reader.GetString(0);
+                        classStatus = reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim();
+                        maxSize = reader.IsDBNull(2) ? 0 : reader.GetInt32(2);
+                    }
+                    else
+                    {
+                        return new ApiResponse<bool> { Success = false, Message = "Không tìm thấy lớp học" };
+                    }
+                }
+                
+                // Kiểm tra trạng thái lớp
+                if (classStatus.Equals("Đã đủ sĩ số", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new ApiResponse<bool> { Success = false, Message = "Lớp học đã đủ sĩ số" };
+                }
+                
+                // Kiểm tra xem học viên đã đăng ký lớp này chưa
+                using (var checkExisting = new OracleCommand("SELECT COUNT(*) FROM DON_DANG_KY WHERE ID_HOC_VIEN = :studentId AND ID_LOP_HOC = :classId", conn) { BindByName = true })
+                {
+                    checkExisting.Parameters.Add(":studentId", OracleDbType.Int32).Value = studentId;
+                    checkExisting.Parameters.Add(":classId", OracleDbType.Int32).Value = classId;
+                    var existingCount = Convert.ToInt32(await checkExisting.ExecuteScalarAsync());
+                    if (existingCount > 0)
+                    {
+                        return new ApiResponse<bool> { Success = false, Message = "Bạn đã đăng ký lớp học này rồi" };
+                    }
+                }
+                
+                // Kiểm tra sĩ số hiện tại
+                using (var checkCurrentSize = new OracleCommand("SELECT COUNT(*) FROM DON_DANG_KY WHERE ID_LOP_HOC = :classId AND UPPER(TRIM(TRANG_THAI)) = UPPER('Đã duyệt')", conn) { BindByName = true })
+                {
+                    checkCurrentSize.Parameters.Add(":classId", OracleDbType.Int32).Value = classId;
+                    var currentSize = Convert.ToInt32(await checkCurrentSize.ExecuteScalarAsync());
+                    if (currentSize >= maxSize)
+                    {
+                        return new ApiResponse<bool> { Success = false, Message = "Lớp học đã đủ sĩ số" };
+                    }
+                }
+                
+                // Tạo mã đăng ký tự động
+                string registrationCode = $"REG_{DateTime.Now:yyyyMMdd}_{studentId}_{classId}";
+                
+                // Tạo đơn đăng ký mới
+                var insertSql = @"INSERT INTO DON_DANG_KY (MA_DANG_KY, NGAY_DANG_KY, TRANG_THAI, ID_HOC_VIEN, ID_LOP_HOC, GHI_CHU)
+                                  VALUES (:regCode, SYSDATE, :status, :studentId, :classId, :note)";
+                
+                using (var insertCmd = new OracleCommand(insertSql, conn) { BindByName = true })
+                {
+                    insertCmd.Parameters.Add(":regCode", OracleDbType.Varchar2).Value = registrationCode;
+                    insertCmd.Parameters.Add(":status", OracleDbType.NVarchar2).Value = "Đang chờ";
+                    insertCmd.Parameters.Add(":studentId", OracleDbType.Int32).Value = studentId;
+                    insertCmd.Parameters.Add(":classId", OracleDbType.Int32).Value = classId;
+                    insertCmd.Parameters.Add(":note", OracleDbType.NVarchar2).Value = note ?? (object)DBNull.Value;
+                    
+                    var affected = await insertCmd.ExecuteNonQueryAsync();
+                    if (affected == 1)
+                    {
+                        _logger.LogInformation("Successfully created registration {RegCode} for student {StudentId} in class {ClassId}", registrationCode, studentId, classId);
+                        return new ApiResponse<bool> 
+                        { 
+                            Success = true, 
+                            Message = $"Đăng ký lớp '{className}' thành công. Đơn đăng ký của bạn đang chờ được duyệt.", 
+                            Data = true 
+                        };
+                    }
+                    else
+                    {
+                        return new ApiResponse<bool> { Success = false, Message = "Không thể tạo đơn đăng ký" };
+                    }
+                }
+                if (autoCreated)
+                {
+                    _logger.LogInformation("Auto-created HOC_VIEN row for user {StudentId} from STUDENTS", studentId);
+                }
+            }
+            catch (UnauthorizedAccessException)
+            {
+                throw;
+            }
+            catch (OracleException oex) when (oex.Number == 1031)
+            {
+                _logger.LogWarning(oex, "Insufficient privileges creating registration for class {ClassId}", classId);
+                return new ApiResponse<bool> { Success = false, Message = "Bạn không có quyền đăng ký lớp học" };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating registration for class {ClassId}", classId);
+                return new ApiResponse<bool> { Success = false, Message = "Có lỗi xảy ra khi đăng ký lớp học" };
+            }
+        }
+
         public async Task<List<Registration>> GetMyRegistrationsAsync()
         {
             using var conn = await GetAdminConnectionAsync();
@@ -322,6 +508,9 @@ namespace QLTTTA_API.Services
             var sid = _httpContextAccessor.HttpContext?.Request?.Headers["X-Session-Id"].FirstOrDefault();
             var deviceType = _httpContextAccessor.HttpContext?.Request?.Headers["X-Device-Type"].FirstOrDefault()?.Trim().ToLowerInvariant() ?? "pc";
             if (deviceType != "pc" && deviceType != "mobile") deviceType = "pc";
+            
+            _logger.LogInformation("GetMyRegistrationsAsync - SessionId: {SessionId}, DeviceType: {DeviceType}", sid ?? "NULL", deviceType);
+            
             var columnName = deviceType == "mobile" ? "SESSION_ID_MOBILE" : "SESSION_ID_PC";
             using (var cmd = new OracleCommand($"SELECT ID_NGUOI_DUNG FROM TAI_KHOAN WHERE {columnName} = :sid", conn) { BindByName = true })
             {
@@ -329,10 +518,13 @@ namespace QLTTTA_API.Services
                 var scalar = await cmd.ExecuteScalarAsync();
                 if (scalar == null || scalar == DBNull.Value)
                 {
-                    return new List<Registration>();
+                    _logger.LogWarning("GetMyRegistrationsAsync - No user found for session {SessionId} on device {DeviceType}", sid ?? "NULL", deviceType);
+                    throw new UnauthorizedAccessException("Phiên đăng nhập không hợp lệ hoặc đã hết hạn");
                 }
                 hvId = Convert.ToInt32(scalar);
             }
+            
+            _logger.LogInformation("GetMyRegistrationsAsync - Found user ID: {UserId}", hvId);
 
             var sql = @"SELECT dk.ID_DANG_KY AS REGISTRATION_ID,
              dk.MA_DANG_KY AS REGISTRATION_CODE,
@@ -368,18 +560,23 @@ namespace QLTTTA_API.Services
                     CourseName = reader.IsDBNull(reader.GetOrdinal("TEN_KHOA_HOC")) ? null : reader.GetString(reader.GetOrdinal("TEN_KHOA_HOC"))
                 });
             }
+            
+            _logger.LogInformation("GetMyRegistrationsAsync - Found {Count} registrations for user {UserId}", list.Count, hvId);
+            
             return list;
         }
 
         public async Task<List<AccountantRegDetail>> GetAccountantRegistrationsAsync(int? courseId = null, int? classId = null)
         {
             var where = new List<string>();
+            // Chỉ lấy các đơn đã được phê duyệt cho màn kế toán, xử lý khoảng trắng bằng TRIM và không phân biệt hoa/thường
+            where.Add("UPPER(TRIM(dk.TRANG_THAI)) = UPPER(:st)");
             if (courseId.HasValue) where.Add("kh.ID_KHOA_HOC = :cid");
             if (classId.HasValue) where.Add("lh.ID_LOP_HOC = :lid");
             var whereSql = where.Count > 0 ? (" WHERE " + string.Join(" AND ", where)) : string.Empty;
             var sql = $@"SELECT dk.ID_DANG_KY,
                                  dk.NGAY_DANG_KY,
-                                 dk.TRANG_THAI,
+                                 TRIM(dk.TRANG_THAI) AS TRANG_THAI,
                                  hv.ID_HOC_VIEN,
                                  hv.HO_TEN,
                                  tk.EMAIL,
@@ -396,18 +593,22 @@ namespace QLTTTA_API.Services
                           JOIN KHOA_HOC kh ON kh.ID_KHOA_HOC = lh.ID_KHOA_HOC
                           LEFT JOIN HOA_DON hd ON hd.ID_DANG_KY = dk.ID_DANG_KY{whereSql}
                           ORDER BY dk.ID_DANG_KY DESC";
-            object? p = null;
-            if (courseId.HasValue && classId.HasValue) p = new { cid = courseId.Value, lid = classId.Value };
-            else if (courseId.HasValue) p = new { cid = courseId.Value };
-            else if (classId.HasValue) p = new { lid = classId.Value };
+            // Build params dynamically (always include status)
+            var paramDict = new Dictionary<string, object> { ["st"] = "Đã duyệt" };
+            if (courseId.HasValue) paramDict["cid"] = courseId.Value;
+            if (classId.HasValue) paramDict["lid"] = classId.Value;
 
             var list = new List<AccountantRegDetail>();
             using var conn = await GetAdminConnectionAsync();
             using var cmd = new OracleCommand(sql, conn) { BindByName = true };
-            if (p != null)
+            foreach (var kv in paramDict)
             {
-                foreach (var prop in p.GetType().GetProperties())
-                    cmd.Parameters.Add($":{prop.Name}", OracleDbType.Int32).Value = (int)prop.GetValue(p)!;
+                var name = kv.Key;
+                var val = kv.Value;
+                if (val is int iv)
+                    cmd.Parameters.Add($":{name}", OracleDbType.Int32).Value = iv;
+                else
+                    cmd.Parameters.Add($":{name}", OracleDbType.Varchar2).Value = val?.ToString();
             }
             using var r = await cmd.ExecuteReaderAsync();
             while (await r.ReadAsync())
@@ -416,7 +617,7 @@ namespace QLTTTA_API.Services
                 {
                     RegistrationId = r.GetInt32(0),
                     RegistrationDate = r.IsDBNull(1) ? null : r.GetDateTime(1),
-                    Status = r.IsDBNull(2) ? null : r.GetString(2),
+                    Status = r.IsDBNull(2) ? null : r.GetString(2).Trim(),
                     StudentId = r.GetInt32(3),
                     StudentName = r.IsDBNull(4) ? null : r.GetString(4),
                     Email = r.IsDBNull(5) ? null : r.GetString(5),
@@ -435,7 +636,7 @@ namespace QLTTTA_API.Services
         {
             var sql = @"SELECT dk.ID_DANG_KY,
                                  dk.NGAY_DANG_KY,
-                                 dk.TRANG_THAI,
+                                 TRIM(dk.TRANG_THAI) AS TRANG_THAI,
                                  hv.ID_HOC_VIEN,
                                  hv.HO_TEN,
                                  tk.EMAIL,
@@ -460,7 +661,7 @@ namespace QLTTTA_API.Services
                 {
                     RegistrationId = r.GetInt32(0),
                     RegistrationDate = r.IsDBNull(1) ? null : r.GetDateTime(1),
-                    Status = r.IsDBNull(2) ? null : r.GetString(2),
+                    Status = r.IsDBNull(2) ? null : r.GetString(2).Trim(),
                     StudentId = r.GetInt32(3),
                     StudentName = r.IsDBNull(4) ? null : r.GetString(4),
                     Email = r.IsDBNull(5) ? null : r.GetString(5),
@@ -472,6 +673,59 @@ namespace QLTTTA_API.Services
                 };
             }
             return null;
+        }
+
+        public async Task<DebugRegistrationCheckResult> DebugCheckAsync(int classId)
+        {
+            var result = new DebugRegistrationCheckResult();
+            using var conn = await GetAdminConnectionAsync();
+            var sid = _httpContextAccessor.HttpContext?.Request?.Headers["X-Session-Id"].FirstOrDefault();
+            var deviceType = _httpContextAccessor.HttpContext?.Request?.Headers["X-Device-Type"].FirstOrDefault()?.Trim().ToLowerInvariant() ?? "pc";
+            if (deviceType != "pc" && deviceType != "mobile") deviceType = "pc";
+            result.SessionId = sid; result.DeviceType = deviceType;
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(sid))
+                {
+                    var columnName = deviceType == "mobile" ? "SESSION_ID_MOBILE" : "SESSION_ID_PC";
+                    using var cmdUser = new OracleCommand($"SELECT ID_NGUOI_DUNG FROM TAI_KHOAN WHERE {columnName} = :sid", conn) { BindByName = true };
+                    cmdUser.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sid;
+                    var obj = await cmdUser.ExecuteScalarAsync();
+                    if (obj != null && obj != DBNull.Value) result.ResolvedAccountUserId = Convert.ToInt32(obj);
+                }
+                if (result.ResolvedAccountUserId.HasValue)
+                {
+                    using var chkHV = new OracleCommand("SELECT COUNT(*) FROM HOC_VIEN WHERE ID_HOC_VIEN=:id", conn) { BindByName = true };
+                    chkHV.Parameters.Add(":id", OracleDbType.Int32).Value = result.ResolvedAccountUserId.Value;
+                    result.HasHocVienRow = Convert.ToInt32(await chkHV.ExecuteScalarAsync()) > 0;
+                    using var chkStu = new OracleCommand("SELECT COUNT(*) FROM QLTT_ADMIN.STUDENTS WHERE STUDENT_ID=:id", conn) { BindByName = true };
+                    chkStu.Parameters.Add(":id", OracleDbType.Int32).Value = result.ResolvedAccountUserId.Value;
+                    result.HasStudentsRow = Convert.ToInt32(await chkStu.ExecuteScalarAsync()) > 0;
+                }
+                using (var chkClass = new OracleCommand("SELECT TRANG_THAI, SI_SO_TOI_DA FROM LOP_HOC WHERE ID_LOP_HOC = :cid", conn) { BindByName = true })
+                {
+                    chkClass.Parameters.Add(":cid", OracleDbType.Int32).Value = classId;
+                    using var rc = await chkClass.ExecuteReaderAsync();
+                    if (await rc.ReadAsync())
+                    {
+                        result.ClassExists = true;
+                        result.ClassStatus = rc.IsDBNull(0) ? null : rc.GetString(0).Trim();
+                        result.ClassMaxSize = rc.IsDBNull(1) ? null : (int?)rc.GetInt32(1);
+                    }
+                }
+                if (result.ClassExists)
+                {
+                    using var cntApproved = new OracleCommand("SELECT COUNT(*) FROM DON_DANG_KY WHERE ID_LOP_HOC = :cid AND UPPER(TRIM(TRANG_THAI)) = UPPER('Đã duyệt')", conn) { BindByName = true };
+                    cntApproved.Parameters.Add(":cid", OracleDbType.Int32).Value = classId;
+                    result.ApprovedCount = Convert.ToInt32(await cntApproved.ExecuteScalarAsync());
+                }
+                result.Message = "OK";
+            }
+            catch (Exception ex)
+            {
+                result.Message = "Lỗi debug: " + ex.Message;
+            }
+            return result;
         }
     }
 }

@@ -15,8 +15,8 @@ namespace QLTTTA_API.Services
 
     public class PaymentService : BaseService, IPaymentService
     {
-        public PaymentService(IConfiguration configuration, ILogger<PaymentService> logger, IOracleConnectionProvider userConnProvider)
-            : base(configuration, logger, userConnProvider) { }
+        public PaymentService(IConfiguration configuration, ILogger<PaymentService> logger, IOracleConnectionProvider userConnProvider, IHttpContextAccessor httpContextAccessor)
+            : base(configuration, logger, userConnProvider, httpContextAccessor) { }
 
         // Học viên gửi yêu cầu xác nhận thanh toán
         public async Task<ApiResponse<bool>> StudentRequestPaymentAsync(int invoiceId)

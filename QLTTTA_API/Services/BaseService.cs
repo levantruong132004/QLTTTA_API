@@ -1,5 +1,6 @@
 using Oracle.ManagedDataAccess.Client;
 using System.Data;
+using Microsoft.Extensions.Logging;
 
 namespace QLTTTA_API.Services
 {
@@ -28,16 +29,18 @@ namespace QLTTTA_API.Services
         protected readonly string _connectionString;
         private readonly IOracleConnectionProvider? _userConnProvider;
         protected readonly ILogger _logger;
+        private readonly IHttpContextAccessor? _httpContextAccessor;
 
         /// <summary>
         /// Khởi tạo BaseService với cấu hình DB, logger và provider kết nối user (có thể null nếu service không cần per-user).
         /// </summary>
-        public BaseService(IConfiguration configuration, ILogger logger, IOracleConnectionProvider? userConnProvider = null)
+        public BaseService(IConfiguration configuration, ILogger logger, IOracleConnectionProvider? userConnProvider = null, IHttpContextAccessor? httpContextAccessor = null)
         {
             _connectionString = configuration.GetConnectionString("OracleDbConnection") ??
                 throw new ArgumentNullException("Connection string not found");
             _logger = logger;
             _userConnProvider = userConnProvider;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         /// <summary>
@@ -45,39 +48,41 @@ namespace QLTTTA_API.Services
         /// </summary>
         public async Task<OracleConnection> GetConnectionAsync()
         {
+            // Ưu tiên kết nối per-user nếu có provider, để các truy vấn chạy đúng ngữ cảnh USER (học viên)
             if (_userConnProvider != null)
             {
                 try
                 {
-                    var userConn = await _userConnProvider.GetUserConnectionAsync();
-                    await EnsureCurrentSchemaAsync(userConn);
-                    return userConn;
+                    return await _userConnProvider.GetUserConnectionAsync();
                 }
-                catch (UnauthorizedAccessException uex)
+                catch (UnauthorizedAccessException ex)
                 {
-                    // Session missing/invalid: fall back to admin connection for read operations
-                    _logger.LogWarning(uex, "User session invalid or missing. Falling back to admin connection");
-                    // continue to fallback below
+                    _logger.LogWarning(ex, "Per-user connection unavailable, falling back to admin connection");
+                    return await GetAdminConnectionAsync();
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Failed to obtain user connection, falling back to admin connection");
+                    _logger.LogWarning(ex, "Per-user connection failed unexpectedly, fallback admin");
+                    return await GetAdminConnectionAsync();
                 }
             }
-            var connection = new OracleConnection(_connectionString);
-            await connection.OpenAsync();
-            await EnsureCurrentSchemaAsync(connection);
-            return connection;
+            // Nếu không cấu hình provider thì dùng admin
+            return await GetAdminConnectionAsync();
         }
 
         /// <summary>
         /// Luôn trả về kết nối admin (bỏ qua cơ chế user). Dùng cho các tác vụ hệ thống hoặc fallback.
+        /// SET CLIENT_IDENTIFIER để VPD policy hoạt động đúng.
         /// </summary>
         public async Task<OracleConnection> GetAdminConnectionAsync()
         {
             var connection = new OracleConnection(_connectionString);
             await connection.OpenAsync();
             await EnsureCurrentSchemaAsync(connection);
+            
+            // Set CLIENT_IDENTIFIER từ session để VPD nhận dạng user
+            await SetClientIdentifierAsync(connection);
+            
             return connection;
         }
 
@@ -98,6 +103,67 @@ namespace QLTTTA_API.Services
             catch
             {
                 // Không chặn luồng nếu ALTER SESSION lỗi; tiếp tục dùng schema mặc định của user
+            }
+        }
+
+        /// <summary>
+        /// Set CLIENT_IDENTIFIER từ session header để VPD policy hoạt động
+        /// </summary>
+        private async Task SetClientIdentifierAsync(OracleConnection conn)
+        {
+            try
+            {
+                string? username = null;
+                string? sessionId = null;
+                string deviceType = "pc";
+                if (_httpContextAccessor?.HttpContext != null)
+                {
+                    // Ưu tiên header
+                    sessionId = _httpContextAccessor.HttpContext.Request.Headers["X-Session-Id"].FirstOrDefault();
+                    deviceType = _httpContextAccessor.HttpContext.Request.Headers["X-Device-Type"].FirstOrDefault()?.Trim().ToLowerInvariant() ?? "pc";
+                    if (deviceType != "pc" && deviceType != "mobile") deviceType = "pc";
+                    // Fallback cookie nếu header trống (khi gọi trực tiếp API qua Swagger / JS fetch chưa gắn handler)
+                    if (string.IsNullOrWhiteSpace(sessionId))
+                    {
+                        sessionId = _httpContextAccessor.HttpContext.Request.Cookies["SessionId"];
+                    }
+                    if (!string.IsNullOrWhiteSpace(sessionId))
+                    {
+                        var columnName = deviceType == "mobile" ? "SESSION_ID_MOBILE" : "SESSION_ID_PC";
+                        try
+                        {
+                            using var cmd = new OracleCommand($"SELECT TEN_DANG_NHAP FROM TAI_KHOAN WHERE {columnName} = :sid", conn) { BindByName = true };
+                            cmd.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sessionId;
+                            var result = await cmd.ExecuteScalarAsync();
+                            if (result != null && result != DBNull.Value)
+                            {
+                                username = result.ToString();
+                            }
+                        }
+                        catch (OracleException oex) when (oex.Number == 904) // ORA-00904 invalid identifier
+                        {
+                            // Fallback legacy cột SESSION_ID_HIENTAI nếu chưa migrate
+                            using var cmd2 = new OracleCommand("SELECT TEN_DANG_NHAP FROM TAI_KHOAN WHERE SESSION_ID_HIENTAI = :sid", conn) { BindByName = true };
+                            cmd2.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sessionId;
+                            var result2 = await cmd2.ExecuteScalarAsync();
+                            if (result2 != null && result2 != DBNull.Value)
+                            {
+                                username = result2.ToString();
+                            }
+                        }
+                    }
+                }
+                if (!string.IsNullOrEmpty(username))
+                {
+                    using var setCmd = new OracleCommand("BEGIN DBMS_SESSION.SET_IDENTIFIER(:ident); END;", conn) { BindByName = true };
+                    setCmd.Parameters.Add(":ident", OracleDbType.Varchar2).Value = username;
+                    await setCmd.ExecuteNonQueryAsync();
+                    _logger.LogDebug("Set CLIENT_IDENTIFIER to {Username} (sid={SessionId}, device={DeviceType})", username, sessionId ?? "NULL", deviceType);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to set CLIENT_IDENTIFIER");
             }
         }
 

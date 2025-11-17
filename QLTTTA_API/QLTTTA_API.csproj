@@ -10,8 +10,11 @@
     <PackageReference Include="DinkToPdf" Version="1.0.8" />
     <PackageReference Include="IronPdf" Version="2025.11.12" />
     <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.9.1" />
+    <PackageReference Include="QuestPDF" Version="2025.7.4" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
     <PackageReference Include="MailKit" Version="4.5.0" />
+    <PackageReference Include="itext7" Version="7.2.5" />
+    <!-- Removed itext7 and adapter (not used now, tránh cảnh báo NU1603) -->
   </ItemGroup>
 
 </Project>

@@ -9,6 +9,7 @@ namespace QLTTTA_API.Services
     public interface IEmailService
     {
         Task SendAsync(string toEmail, string subject, string htmlBody, IEnumerable<(string fileName, byte[] content, string contentType)>? attachments = null, CancellationToken ct = default);
+        Task<bool> SendEmailWithAttachmentAsync(string toEmail, string subject, string htmlBody, byte[] pdfBytes, string pdfFileName);
     }
 
     public class MailKitEmailService : IEmailService
@@ -83,6 +84,30 @@ namespace QLTTTA_API.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to send email to {To} with subject {Subject}", toEmail, subject);
+            }
+        }
+
+        public async Task<bool> SendEmailWithAttachmentAsync(string toEmail, string subject, string htmlBody, byte[] pdfBytes, string pdfFileName)
+        {
+            try
+            {
+                // Validate SMTP config first to reflect accurate result
+                var host = _config["Smtp:Host"] ?? _config["Email:SmtpHost"];
+                var user = _config["Smtp:User"] ?? _config["Email:SmtpUser"];
+                var pass = _config["Smtp:Pass"] ?? _config["Email:SmtpPass"];
+                if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(user) || string.IsNullOrWhiteSpace(pass))
+                {
+                    _logger.LogWarning("SMTP settings missing. Skip sending email to {Email}", toEmail);
+                    return false;
+                }
+
+                await SendAsync(toEmail, subject, htmlBody, new[] { (pdfFileName, pdfBytes, "application/pdf") });
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "SendEmailWithAttachmentAsync failed for {Email}", toEmail);
+                return false;
             }
         }
     }

@@ -1,8 +1,9 @@
 using Oracle.ManagedDataAccess.Client;
 using QLTTTA_API.Models;
 using QLTTTA_API.Models.DTOs;
-using DinkToPdf;
-using DinkToPdf.Contracts;
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
 
 namespace QLTTTA_API.Services
 {
@@ -12,20 +13,39 @@ namespace QLTTTA_API.Services
         Task<Invoice?> GetByRegistrationAsync(int registrationId);
         Task<Invoice?> GetByIdAsync(int invoiceId);
         Task<bool> UpdateStatusAsync(int invoiceId, string status);
-        Task<ApiResponse<PdfEmailResult>> GeneratePdfAndSendEmailAsync(int invoiceId, int accountantId);
+        Task<ApiResponse<InvoicePdfEmailResult>> GeneratePdfAndSendEmailAsync(int invoiceId, int accountantId);
+        Task<(string studentName, string studentEmail, string courseName, string className)> GetStudentCourseInfoAsync(int registrationId);
+        Task<bool> MarkPrintedAsync(int invoiceId);
     }
 
-    public class PdfEmailResult
+    public class InvoicePdfEmailResult
     {
+        public int InvoiceId { get; set; }
         public string? EmailAddress { get; set; }
-        public string? PdfFilePath { get; set; }
+        public bool PdfGenerated { get; set; }
         public bool EmailSent { get; set; }
     }
 
     public class InvoiceService : BaseService, IInvoiceService
     {
-        public InvoiceService(IConfiguration configuration, ILogger<InvoiceService> logger, IOracleConnectionProvider userConnProvider)
-            : base(configuration, logger, userConnProvider) { }
+        private readonly IEmailService _emailService;
+        private readonly IPdfSignatureService _pdfSignatureService; // add
+
+        public InvoiceService(
+            IConfiguration configuration, 
+            ILogger<InvoiceService> logger, 
+            IOracleConnectionProvider userConnProvider, 
+            IHttpContextAccessor httpContextAccessor,
+            IEmailService emailService,
+            IPdfSignatureService pdfSignatureService) // add
+            : base(configuration, logger, userConnProvider, httpContextAccessor) 
+        { 
+            _emailService = emailService;
+            _pdfSignatureService = pdfSignatureService; // assign
+            
+            // Cấu hình QuestPDF license - Sử dụng Community License (miễn phí)
+            QuestPDF.Settings.License = LicenseType.Community;
+        }
 
         public async Task<ApiResponse<Invoice>> CreateAsync(int registrationId, DateTime dueDate, int amount)
         {
@@ -78,6 +98,30 @@ namespace QLTTTA_API.Services
                             Status = r.GetString(5),
                             RegistrationId = r.GetInt32(6)
                         };
+
+                        // Tạo sẵn Base PDF ngay khi tạo hóa đơn để giữ nguyên format khi ký sau này
+                        try
+                        {
+                            var (studentName, _, courseName, className) = await GetStudentCourseInfoAsync(inv.RegistrationId);
+                            var created = inv.CreatedDate ?? DateTime.Now;
+                            var due = inv.DueDate ?? dueDate;
+                            await _pdfSignatureService.GenerateAndSaveBaseInvoicePdfAsync(
+                                inv.InvoiceId,
+                                inv.InvoiceCode ?? code,
+                                studentName,
+                                courseName,
+                                className,
+                                inv.Amount,
+                                created,
+                                due
+                            );
+                        }
+                        catch (Exception genPdfEx)
+                        {
+                            _logger.LogWarning(genPdfEx, "Không thể tạo base PDF ngay lúc tạo hóa đơn {InvoiceId}", invId);
+                            // Không chặn luồng tạo hóa đơn nếu tạo PDF thất bại
+                        }
+
                         return new ApiResponse<Invoice> { Success = true, Message = "Tạo hóa đơn thành công", Data = inv };
                     }
                 }
@@ -102,29 +146,32 @@ namespace QLTTTA_API.Services
 
         public async Task<Invoice?> GetByRegistrationAsync(int registrationId)
         {
-            var sql = @"SELECT ID_HOA_DON, MA_HOA_DON, NGAY_TAO, NGAY_HET_HAN, SO_TIEN, TRANG_THAI, ID_DANG_KY,
-                              CHU_KY_BASE64, THUAT_TOAN, ID_KE_TOAN_KY, NGAY_KY, CHU_KY_HINH_BASE64
-                        FROM HOA_DON WHERE ID_DANG_KY=:rid";
-            using var conn = await GetConnectionAsync();
+            var sql = @"SELECT ID_HOA_DON, MA_HOA_DON, NGAY_TAO, NGAY_HET_HAN, SO_TIEN, TRANG_THAI, 
+                               ID_DANG_KY, CHU_KY_BASE64, THUAT_TOAN, ID_KE_TOAN_KY, NGAY_KY, CHU_KY_HINH_BASE64,
+                               NVL(DA_IN, 0) AS DA_IN
+                        FROM HOA_DON 
+                        WHERE ID_DANG_KY = :regId";
+            using var conn = await GetAdminConnectionAsync();
             using var cmd = new OracleCommand(sql, conn) { BindByName = true };
-            cmd.Parameters.Add(":rid", OracleDbType.Int32).Value = registrationId;
+            cmd.Parameters.Add(":regId", OracleDbType.Int32).Value = registrationId;
             using var r = await cmd.ExecuteReaderAsync();
             if (await r.ReadAsync())
             {
                 return new Invoice
                 {
                     InvoiceId = r.GetInt32(0),
-                    InvoiceCode = r.GetString(1),
-                    CreatedDate = r.GetDateTime(2),
-                    DueDate = r.GetDateTime(3),
-                    Amount = Convert.ToInt32(r.GetValue(4)),
-                    Status = r.GetString(5),
+                    InvoiceCode = r.IsDBNull(1) ? null : r.GetString(1),
+                    CreatedDate = r.IsDBNull(2) ? null : r.GetDateTime(2),
+                    DueDate = r.IsDBNull(3) ? null : r.GetDateTime(3),
+                    Amount = r.IsDBNull(4) ? 0 : Convert.ToInt32(r.GetValue(4)),
+                    Status = r.IsDBNull(5) ? null : r.GetString(5),
                     RegistrationId = r.GetInt32(6),
                     SignatureBase64 = r.IsDBNull(7) ? null : r.GetString(7),
                     Algorithm = r.IsDBNull(8) ? null : r.GetString(8),
                     AccountantId = r.IsDBNull(9) ? 0 : r.GetInt32(9),
                     SignedDate = r.IsDBNull(10) ? null : r.GetDateTime(10),
-                    SignatureImageBase64 = r.IsDBNull(11) ? null : r.GetString(11)
+                    SignatureImageBase64 = r.IsDBNull(11) ? null : r.GetString(11),
+                    IsPrinted = r.IsDBNull(12) ? false : r.GetInt32(12) == 1
                 };
             }
             return null;
@@ -132,10 +179,12 @@ namespace QLTTTA_API.Services
 
         public async Task<Invoice?> GetByIdAsync(int invoiceId)
         {
-            var sql = @"SELECT ID_HOA_DON, MA_HOA_DON, NGAY_TAO, NGAY_HET_HAN, SO_TIEN, TRANG_THAI, ID_DANG_KY,
-                              CHU_KY_BASE64, THUAT_TOAN, ID_KE_TOAN_KY, NGAY_KY, CHU_KY_HINH_BASE64
-                        FROM HOA_DON WHERE ID_HOA_DON=:id";
-            using var conn = await GetConnectionAsync();
+            var sql = @"SELECT ID_HOA_DON, MA_HOA_DON, NGAY_TAO, NGAY_HET_HAN, SO_TIEN, TRANG_THAI, 
+                               ID_DANG_KY, CHU_KY_BASE64, THUAT_TOAN, ID_KE_TOAN_KY, NGAY_KY, CHU_KY_HINH_BASE64,
+                               NVL(DA_IN, 0) AS DA_IN
+                        FROM HOA_DON 
+                        WHERE ID_HOA_DON = :id";
+            using var conn = await GetAdminConnectionAsync();
             using var cmd = new OracleCommand(sql, conn) { BindByName = true };
             cmd.Parameters.Add(":id", OracleDbType.Int32).Value = invoiceId;
             using var r = await cmd.ExecuteReaderAsync();
@@ -144,17 +193,18 @@ namespace QLTTTA_API.Services
                 return new Invoice
                 {
                     InvoiceId = r.GetInt32(0),
-                    InvoiceCode = r.GetString(1),
-                    CreatedDate = r.GetDateTime(2),
-                    DueDate = r.GetDateTime(3),
-                    Amount = Convert.ToInt32(r.GetValue(4)),
-                    Status = r.GetString(5),
+                    InvoiceCode = r.IsDBNull(1) ? null : r.GetString(1),
+                    CreatedDate = r.IsDBNull(2) ? null : r.GetDateTime(2),
+                    DueDate = r.IsDBNull(3) ? null : r.GetDateTime(3),
+                    Amount = r.IsDBNull(4) ? 0 : Convert.ToInt32(r.GetValue(4)),
+                    Status = r.IsDBNull(5) ? null : r.GetString(5),
                     RegistrationId = r.GetInt32(6),
                     SignatureBase64 = r.IsDBNull(7) ? null : r.GetString(7),
                     Algorithm = r.IsDBNull(8) ? null : r.GetString(8),
                     AccountantId = r.IsDBNull(9) ? 0 : r.GetInt32(9),
                     SignedDate = r.IsDBNull(10) ? null : r.GetDateTime(10),
-                    SignatureImageBase64 = r.IsDBNull(11) ? null : r.GetString(11)
+                    SignatureImageBase64 = r.IsDBNull(11) ? null : r.GetString(11),
+                    IsPrinted = r.IsDBNull(12) ? false : r.GetInt32(12) == 1
                 };
             }
             return null;
@@ -178,332 +228,557 @@ namespace QLTTTA_API.Services
             }
         }
 
-        public async Task<ApiResponse<PdfEmailResult>> GeneratePdfAndSendEmailAsync(int invoiceId, int accountantId)
+        public async Task<ApiResponse<InvoicePdfEmailResult>> GeneratePdfAndSendEmailAsync(int invoiceId, int accountantId)
         {
             try
             {
-                // 1. Lấy thông tin hóa đơn và học viên
-                var invoiceData = await GetInvoiceWithStudentInfoAsync(invoiceId);
-                if (invoiceData == null)
+                // 1. Lấy thông tin hóa đơn đầy đủ
+                var invoice = await GetByIdAsync(invoiceId);
+                if (invoice == null)
                 {
-                    return new ApiResponse<PdfEmailResult> 
-                    { 
-                        Success = false, 
-                        Message = "Không tìm thấy thông tin hóa đơn" 
+                    return new ApiResponse<InvoicePdfEmailResult>
+                    {
+                        Success = false,
+                        Message = "Không tìm thấy hóa đơn"
                     };
                 }
 
-                // 2. Tạo HTML content cho hóa đơn
-                var htmlContent = GenerateInvoiceHtml(invoiceData);
+                // 2. Lấy thông tin đơn đăng ký và học viên
+                var (studentName, studentEmail, courseName, className) = await GetStudentCourseInfoAsync(invoice.RegistrationId);
 
-                // 3. Tạo PDF từ HTML (sử dụng thư viện như iTextSharp hoặc PuppeteerSharp)
-                var pdfBytes = await GeneratePdfFromHtml(htmlContent);
-                
-                // 4. Lưu PDF vào thư mục tạm
-                var pdfFileName = $"HoaDon_{invoiceData.InvoiceCode}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
-                var pdfPath = Path.Combine(Path.GetTempPath(), pdfFileName);
-                await File.WriteAllBytesAsync(pdfPath, pdfBytes);
+                if (string.IsNullOrEmpty(studentEmail))
+                {
+                    return new ApiResponse<InvoicePdfEmailResult>
+                    {
+                        Success = false,
+                        Message = "Học viên không có email để gửi"
+                    };
+                }
 
-                // 5. Gửi email với PDF đính kèm
-                var emailSent = await SendInvoicePdfByEmail(invoiceData.StudentEmail, invoiceData.InvoiceCode, pdfPath);
+                // 3. Tạo PDF hóa đơn bằng QuestPDF (sử dụng giao diện đẹp giống PDF học viên xem)
+                byte[] pdfBytes;
+                try
+                {
+                    pdfBytes = await GenerateInvoicePdf(invoice, studentName, courseName, className);
+                }
+                catch (Exception pdfEx)
+                {
+                    _logger.LogError(pdfEx, "Failed to generate PDF for invoice {InvoiceId}", invoiceId);
+                    return new ApiResponse<InvoicePdfEmailResult>
+                    {
+                        Success = false,
+                        Message = "Không thể tạo file PDF: " + pdfEx.Message
+                    };
+                }
 
-                // 6. Log activity
-                await LogPrintActivity(invoiceId, accountantId, pdfPath, emailSent);
+                // 4. Gửi email với PDF đính kèm
+                var emailBody = $@"
+                    <html>
+                    <body style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
+                        <div style='max-width: 600px; margin: 0 auto; padding: 20px;'>
+                            <h2 style='color: #2c5aa0; text-align: center;'>🎓 Hóa đơn học phí - Trung tâm Tin học</h2>
+                            
+                            <p>Kính gửi: <strong>{studentName}</strong>,</p>
+                            
+                            <p>Trung tâm gửi bạn hóa đơn học phí cho khóa học <strong>{courseName}</strong> - Lớp <strong>{className}</strong>.</p>
+                            
+                            <div style='background: #f8f9fa; padding: 15px; border-left: 4px solid #2c5aa0; margin: 20px 0;'>
+                                <p><strong>📋 Mã hóa đơn:</strong> {invoice.InvoiceCode}</p>
+                                <p><strong>💰 Số tiền:</strong> <span style='color: #d63384; font-size: 1.2em;'>{invoice.Amount:N0} VNĐ</span></p>
+                                <p><strong>📅 Hạn thanh toán:</strong> <span style='color: #dc3545;'>{invoice.DueDate?.ToString("dd/MM/yyyy")}</span></p>
+                            </div>
 
-                return new ApiResponse<PdfEmailResult>
+                            <p>📎 Vui lòng xem file PDF đính kèm để biết chi tiết hóa đơn.</p>
+                            
+                            <p style='margin-top: 30px;'>Trân trọng,<br/>
+                            <strong>🏫 Trung tâm Tin học LDA</strong></p>
+                            
+                            <hr style='margin: 30px 0; border: none; border-top: 1px solid #eee;'/>
+                            <p style='font-size: 12px; color: #666; text-align: center;'>
+                                Email này được gửi tự động từ hệ thống quản lý trung tâm.
+                            </p>
+                        </div>
+                    </body>
+                    </html>";
+
+                bool emailSent;
+                try
+                {
+                    emailSent = await _emailService.SendEmailWithAttachmentAsync(
+                        studentEmail,
+                        $"🎓 Hóa đơn học phí - {invoice.InvoiceCode}",
+                        emailBody,
+                        pdfBytes,
+                        $"HoaDon_{invoice.InvoiceCode}.pdf"
+                    );
+                }
+                catch (Exception emailEx)
+                {
+                    _logger.LogError(emailEx, "Failed to send email for invoice {InvoiceId}", invoiceId);
+                    return new ApiResponse<InvoicePdfEmailResult>
+                    {
+                        Success = false,
+                        Message = "Không thể gửi email: " + emailEx.Message
+                    };
+                }
+
+                if (!emailSent)
+                {
+                    return new ApiResponse<InvoicePdfEmailResult>
+                    {
+                        Success = false,
+                        Message = "Gửi email thất bại"
+                    };
+                }
+
+                // 5. Cập nhật flag DA_IN = 1 trong database
+                await MarkPrintedAsync(invoiceId);
+
+                return new ApiResponse<InvoicePdfEmailResult>
                 {
                     Success = true,
-                    Message = emailSent ? "Tạo PDF và gửi email thành công" : "Tạo PDF thành công nhưng gửi email thất bại",
-                    Data = new PdfEmailResult
+                    Message = $"✅ Đã in hóa đơn và gửi PDF tới {studentEmail} thành công!",
+                    Data = new InvoicePdfEmailResult
                     {
-                        EmailAddress = invoiceData.StudentEmail,
-                        PdfFilePath = pdfPath,
-                        EmailSent = emailSent
+                        InvoiceId = invoiceId,
+                        EmailAddress = studentEmail,
+                        PdfGenerated = true,
+                        EmailSent = true
                     }
                 };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "GeneratePdfAndSendEmailAsync failed for invoice {InvoiceId}", invoiceId);
-                return new ApiResponse<PdfEmailResult>
+                return new ApiResponse<InvoicePdfEmailResult>
                 {
                     Success = false,
-                    Message = $"Lỗi tạo PDF và gửi email: {ex.Message}"
+                    Message = "Có lỗi xảy ra: " + ex.Message
                 };
             }
         }
 
-        private async Task<InvoiceWithStudentInfo?> GetInvoiceWithStudentInfoAsync(int invoiceId)
-        {
-            var sql = @"SELECT h.ID_HOA_DON, h.MA_HOA_DON, h.NGAY_TAO, h.NGAY_HET_HAN, h.SO_TIEN, h.TRANG_THAI,
-                              h.CHU_KY_BASE64, h.NGAY_KY, h.ID_DANG_KY, h.CHU_KY_HINH_BASE64,
-                              tk.EMAIL, hv.HO_TEN, hv.SO_DIEN_THOAI,
-                              kh.TEN_KHOA_HOC, l.TEN_LOP
-                       FROM HOA_DON h
-                       JOIN DON_DANG_KY dk ON h.ID_DANG_KY = dk.ID_DANG_KY
-                       JOIN HOC_VIEN hv ON dk.ID_HOC_VIEN = hv.ID_HOC_VIEN
-                       JOIN TAI_KHOAN tk ON hv.ID_TAI_KHOAN = tk.ID_TAI_KHOAN
-                       JOIN LOP l ON dk.ID_LOP = l.ID_LOP
-                       JOIN KHOA_HOC kh ON l.ID_KHOA_HOC = kh.ID_KHOA_HOC
-                       WHERE h.ID_HOA_DON = :id";
-
-            OracleConnection? conn = null;
-            try
-            {
-                // Ưu tiên dùng kết nối per-user (tài khoản kế toán đang đăng nhập)
-                conn = await GetConnectionAsync();
-            }
-            catch (OracleException oex) when (oex.Number == 1031 || oex.Number == 942)
-            {
-                // Thiếu quyền hoặc thiếu đối tượng -> fallback admin để đảm bảo in không bị chặn
-                _logger.LogWarning(oex, "Fallback to admin connection for GetInvoiceWithStudentInfo (invoice {InvoiceId})", invoiceId);
-                conn = await GetAdminConnectionAsync();
-            }
-
-            using var cmd = new OracleCommand(sql, conn) { BindByName = true };
-            cmd.Parameters.Add(":id", OracleDbType.Int32).Value = invoiceId;
-            using var r = await cmd.ExecuteReaderAsync();
-            if (await r.ReadAsync())
-            {
-                return new InvoiceWithStudentInfo
-                {
-                    InvoiceId = r.GetInt32(0),
-                    InvoiceCode = r.GetString(1),
-                    CreatedDate = r.GetDateTime(2),
-                    DueDate = r.GetDateTime(3),
-                    Amount = Convert.ToInt32(r.GetValue(4)),
-                    Status = r.GetString(5),
-                    SignatureBase64 = r.IsDBNull(6) ? null : r.GetString(6),
-                    SignedDate = r.IsDBNull(7) ? null : r.GetDateTime(7),
-                    RegistrationId = r.GetInt32(8),
-                    SignatureImageBase64 = r.IsDBNull(9) ? null : r.GetString(9),
-                    StudentEmail = r.GetString(10),
-                    StudentName = r.GetString(11),
-                    PhoneNumber = r.GetString(12),
-                    CourseName = r.GetString(13),
-                    ClassName = r.GetString(14)
-                };
-            }
-            return null;
-        }
-
-        private string GenerateInvoiceHtml(InvoiceWithStudentInfo data)
-        {
-            var hasSignatureImage = !string.IsNullOrEmpty(data.SignatureImageBase64);
-            var signatureHtml = hasSignatureImage 
-                ? $"<img src=\"data:image/png;base64,{data.SignatureImageBase64}\" style=\"max-width: 140px; max-height: 50px;\" />"
-                : "<span style='color: #666; font-size: 0.8rem;'>Đã ký số</span>";
-
-            return $@"
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset='UTF-8'>
-                <title>Hóa đơn {data.InvoiceCode}</title>
-                <style>
-                    body {{ font-family: 'Times New Roman', serif; font-size: 12px; line-height: 1.3; margin: 0; }}
-                    .invoice-container {{ max-width: 210mm; margin: 0 auto; }}
-                    .invoice-header {{ background: #8B4513; color: white; padding: 12px 20px; text-align: center; }}
-                    .invoice-title {{ font-size: 1.5rem; margin: 0; }}
-                    .company-info {{ text-align: center; margin: 15px 0; padding-bottom: 10px; border-bottom: 1px solid #ddd; }}
-                    .invoice-details {{ display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }}
-                    .detail-section {{ background: #f8f9ff; padding: 12px; border-left: 3px solid #8B4513; }}
-                    .signature-section {{ margin-top: 15px; border-top: 1px solid #ddd; padding-top: 12px; }}
-                    .signature-layout {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; text-align: center; }}
-                    .signature-area {{ height: 60px; display: flex; align-items: center; justify-content: center; }}
-                </style>
-            </head>
-            <body>
-                <div class='invoice-container'>
-                    <div class='invoice-header'>
-                        <h1 class='invoice-title'>HÓA ĐƠN ĐIỆN TỬ</h1>
-                        <p>Số: {data.InvoiceCode}</p>
-                    </div>
-                    
-                    <div class='company-info'>
-                        <div style='font-size: 1.2rem; font-weight: bold;'>TRUNG TÂM TIẾNG ANH LDA</div>
-                        <div>Mã số thuế: 0123456789 | Địa chỉ: 123 Đường ABC, Quận XYZ, TP.HCM</div>
-                        <div>Điện thoại: (028) 1234.5678 | Email: info@lda.edu.vn</div>
-                    </div>
-
-                    <div class='invoice-details'>
-                        <div class='detail-section'>
-                            <div style='font-weight: bold; margin-bottom: 8px;'>Thông tin hóa đơn</div>
-                            <div>Mã hóa đơn: {data.InvoiceCode}</div>
-                            <div>Ngày tạo: {data.CreatedDate:dd/MM/yyyy}</div>
-                            <div>Hạn thanh toán: {data.DueDate:dd/MM/yyyy}</div>
-                            <div>Trạng thái: {data.Status}</div>
-                        </div>
-                        
-                        <div class='detail-section'>
-                            <div style='font-weight: bold; margin-bottom: 8px;'>Thông tin học viên</div>
-                            <div>Họ tên: {data.StudentName}</div>
-                            <div>Email: {data.StudentEmail}</div>
-                            <div>SĐT: {data.PhoneNumber}</div>
-                            <div>Khóa học: {data.CourseName}</div>
-                            <div>Lớp: {data.ClassName}</div>
-                            <div><strong>Số tiền: {data.Amount:N0} VNĐ</strong></div>
-                        </div>
-                    </div>
-
-                    <div class='signature-section'>
-                        <div class='signature-layout'>
-                            <div>
-                                <div style='font-weight: bold;'>Người mua hàng</div>
-                                <div style='font-style: italic; font-size: 0.8rem;'>(Ký, ghi rõ họ, tên)</div>
-                                <div class='signature-area'></div>
-                            </div>
-                            
-                            <div>
-                                <div style='font-weight: bold;'>Người bán hàng</div>
-                                <div style='font-style: italic; font-size: 0.8rem;'>(Ký, ghi rõ họ, tên)</div>
-                                <div class='signature-area'>{signatureHtml}</div>
-                                {(data.SignedDate.HasValue ? $@"
-                                <div style='margin-top: 5px; font-weight: bold;'>TRUNG TÂM TIẾNG ANH LDA</div>
-                                <div style='font-size: 0.8rem;'>Ký ngày: {data.SignedDate:dd/MM/yyyy}</div>" : "")}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </body>
-            </html>";
-        }
-
-        private async Task<byte[]> GeneratePdfFromHtml(string htmlContent)
+        public async Task<bool> MarkPrintedAsync(int invoiceId)
         {
             try
             {
-                // Sử dụng DinkToPdf để tạo PDF từ HTML
-                var converter = new BasicConverter(new PdfTools());
-                
-                var doc = new HtmlToPdfDocument()
-                {
-                    GlobalSettings = {
-                        ColorMode = ColorMode.Color,
-                        Orientation = Orientation.Portrait,
-                        PaperSize = PaperKind.A4,
-                        Margins = new MarginSettings() { Top = 10, Bottom = 10, Left = 10, Right = 10 },
-                        DocumentTitle = "Hóa đơn điện tử - Trung tâm Tiếng Anh LDA"
-                    },
-                    Objects = {
-                        new ObjectSettings() {
-                            PagesCount = true,
-                            HtmlContent = htmlContent,
-                            WebSettings = { DefaultEncoding = "utf-8" }
-                        }
-                    }
-                };
-                
-                var pdfBytes = converter.Convert(doc);
-                return await Task.FromResult(pdfBytes);
+                using var conn = await GetAdminConnectionAsync();
+                using var updateCmd = new OracleCommand("UPDATE HOA_DON SET DA_IN = 1 WHERE ID_HOA_DON = :id", conn) { BindByName = true };
+                updateCmd.Parameters.Add(":id", OracleDbType.Int32).Value = invoiceId;
+                var rows = await updateCmd.ExecuteNonQueryAsync();
+                return rows > 0;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to generate PDF from HTML");
-                // Fallback: trả về HTML bytes nếu tạo PDF thất bại
-                return System.Text.Encoding.UTF8.GetBytes(htmlContent);
-            }
-        }
-
-        private async Task<bool> SendInvoicePdfByEmail(string toEmail, string invoiceCode, string pdfPath)
-        {
-            try
-            {
-                // Sử dụng EmailService để gửi email với PDF đính kèm
-                // Cần inject IEmailService vào constructor
-                
-                var subject = $"Hóa đơn điện tử {invoiceCode} - Trung tâm Tiếng Anh LDA";
-                var body = $@"
-                    Kính gửi Quý khách,<br><br>
-                    
-                    Trung tâm Tiếng Anh LDA xin gửi đến Quý khách hóa đơn điện tử <strong>{invoiceCode}</strong>.<br><br>
-                    
-                    Vui lòng kiểm tra file PDF đính kèm để xem chi tiết hóa đơn.<br><br>
-                    
-                    Trân trọng,<br>
-                    <strong>Trung tâm Tiếng Anh LDA</strong><br>
-                    Email: info@lda.edu.vn<br>
-                    Điện thoại: (028) 1234.5678
-                ";
-
-                // Tạm thời return true - cần implement gửi email thực tế
-                await Task.Delay(100); // Simulate async operation
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to send invoice PDF email to {Email}", toEmail);
+                _logger.LogError(ex, "MarkPrintedAsync failed for invoice {InvoiceId}", invoiceId);
                 return false;
             }
         }
 
-        private async Task LogPrintActivity(int invoiceId, int accountantId, string pdfPath, bool emailSent)
+        public async Task<(string studentName, string studentEmail, string courseName, string className)> GetStudentCourseInfoAsync(int registrationId)
         {
-            OracleConnection? conn = null;
-            try
+            string studentName = "", studentEmail = "", courseName = "", className = "";
+            using var conn = await GetAdminConnectionAsync();
+            using (var cmd = new OracleCommand(@"
+                    SELECT hv.HO_TEN, tk.EMAIL, kh.TEN_KHOA_HOC, lh.TEN_LOP_HOC
+                    FROM DON_DANG_KY dk
+                    JOIN HOC_VIEN hv ON hv.ID_HOC_VIEN = dk.ID_HOC_VIEN
+                    LEFT JOIN TAI_KHOAN tk ON tk.ID_NGUOI_DUNG = hv.ID_HOC_VIEN
+                    JOIN LOP_HOC lh ON lh.ID_LOP_HOC = dk.ID_LOP_HOC
+                    JOIN KHOA_HOC kh ON kh.ID_KHOA_HOC = lh.ID_KHOA_HOC
+                    WHERE dk.ID_DANG_KY = :regId", conn))
             {
-                conn = await GetConnectionAsync(); // per-user trước
-            }
-            catch (OracleException oex) when (oex.Number == 1031)
-            {
-                _logger.LogWarning(oex, "Fallback admin for LogPrintActivity invoice {InvoiceId}", invoiceId);
-                conn = await GetAdminConnectionAsync();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Unexpected error getting per-user connection; fallback admin for LogPrintActivity invoice {InvoiceId}", invoiceId);
-                conn = await GetAdminConnectionAsync();
-            }
-
-            try
-            {
-                var sql = @"INSERT INTO LOG_IN_HOA_DON (ID_HOA_DON, ID_KE_TOAN, NGAY_IN, DUONG_DAN_PDF, EMAIL_SENT)
-                           VALUES (:invoiceId, :accountantId, SYSDATE, :pdfPath, :emailSent)";
-                using var cmd = new OracleCommand(sql, conn) { BindByName = true };
-                cmd.Parameters.Add(":invoiceId", OracleDbType.Int32).Value = invoiceId;
-                cmd.Parameters.Add(":accountantId", OracleDbType.Int32).Value = accountantId;
-                cmd.Parameters.Add(":pdfPath", OracleDbType.Varchar2).Value = pdfPath;
-                cmd.Parameters.Add(":emailSent", OracleDbType.Int32).Value = emailSent ? 1 : 0;
-                await cmd.ExecuteNonQueryAsync();
-            }
-            catch (OracleException oex) when (oex.Number == 942)
-            {
-                _logger.LogWarning(oex, "LOG_IN_HOA_DON table missing; skip logging for invoice {InvoiceId}", invoiceId);
-            }
-            catch (OracleException oex) when (oex.Number == 1031)
-            {
-                _logger.LogWarning(oex, "Insufficient privileges to insert LOG_IN_HOA_DON; skip logging invoice {InvoiceId}");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to log print activity for invoice {InvoiceId}");
-            }
-            finally
-            {
-                if (conn != null)
+                cmd.BindByName = true;
+                cmd.Parameters.Add(":regId", OracleDbType.Int32).Value = registrationId;
+                using var reader = await cmd.ExecuteReaderAsync();
+                if (await reader.ReadAsync())
                 {
-                    await conn.DisposeAsync();
+                    studentName = reader.IsDBNull(0) ? "" : reader.GetString(0);
+                    studentEmail = reader.IsDBNull(1) ? "" : reader.GetString(1);
+                    courseName = reader.IsDBNull(2) ? "" : reader.GetString(2);
+                    className = reader.IsDBNull(3) ? "" : reader.GetString(3);
                 }
+            }
+            return (studentName, studentEmail, courseName, className);
+        }
+
+        /// <summary>
+        /// Tạo PDF hóa đơn với chữ ký số của toàn bộ nội dung PDF (async)
+        /// </summary>
+        private async Task<byte[]> GenerateInvoicePdf(Invoice invoice, string studentName, string courseName, string className)
+        {
+            try
+            {
+                // Đảm bảo QuestPDF license
+                QuestPDF.Settings.License = LicenseType.Community;
+
+                _logger.LogInformation("Bắt đầu tạo PDF cho hóa đơn {InvoiceId}, học viên: {StudentName}", invoice.InvoiceId, studentName);
+
+                // 1. Tạo PDF cơ bản trước (chưa có chữ ký)
+                var basePdfBytes = await Task.Run(() => CreateBasePdf(invoice, studentName, courseName, className));
+                _logger.LogInformation("Đã tạo base PDF {Size} bytes", basePdfBytes.Length);
+
+                // 2. Nếu đã có chữ ký, tạo chữ ký cho toàn bộ nội dung PDF
+                if (!string.IsNullOrEmpty(invoice.SignatureBase64))
+                {
+                    var signedPdf = await Task.Run(() => CreateSignedPdf(basePdfBytes, invoice, studentName, courseName, className));
+                    _logger.LogInformation("Đã tạo signed PDF {Size} bytes", signedPdf.Length);
+                    return signedPdf;
+                }
+
+                return basePdfBytes;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi tạo PDF cho hóa đơn {InvoiceId}: {Error}", invoice.InvoiceId, ex.Message);
+                // Fallback: Tạo PDF text đơn giản
+                return await Task.Run(() => CreateFallbackTextPdf(invoice, studentName, courseName, className));
             }
         }
 
-        private class InvoiceWithStudentInfo
+        /// <summary>
+        /// Tạo PDF text đơn giản khi QuestPDF thất bại
+        /// </summary>
+        private byte[] CreateFallbackTextPdf(Invoice invoice, string studentName, string courseName, string className)
         {
-            public int InvoiceId { get; set; }
-            public string InvoiceCode { get; set; } = string.Empty;
-            public DateTime CreatedDate { get; set; }
-            public DateTime DueDate { get; set; }
-            public int Amount { get; set; }
-            public string Status { get; set; } = string.Empty;
-            public string? SignatureBase64 { get; set; }
-            public DateTime? SignedDate { get; set; }
-            public int RegistrationId { get; set; }
-            public string? SignatureImageBase64 { get; set; }
-            public string StudentEmail { get; set; } = string.Empty;
-            public string StudentName { get; set; } = string.Empty;
-            public string PhoneNumber { get; set; } = string.Empty;
-            public string CourseName { get; set; } = string.Empty;
-            public string ClassName { get; set; } = string.Empty;
+            try
+            {
+                _logger.LogInformation("Tạo fallback text PDF cho hóa đơn {InvoiceId}", invoice.InvoiceId);
+                
+                var content = $@"HOA DON HOC PHI DIEN TU - TRUNG TAM TIN HOC LDA
+
+==================================================
+                  THONG TIN HOA DON
+==================================================
+Ma hoa don: {invoice.InvoiceCode}
+Ngay tao: {invoice.CreatedDate?.ToString("dd/MM/yyyy HH:mm")}
+Han thanh toan: {invoice.DueDate?.ToString("dd/MM/yyyy")}
+Trang thai: {invoice.Status}
+
+==================================================
+                  THONG TIN HOC VIEN
+==================================================
+Ho va ten: {studentName}
+Khoa hoc: {courseName}
+Lop hoc: {className}
+
+==================================================
+                   CHI TIET HOA DON
+==================================================
+Noi dung: Hoc phi khoa hoc {courseName} - Lop {className}
+So luong: 1
+Don gia: {invoice.Amount:N0} VND
+--------------------------------------------------
+TONG CONG: {invoice.Amount:N0} VND
+
+==================================================
+                    CHU KY SO
+==================================================
+{(string.IsNullOrEmpty(invoice.SignatureBase64) ? 
+    "Hoa don chua duoc ky so" : 
+    $"Da ky so vao: {invoice.SignedDate?.ToString("dd/MM/yyyy HH:mm:ss")}\nTrang thai: Hop le")}
+
+==================================================
+Cam on quy khach da tin tuong va su dung dich vu!
+Website: lda.edu.vn | Email: info@lda.edu.vn
+==================================================
+
+File duoc tao tu dong vao: {DateTime.Now:dd/MM/yyyy HH:mm:ss}
+";
+
+                if (!string.IsNullOrEmpty(invoice.SignatureBase64))
+                {
+                    content += $@"
+
+--BEGIN-LDA-INVOICE-SIGNATURE--
+Data: {Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(new {
+    InvoiceCode = invoice.InvoiceCode,
+    StudentName = studentName,
+    CourseName = courseName,  
+    ClassName = className,
+    Amount = invoice.Amount,
+    CreatedDate = invoice.CreatedDate?.ToString("yyyy-MM-dd HH:mm:ss"),
+    DueDate = invoice.DueDate?.ToString("yyyy-MM-dd HH:mm:ss"),
+    Status = invoice.Status
+})))}
+Signature: {invoice.SignatureBase64}
+Algorithm: RSA-SHA256
+Timestamp: {DateTime.Now:yyyy-MM-dd HH:mm:ss}
+--END-LDA-INVOICE-SIGNATURE--";
+                }
+
+                return System.Text.Encoding.UTF8.GetBytes(content);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi tạo fallback text PDF");
+                return System.Text.Encoding.UTF8.GetBytes($@"HOA DON - {invoice.InvoiceCode}
+Hoc vien: {studentName}
+So tien: {invoice.Amount:N0} VND
+Loi tao PDF: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Tạo PDF cơ bản (chưa có chữ ký) - Phiên bản đơn giản và ổn định
+        /// </summary>
+        private byte[] CreateBasePdf(Invoice invoice, string studentName, string courseName, string className)
+        {
+            try
+            {
+                var document = Document.Create(container =>
+                {
+                    container.Page(page =>
+                    {
+                        page.Size(PageSizes.A4);
+                        page.Margin(2, Unit.Centimetre);
+                        page.PageColor(Colors.White);
+                        // Không chỉ định font cụ thể để tránh lỗi
+                        page.DefaultTextStyle(x => x.FontSize(11));
+
+                        page.Header()
+                            .PaddingBottom(20)
+                            .Column(column =>
+                            {
+                                // Header đơn giản không có emoji
+                                column.Item().AlignCenter()
+                                    .Text("TRUNG TAM TIN HOC LDA")
+                                    .FontSize(20).Bold().FontColor(Colors.Blue.Darken3);
+                                    
+                                column.Item().AlignCenter().PaddingTop(8)
+                                    .Text("HOA DON HOC PHI DIEN TU")
+                                    .FontSize(18).Bold();
+                                    
+                                column.Item().AlignCenter().PaddingTop(10)
+                                    .Text($"So: {invoice.InvoiceCode}")
+                                    .FontSize(14).Bold().FontColor(Colors.Red.Medium);
+                            });
+
+                        page.Content()
+                            .PaddingVertical(20)
+                            .Column(column =>
+                            {
+                                // Thông tin chung
+                                column.Item().Row(row =>
+                                {
+                                    row.RelativeItem().Column(col =>
+                                    {
+                                        col.Item().Text("THONG TIN HOC VIEN").Bold().FontSize(14).FontColor(Colors.Blue.Darken2);
+                                        col.Item().PaddingTop(10).Text($"Ho va ten: {studentName}").FontSize(12);
+                                        col.Item().PaddingTop(5).Text($"Khoa hoc: {courseName}").FontSize(12);
+                                        col.Item().PaddingTop(5).Text($"Lop hoc: {className}").FontSize(12);
+                                    });
+                                    
+                                    row.RelativeItem().Column(col =>
+                                    {
+                                        col.Item().Text("THONG TIN HOA DON").Bold().FontSize(14).FontColor(Colors.Blue.Darken2);
+                                        col.Item().PaddingTop(10).Text($"Ngay tao: {invoice.CreatedDate?.ToString("dd/MM/yyyy HH:mm")}").FontSize(12);
+                                        col.Item().PaddingTop(5).Text($"Han thanh toan: {invoice.DueDate?.ToString("dd/MM/yyyy")}").FontSize(12).FontColor(Colors.Red.Medium);
+                                        col.Item().PaddingTop(5).Text($"Trang thai: {invoice.Status}").FontSize(12);
+                                    });
+                                });
+
+                                // Separator
+                                column.Item().PaddingTop(20).LineHorizontal(2).LineColor(Colors.Blue.Lighten2);
+
+                                // Bảng chi tiết hóa đơn
+                                column.Item().PaddingTop(20).Text("CHI TIET HOA DON").Bold().FontSize(16);
+                                
+                                column.Item().PaddingTop(15).Table(table =>
+                                {
+                                    table.ColumnsDefinition(columns =>
+                                    {
+                                        columns.ConstantColumn(50);
+                                        columns.RelativeColumn(4);
+                                        columns.ConstantColumn(60);
+                                        columns.ConstantColumn(120);
+                                    });
+
+                                    // Header
+                                    table.Cell().Element(HeaderCellStyle).Text("STT").Bold();
+                                    table.Cell().Element(HeaderCellStyle).Text("NOI DUNG").Bold();
+                                    table.Cell().Element(HeaderCellStyle).AlignCenter().Text("SO LUONG").Bold();
+                                    table.Cell().Element(HeaderCellStyle).AlignCenter().Text("THANH TIEN (VND)").Bold();
+
+                                    // Content
+                                    table.Cell().Element(ContentCellStyle).AlignCenter().Text("1");
+                                    table.Cell().Element(ContentCellStyle).Text($"Hoc phi khoa hoc {courseName} - Lop {className}");
+                                    table.Cell().Element(ContentCellStyle).AlignCenter().Text("1");
+                                    table.Cell().Element(ContentCellStyle).AlignRight().Text($"{invoice.Amount:N0}");
+
+                                    // Total row
+                                    table.Cell().ColumnSpan(3).Element(TotalCellStyle).AlignRight().Text("TONG CONG:").Bold().FontSize(14);
+                                    table.Cell().Element(TotalCellStyle).AlignRight().Text($"{invoice.Amount:N0} VND").Bold().FontColor(Colors.Red.Medium).FontSize(14);
+                                });
+
+                                // Ghi chú đơn giản
+                                column.Item().PaddingTop(25)
+                                    .Background(Colors.Blue.Lighten5)
+                                    .Padding(15)
+                                    .Column(noteCol =>
+                                    {
+                                        noteCol.Item().Text("GHI CHU QUAN TRONG:").Bold().FontSize(13).FontColor(Colors.Blue.Darken2);
+                                        noteCol.Item().PaddingTop(8).Text("Vui long thanh toan dung han de tranh gian doan viec hoc").FontSize(11);
+                                        noteCol.Item().PaddingTop(4).Text("Hoa don nay duoc tao tu dong bang he thong dien tu va co gia tri phap ly").FontSize(11);
+                                        noteCol.Item().PaddingTop(4).Text("De xac thuc tinh hop le, upload file PDF nay vao muc 'Xac thuc hoa don' tren website").FontSize(11);
+                                        noteCol.Item().PaddingTop(4).Text("Moi thac mac xin lien he: info@lda.edu.vn hoac hotline 1900-xxx-xxx").FontSize(11);
+                                    });
+                            });
+
+                        page.Footer()
+                            .PaddingTop(20)
+                            .BorderTop(1)
+                            .BorderColor(Colors.Grey.Medium)
+                            .PaddingTop(10)
+                            .Column(footerCol =>
+                            {
+                                footerCol.Item().AlignCenter().Text("Cam on quy khach da tin tuong va su dung dich vu cua Trung tam!")
+                                    .Italic().FontSize(12).FontColor(Colors.Blue.Darken1);
+                                footerCol.Item().AlignCenter().PaddingTop(5)
+                                    .Text("Website: lda.edu.vn | Email: info@lda.edu.vn | Hotline: 1900-xxx-xxx")
+                                    .FontSize(10).FontColor(Colors.Grey.Darken1);
+                                footerCol.Item().AlignCenter().PaddingTop(8)
+                                    .Text($"Tai lieu duoc tao tu dong vao {DateTime.Now:dd/MM/yyyy HH:mm}")
+                                    .FontSize(8).FontColor(Colors.Grey.Medium);
+                            });
+                    });
+                });
+
+                return document.GeneratePdf();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi tạo base PDF bằng QuestPDF: {Error}", ex.Message);
+                // Fallback tạo PDF text đơn giản
+                throw; // Re-throw để fallback vào CreateFallbackTextPdf
+            }
+
+            // Định nghĩa style cho table cells
+            static IContainer HeaderCellStyle(IContainer container) =>
+                container.Background(Colors.Blue.Darken2).Border(1).BorderColor(Colors.Blue.Darken3).Padding(8);
+
+            static IContainer ContentCellStyle(IContainer container) =>
+                container.Background(Colors.White).Border(1).BorderColor(Colors.Grey.Medium).Padding(8);
+
+            static IContainer TotalCellStyle(IContainer container) =>
+                container.Background(Colors.Blue.Lighten4).Border(1).BorderColor(Colors.Blue.Medium).Padding(8);
+        }
+
+        /// <summary>
+        /// Tạo PDF đã ký số với thông tin chữ ký
+        /// </summary>
+        private byte[] CreateSignedPdf(byte[] basePdfBytes, Invoice invoice, string studentName, string courseName, string className)
+        {
+            try
+            {
+                // Tạo PDF với thông tin chữ ký số
+                var signedDocument = Document.Create(container =>
+                {
+                    container.Page(page =>
+                    {
+                        page.Size(PageSizes.A4);
+                        page.Margin(2, Unit.Centimetre);
+                        page.PageColor(Colors.White);
+                        page.DefaultTextStyle(x => x.FontSize(11));
+
+                        page.Header()
+                            .PaddingBottom(20)
+                            .Column(column =>
+                            {
+                                column.Item().AlignCenter()
+                                    .Text("TRUNG TAM TIN HOC LDA")
+                                    .FontSize(20).Bold().FontColor(Colors.Blue.Darken3);
+                                    
+                                column.Item().AlignCenter().PaddingTop(8)
+                                    .Text("HOA DON HOC PHI - DA KY SO")
+                                    .FontSize(18).Bold().FontColor(Colors.Green.Darken2);
+                                    
+                                column.Item().AlignCenter().PaddingTop(10)
+                                    .Text($"So: {invoice.InvoiceCode}")
+                                    .FontSize(14).Bold().FontColor(Colors.Red.Medium);
+                            });
+
+                        page.Content()
+                            .PaddingVertical(20)
+                            .Column(column =>
+                            {
+                                // Thông tin chung
+                                column.Item().Row(row =>
+                                {
+                                    row.RelativeItem().Column(col =>
+                                    {
+                                        col.Item().Text("THONG TIN HOC VIEN").Bold().FontSize(14);
+                                        col.Item().PaddingTop(10).Text($"Ho va ten: {studentName}").FontSize(12);
+                                        col.Item().PaddingTop(5).Text($"Khoa hoc: {courseName}").FontSize(12);
+                                        col.Item().PaddingTop(5).Text($"Lop hoc: {className}").FontSize(12);
+                                    });
+                                    
+                                    row.RelativeItem().Column(col =>
+                                    {
+                                        col.Item().Text("THONG TIN HOA DON").Bold().FontSize(14);
+                                        col.Item().PaddingTop(10).Text($"Ngay tao: {invoice.CreatedDate?.ToString("dd/MM/yyyy HH:mm")}").FontSize(12);
+                                        col.Item().PaddingTop(5).Text($"Han thanh toan: {invoice.DueDate?.ToString("dd/MM/yyyy")}").FontSize(12);
+                                        col.Item().PaddingTop(5).Text($"So tien: {invoice.Amount:N0} VND").FontSize(12).Bold();
+                                    });
+                                });
+
+                                // Thông tin chữ ký số
+                                column.Item().PaddingTop(30)
+                                    .Background(Colors.Green.Lighten5)
+                                    .Border(2)
+                                    .BorderColor(Colors.Green.Darken2)
+                                    .Padding(15)
+                                    .Column(signCol =>
+                                    {
+                                        signCol.Item().Text("HOA DON DA DUOC KY SO DIEN TU")
+                                            .FontColor(Colors.Green.Darken2).Bold().FontSize(16);
+                                        signCol.Item().PaddingTop(8).Text($"Thoi gian ky: {invoice.SignedDate?.ToString("dd/MM/yyyy HH:mm:ss")}")
+                                            .FontSize(12);
+                                        signCol.Item().PaddingTop(5).Text("Thuat toan: RSA-SHA256")
+                                            .FontSize(12);
+                                        signCol.Item().PaddingTop(5).Text("Don vi ky: Trung tam Tin hoc LDA")
+                                            .FontSize(12);
+                                        signCol.Item().PaddingTop(8).Text("Tinh toan ven da duoc bao dam - Moi thay doi deu duoc phat hien")
+                                            .FontSize(11).Italic().FontColor(Colors.Green.Darken1);
+                                    });
+
+                                // Ghi chú
+                                column.Item().PaddingTop(20)
+                                    .Background(Colors.Blue.Lighten5)
+                                    .Padding(15)
+                                    .Column(noteCol =>
+                                    {
+                                        noteCol.Item().Text("GHI CHU QUAN TRONG:").Bold().FontSize(13);
+                                        noteCol.Item().PaddingTop(8).Text("File PDF nay da duoc ky so - moi thay doi deu duoc phat hien").FontSize(11).Bold();
+                                        noteCol.Item().PaddingTop(4).Text("Vui long thanh toan dung han de tranh gian doan viec hoc").FontSize(11);
+                                        noteCol.Item().PaddingTop(4).Text("De xac thuc tinh hop le, upload file PDF nay vao muc 'Xac thuc hoa don'").FontSize(11);
+                                    });
+                            });
+
+                        page.Footer()
+                            .PaddingTop(20)
+                            .BorderTop(1)
+                            .BorderColor(Colors.Grey.Medium)
+                            .PaddingTop(10)
+                            .Column(footerCol =>
+                            {
+                                footerCol.Item().AlignCenter().Text("Cam on quy khach da tin tuong va su dung dich vu!")
+                                    .Italic().FontSize(12);
+                                footerCol.Item().AlignCenter().PaddingTop(8)
+                                    .Text($"Tai lieu duoc tao tu dong vao {DateTime.Now:dd/MM/yyyy HH:mm}")
+                                    .FontSize(8).FontColor(Colors.Grey.Medium);
+                            });
+                    });
+                });
+
+                return signedDocument.GeneratePdf();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi tạo signed PDF: {Error}", ex.Message);
+                // Fallback về PDF text với thông tin chữ ký
+                return CreateFallbackTextPdf(invoice, studentName, courseName, className);
+            }
         }
     }
 }

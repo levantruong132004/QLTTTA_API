@@ -500,7 +500,7 @@ namespace QLTTTA_WEB.Controllers
             }
         }
 
-        // NEW: Trang upload PDF để xác thực chữ ký số (dùng public key TTTA)
+        // Trang upload PDF để kiểm tra tính toàn vẹn (hash comparison)
         [HttpGet]
         public IActionResult VerifyPdf()
         {
@@ -509,42 +509,73 @@ namespace QLTTTA_WEB.Controllers
             return View();
         }
 
-        // NEW: Xử lý upload PDF và gọi API xác thực
+        // Xử lý upload PDF và kiểm tra hash
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> VerifyPdfUpload(IFormFile pdf)
+        public async Task<IActionResult> VerifyPdfUpload(IFormFile pdf, int? invoiceId)
         {
             if (HttpContext.Session.GetString("UserId") == null)
                 return RedirectToAction("Login", "Account");
 
             if (pdf == null || pdf.Length == 0)
             {
-                TempData["ErrorMessage"] = "Vui lòng chọn file PDF";
+                TempData["ErrorMessage"] = "Vui lòng chọn file PDF để kiểm tra";
+                return RedirectToAction("VerifyPdf");
+            }
+
+            if (!invoiceId.HasValue || invoiceId.Value <= 0)
+            {
+                TempData["ErrorMessage"] = "Vui lòng nhập mã hóa đơn (Invoice ID)";
                 return RedirectToAction("VerifyPdf");
             }
 
             try
             {
+                // Tạo multipart form data với PDF và invoiceId
                 using var content = new MultipartFormDataContent();
                 using var ms = new MemoryStream();
                 await pdf.CopyToAsync(ms);
                 var fileContent = new ByteArrayContent(ms.ToArray());
                 fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/pdf");
                 content.Add(fileContent, "pdf", pdf.FileName);
+                content.Add(new StringContent(invoiceId.Value.ToString()), "invoiceId");
 
-                var res = await _httpClient.PostAsync("api/digitalsignature/verify-pdf", content);
+                // Gọi API kiểm tra hash
+                var res = await _httpClient.PostAsync("api/digitalsignature/verify-file-hash", content);
                 var body = await res.Content.ReadAsStringAsync();
+                
                 if (res.IsSuccessStatusCode)
                 {
                     using var doc = JsonDocument.Parse(body);
-                    var data = doc.RootElement.GetProperty("data");
-                    var isValid = data.GetProperty("isValid").GetBoolean();
-                    TempData["SuccessMessage"] = isValid ? "Xác thực hợp lệ" : "Xác thực không hợp lệ";
-                    TempData["VerifyDetail"] = data.TryGetProperty("invoiceData", out var id) ? id.GetString() : null;
+                    var success = doc.RootElement.GetProperty("success").GetBoolean();
+                    var message = doc.RootElement.GetProperty("message").GetString() ?? "";
+                    
+                    if (success && doc.RootElement.TryGetProperty("data", out var data))
+                    {
+                        var isIntact = data.GetProperty("isIntact").GetBoolean();
+                        var details = data.TryGetProperty("details", out var det) ? det.GetString() : "";
+                        
+                        if (isIntact)
+                        {
+                            // File TOÀN VẸN - Hiển thị màu xanh
+                            TempData["SuccessMessage"] = "✅ FILE PDF TOÀN VẸN - Không bị thay đổi";
+                            TempData["VerifyDetail"] = details;
+                        }
+                        else
+                        {
+                            // File BỊ THAY ĐỔI - Hiển thị màu đỏ
+                            TempData["ErrorMessage"] = "❌ FILE PDF ĐÃ BỊ THAY ĐỔI - Không khớp với bản gốc";
+                            TempData["VerifyDetail"] = details;
+                        }
+                    }
+                    else
+                    {
+                        TempData["ErrorMessage"] = message;
+                    }
                 }
                 else
                 {
-                    string msg = "Không thể xác thực chữ ký";
+                    string msg = "Không thể kiểm tra file PDF";
                     try
                     {
                         using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(body) ? "{}" : body);
@@ -558,7 +589,7 @@ namespace QLTTTA_WEB.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "VerifyPdfUpload failed");
-                TempData["ErrorMessage"] = "Có lỗi xảy ra khi xác thực PDF";
+                TempData["ErrorMessage"] = "Có lỗi xảy ra khi kiểm tra file PDF";
             }
             return RedirectToAction("VerifyPdf");
         }
