@@ -203,6 +203,19 @@ namespace QLTTTA_API.Services
 
             var userConn = new OracleConnection(userCs.ConnectionString); // Mở kết nối bằng credential học viên
             await userConn.OpenAsync(ct);
+            try
+            {
+                using var tag = new OracleCommand("BEGIN DBMS_SESSION.SET_IDENTIFIER(:id); DBMS_APPLICATION_INFO.SET_CLIENT_INFO(:info); END;", userConn)
+                { BindByName = true };
+                tag.Parameters.Add(":id", OracleDbType.Varchar2).Value = sessionId;
+                var info = $"sid={sessionId};device={deviceType};user={cred.Username}";
+                tag.Parameters.Add(":info", OracleDbType.Varchar2).Value = info;
+                await tag.ExecuteNonQueryAsync(ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Could not set CLIENT_IDENTIFIER/CLIENT_INFO for session {Sid}", sessionId);
+            }
             return userConn;
         }
     }

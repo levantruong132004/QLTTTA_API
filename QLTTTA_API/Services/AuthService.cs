@@ -778,7 +778,7 @@ namespace QLTTTA_API.Services
                 await connection.OpenAsync();
 
                 var columnName = deviceType == "mobile" ? "SESSION_ID_MOBILE" : "SESSION_ID_PC";
-                var sqlNew = $"SELECT {columnName} FROM TAI_KHOAN WHERE TEN_DANG_NHAP = :u";
+                var sqlNew = $"SELECT {columnName} FROM TAI_KHOAN WHERE UPPER(TEN_DANG_NHAP) = UPPER(:u)";
                 using var cmdNew = new OracleCommand(sqlNew, connection) { BindByName = true };
                 cmdNew.Parameters.Add(":u", OracleDbType.Varchar2).Value = username?.Trim();
                 var dbValNew = await cmdNew.ExecuteScalarAsync();
@@ -838,7 +838,7 @@ namespace QLTTTA_API.Services
             {
                 _credCache.Remove(sessionId);
 
-                // Optionally clear DB session column on logout (configurable)
+                // Determine preferences for clearing the DB column
                 var clearFlag = true;
                 try
                 {
@@ -848,31 +848,39 @@ namespace QLTTTA_API.Services
                 }
                 catch { /* ignore */ }
 
-                if (clearFlag)
+                // Always open a DB connection once to resolve user and perform actions
+                using var conn = new OracleConnection(_connectionString);
+                await conn.OpenAsync();
+
+                // Determine device type from header; default pc
+                var deviceType = _httpContextAccessor.HttpContext?.Request?.Headers["X-Device-Type"].FirstOrDefault()?.Trim().ToLowerInvariant() ?? "pc";
+                if (deviceType != "pc" && deviceType != "mobile") deviceType = "pc";
+                var col = deviceType == "mobile" ? "SESSION_ID_MOBILE" : "SESSION_ID_PC";
+
+                // If username missing, resolve from sessionId via the device-specific column first
+                if (string.IsNullOrWhiteSpace(username))
                 {
-                    using var conn = new OracleConnection(_connectionString);
-                    await conn.OpenAsync();
-
-                    // Determine device type from header; default pc
-                    var deviceType = _httpContextAccessor.HttpContext?.Request?.Headers["X-Device-Type"].FirstOrDefault()?.Trim().ToLowerInvariant() ?? "pc";
-                    if (deviceType != "pc" && deviceType != "mobile") deviceType = "pc";
-                    var col = deviceType == "mobile" ? "SESSION_ID_MOBILE" : "SESSION_ID_PC";
-
-                    // If username missing, resolve from sessionId
+                    using var findU = new OracleCommand($"SELECT TEN_DANG_NHAP FROM TAI_KHOAN WHERE {col} = :sid", conn) { BindByName = true };
+                    findU.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sessionId;
+                    var o = await findU.ExecuteScalarAsync();
+                    username = o?.ToString() ?? string.Empty;
+                    // Fallback: try the other column if still not found
                     if (string.IsNullOrWhiteSpace(username))
                     {
-                        using var findU = new OracleCommand($"SELECT TEN_DANG_NHAP FROM TAI_KHOAN WHERE {col} = :sid", conn) { BindByName = true };
-                        findU.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sessionId;
-                        var o = await findU.ExecuteScalarAsync();
-                        username = o?.ToString() ?? string.Empty;
+                        var otherCol = deviceType == "mobile" ? "SESSION_ID_PC" : "SESSION_ID_MOBILE";
+                        using var findU2 = new OracleCommand($"SELECT TEN_DANG_NHAP FROM TAI_KHOAN WHERE {otherCol} = :sid", conn) { BindByName = true };
+                        findU2.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sessionId;
+                        var o2 = await findU2.ExecuteScalarAsync();
+                        username = o2?.ToString() ?? string.Empty;
                     }
+                }
 
-                    // Clear the session column
-                    using (var up = new OracleCommand($"UPDATE TAI_KHOAN SET {col} = NULL WHERE {col} = :sid", conn) { BindByName = true })
-                    {
-                        up.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sessionId;
-                        await up.ExecuteNonQueryAsync();
-                    }
+                // Clear the session column if configured to do so
+                if (clearFlag)
+                {
+                    using var up = new OracleCommand($"UPDATE TAI_KHOAN SET {col} = NULL WHERE {col} = :sid", conn) { BindByName = true };
+                    up.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sessionId;
+                    await up.ExecuteNonQueryAsync();
 
                     // Best-effort: tag client id for auditing of logout
                     try
@@ -886,41 +894,45 @@ namespace QLTTTA_API.Services
                         }
                     }
                     catch { /* ignore */ }
+                }
 
-                    // Optional: attempt to disconnect active Oracle sessions for this user (skip admin accounts)
-                    try
+                // Attempt to disconnect only Oracle sessions that belong to this specific sessionId (skip admin accounts)
+                try
+                {
+                    var upper = (username ?? string.Empty).Trim().ToUpperInvariant();
+                    var isAdminUser = upper == "QLTT_ADMIN" || upper == "QLTTTA_ADMIN" || upper == "QLTTA_ADMIN";
+                    if (!string.IsNullOrWhiteSpace(upper) && !isAdminUser)
                     {
-                        var upper = (username ?? string.Empty).Trim().ToUpperInvariant();
-                        var isAdminUser = upper == "QLTT_ADMIN" || upper == "QLTTTA_ADMIN" || upper == "QLTTA_ADMIN";
-                        if (!string.IsNullOrWhiteSpace(upper) && !isAdminUser)
+                        using var sessCmd = new OracleCommand(@"SELECT SID, SERIAL# FROM V$SESSION 
+                                                               WHERE USERNAME = :uname 
+                                                                 AND (CLIENT_IDENTIFIER = :sid OR INSTR(CLIENT_INFO, :sidTag) > 0)", conn) { BindByName = true };
+                        sessCmd.Parameters.Add(":uname", OracleDbType.Varchar2).Value = upper;
+                        sessCmd.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sessionId;
+                        sessCmd.Parameters.Add(":sidTag", OracleDbType.Varchar2).Value = "sid=" + sessionId;
+                        using var rdr = await sessCmd.ExecuteReaderAsync();
+                        while (await rdr.ReadAsync())
                         {
-                            using var sessCmd = new OracleCommand(@"SELECT SID, SERIAL# FROM V$SESSION WHERE USERNAME = :uname", conn) { BindByName = true };
-                            sessCmd.Parameters.Add(":uname", OracleDbType.Varchar2).Value = upper;
-                            using var rdr = await sessCmd.ExecuteReaderAsync();
-                            while (await rdr.ReadAsync())
+                            var sid = rdr.GetInt32(0);
+                            var serial = rdr.GetInt32(1);
+                            try
                             {
-                                var sid = rdr.GetInt32(0);
-                                var serial = rdr.GetInt32(1);
-                                try
+                                using var kill = new OracleCommand($"ALTER SYSTEM DISCONNECT SESSION '{sid},{serial}' POST_TRANSACTION", conn);
+                                await kill.ExecuteNonQueryAsync();
+                            }
+                            catch (OracleException oex)
+                            {
+                                // ignore insufficient privileges or invalid session
+                                if (oex.Number != 1031 && oex.Number != 3086)
                                 {
-                                    using var kill = new OracleCommand($"ALTER SYSTEM DISCONNECT SESSION '{sid},{serial}' POST_TRANSACTION", conn);
-                                    await kill.ExecuteNonQueryAsync();
-                                }
-                                catch (OracleException oex)
-                                {
-                                    // ignore insufficient privileges or invalid session
-                                    if (oex.Number != 1031 && oex.Number != 3086)
-                                    {
-                                        _logger.LogDebug(oex, "DISCONNECT SESSION failed for {User} sid={Sid} serial={Serial}", username, sid, serial);
-                                    }
+                                    _logger.LogDebug(oex, "DISCONNECT SESSION failed for {User} sid={Sid} serial={Serial}", username, sid, serial);
                                 }
                             }
                         }
                     }
-                    catch (Exception exKill)
-                    {
-                        _logger.LogDebug(exKill, "Skip killing sessions for {User}", username);
-                    }
+                }
+                catch (Exception exKill)
+                {
+                    _logger.LogDebug(exKill, "Skip targeted kill for {User} session {SessionId}", username, sessionId);
                 }
             }
             catch (Exception ex)
