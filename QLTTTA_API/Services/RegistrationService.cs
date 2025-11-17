@@ -231,7 +231,8 @@ namespace QLTTTA_API.Services
         {
             try
             {
-                using var conn = await GetAdminConnectionAsync();
+                // Use per-user connection like ApproveAsync so audit/FGA record staff identity
+                using var conn = await GetConnectionAsync();
                 // Lấy ID nhân viên theo USER hiện tại của kết nối per-user
                 int? staffIdForUpdate = null;
                 using (var findStaff = new OracleCommand("SELECT ID_NGUOI_DUNG FROM QLTT_ADMIN.TAI_KHOAN WHERE UPPER(TEN_DANG_NHAP)=USER", conn))

@@ -134,7 +134,7 @@ namespace QLTTTA_API.Services
                 await adminConn.OpenAsync(ct);
                 int? userId = null;
                 int? roleId = null;
-                using (var findCmd = new OracleCommand("SELECT ID_NGUOI_DUNG, ID_VAI_TRO FROM QLTT_ADMIN.TAI_KHOAN WHERE TEN_DANG_NHAP = :u", adminConn) { BindByName = true }) // lấy ID + ROLE
+                using (var findCmd = new OracleCommand("SELECT ID_NGUOI_DUNG, ID_VAI_TRO FROM QLTT_ADMIN.TAI_KHOAN WHERE UPPER(TEN_DANG_NHAP) = UPPER(:u)", adminConn) { BindByName = true }) // lấy ID + ROLE (case-insensitive)
                 {
                     findCmd.Parameters.Add(":u", OracleDbType.Varchar2).Value = cred.Username;
                     using var r = await findCmd.ExecuteReaderAsync(ct);
@@ -167,6 +167,15 @@ namespace QLTTTA_API.Services
                     var adminCs2 = _configuration.GetConnectionString("OracleDbConnection") ?? throw new Exception("Missing OracleDbConnection");
                     var adminConn2 = new OracleConnection(adminCs2);
                     await adminConn2.OpenAsync(ct);
+                    try
+                    {
+                        using var tag = new OracleCommand("BEGIN DBMS_SESSION.SET_IDENTIFIER(:id); DBMS_APPLICATION_INFO.SET_CLIENT_INFO(:info); END;", adminConn2) { BindByName = true };
+                        tag.Parameters.Add(":id", OracleDbType.Varchar2).Value = sessionId;
+                        var info = $"sid={sessionId};device={deviceType};user={cred.Username}";
+                        tag.Parameters.Add(":info", OracleDbType.Varchar2).Value = info;
+                        await tag.ExecuteNonQueryAsync(ct);
+                    }
+                    catch { }
                     return adminConn2;
                 }
             }
@@ -189,6 +198,15 @@ namespace QLTTTA_API.Services
                 var adminCs = _configuration.GetConnectionString("OracleDbConnection") ?? throw new Exception("Missing OracleDbConnection");
                 var adminConn = new OracleConnection(adminCs);
                 await adminConn.OpenAsync(ct);
+                try
+                {
+                    using var tag = new OracleCommand("BEGIN DBMS_SESSION.SET_IDENTIFIER(:id); DBMS_APPLICATION_INFO.SET_CLIENT_INFO(:info); END;", adminConn) { BindByName = true };
+                    tag.Parameters.Add(":id", OracleDbType.Varchar2).Value = sessionId;
+                    var info = $"sid={sessionId};device={deviceType};user={cred.Username}";
+                    tag.Parameters.Add(":info", OracleDbType.Varchar2).Value = info;
+                    await tag.ExecuteNonQueryAsync(ct);
+                }
+                catch { }
                 return adminConn;
             }
 
