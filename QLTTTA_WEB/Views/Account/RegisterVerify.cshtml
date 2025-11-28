@@ -1,0 +1,43 @@
+@model QLTTTA_WEB.Models.RegisterVerifyViewModel
+@{
+    ViewData["Title"] = "Xác thực OTP - Đăng ký";
+}
+
+<div class="register-container" style="max-width:520px;margin:30px auto;">
+    <div class="retro-form corner-decorated">
+        <h2 class="vintage-title"><i class="fas fa-shield-alt"></i> Xác thực OTP đăng ký</h2>
+
+        @* Hiển thị thông báo từ TempData nếu có *@
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger" role="alert">@TempData["ErrorMessage"]</div>
+        }
+        @if (TempData["InfoMessage"] != null)
+        {
+            <div class="alert alert-info" role="alert">@TempData["InfoMessage"]</div>
+        }
+
+        @* Hiển thị lỗi xác thực server-side từ ModelState *@
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="alert alert-danger" role="alert">
+                @Html.ValidationSummary(false, "", new { @class = "text-danger" })
+            </div>
+        }
+
+        <form asp-action="RegisterVerify" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="CorrelationId" />
+            <div class="form-group-retro">
+                <label asp-for="Otp" class="form-label-retro"><i class="fas fa-hashtag"></i> Mã OTP</label>
+                <input asp-for="Otp" class="form-control-retro" />
+                <span asp-validation-for="Otp" class="text-validation-error"></span>
+            </div>
+            <button type="submit" class="btn-retro btn-retro-primary" style="width:100%"><i class="fas fa-check"></i>
+                Xác nhận</button>
+        </form>
+        <div class="login-link" style="margin-top: 1rem; text-align:center">
+            <a asp-action="Register"><i class="fas fa-arrow-left"></i> Quay lại đăng ký</a>
+        </div>
+    </div>
+</div>

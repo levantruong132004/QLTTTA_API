@@ -1,0 +1,97 @@
+@model List<QLTTTA_WEB.Models.StaffStudentListItem>
+@{
+    ViewData["Title"] = "Quản lý học viên";
+}
+
+<div class="container">
+    <h2 class="mb-3"><i class="fas fa-users"></i> Quản lý học viên</h2>
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+    }
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success">@TempData["SuccessMessage"]</div>
+    }
+
+    <form method="get" class="row g-2 mb-3">
+        <div class="col-md-6">
+            <input type="text" name="search" value="@Convert.ToString(ViewBag.Search)" class="form-control" placeholder="Tìm theo tên, email, SĐT hoặc mã HV" />
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> Tìm kiếm</button>
+        </div>
+        <div class="col-md-4 text-end">
+            <a asp-action="Index" class="btn btn-secondary"><i class="fas fa-rotate"></i> Làm mới</a>
+        </div>
+    </form>
+
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Mã HV</th>
+                    <th>Họ tên</th>
+                    <th>Email</th>
+                    <th>SĐT</th>
+                    <th>Trạng thái</th>
+                    <th class="text-end">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model != null && Model.Count > 0)
+                {
+                    foreach (var s in Model)
+                    {
+                        <tr>
+                            <td>@(string.IsNullOrWhiteSpace(s.StudentCode) ? s.StudentId.ToString() : s.StudentCode)</td>
+                            <td>@s.FullName</td>
+                            <td>@s.Email</td>
+                            <td>@s.PhoneNumber</td>
+                            <td>
+                                @if (s.IsActive)
+                                {
+                                    <span class="badge bg-success">Hoạt động</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Đã khóa</span>
+                                }
+                            </td>
+                            <td class="text-end">
+                                <a asp-action="Detail" asp-route-id="@s.StudentId" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye"></i> Chi tiết
+                                </a>
+                                @if (s.IsActive)
+                                {
+                                    <form asp-action="Lock" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@s.StudentId" />
+                                        <button type="submit" class="btn btn-sm btn-outline-warning" onclick="return confirm('Khóa tài khoản học viên này?');">
+                                            <i class="fas fa-lock"></i> Khóa
+                                        </button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <form asp-action="Unlock" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@s.StudentId" />
+                                        <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('Mở khóa tài khoản học viên này?');">
+                                            <i class="fas fa-unlock"></i> Mở khóa
+                                        </button>
+                                    </form>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr><td colspan="6" class="text-center text-muted">Không có dữ liệu</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

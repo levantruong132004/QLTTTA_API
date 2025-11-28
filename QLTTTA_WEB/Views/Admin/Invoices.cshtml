@@ -1,0 +1,52 @@
+@{
+    ViewData["Title"] = "Quản lý hóa đơn";
+}
+<div class="retro-card corner-decorated">
+    <div class="retro-card-header text-center">
+        <h2 class="retro-card-title"><i class="fas fa-file-invoice-dollar"></i> Quản lý hóa đơn</h2>
+    </div>
+    <div class="retro-card-body">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-success"><div class="retro-alert-content">@TempData["SuccessMessage"]</div></div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-danger"><div class="retro-alert-content">@TempData["ErrorMessage"]</div></div>
+        }
+
+        <div class="retro-card">
+            <div class="retro-card-header"><strong><i class="fas fa-key"></i> Tạo khóa chữ ký số Trung tâm (TTTA)</strong></div>
+            <div class="retro-card-body">
+                <p class="text-muted">Tạo khóa RSA 2048 cho TTTA. Public key sẽ lưu cố định vào Oracle (bảng TTTA). Private key được gửi về email của tài khoản kế toán đã chọn.</p>
+                <form asp-controller="Manage" asp-action="GenerateCenterKeyPair" method="post">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Tên Trung tâm</label>
+                            <input name="centerName" type="text" class="form-control" placeholder="Trung tâm LDA" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Số điện thoại</label>
+                            <input name="phone" type="text" class="form-control" placeholder="0123456789" />
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Địa chỉ</label>
+                            <input name="address" type="text" class="form-control" placeholder="Số nhà, đường, quận/huyện, tỉnh/thành" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">ID tài khoản kế toán nhận private key</label>
+                            <input name="accountantId" type="number" min="1" class="form-control" placeholder="Ví dụ: 5" required />
+                            <div class="form-text">Hệ thống sẽ gửi private key tới email của tài khoản này trong bảng TAI_KHOAN.</div>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button class="btn btn-primary"><i class="fas fa-lock"></i> Tạo khóa TTTA</button>
+                    </div>
+                </form>
+                <div class="retro-alert retro-alert-warning mt-3">
+                    <div class="retro-alert-content"><i class="fas fa-exclamation-triangle"></i> Khóa TTTA chỉ được tạo một lần và không thể thay đổi.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,6 @@
+@QLTTTA_API_HostAddress = http://localhost:5069
+
+GET {{QLTTTA_API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

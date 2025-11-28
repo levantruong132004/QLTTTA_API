@@ -1,0 +1,229 @@
+@model QLTTTA_WEB.Models.AccountantHomeViewModel
+@{
+    ViewData["Title"] = "Trang chủ Kế toán";
+}
+
+<div class="retro-card corner-decorated">
+    <div class="retro-card-header text-center">
+        <h2 class="retro-card-title"><i class="fas fa-file-invoice-dollar"></i> Trang chủ Kế toán</h2>
+    </div>
+    <div class="retro-card-body">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-success"><div class="retro-alert-content">@TempData["SuccessMessage"]</div></div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-danger"><div class="retro-alert-content">@TempData["ErrorMessage"]</div></div>
+        }
+
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-5">
+                <label class="form-label"><i class="fas fa-filter"></i> Chọn khóa học</label>
+                @if (Model.Courses != null && Model.Courses.Any())
+                {
+                    @Html.DropDownList(
+                        "courseId",
+                        new Microsoft.AspNetCore.Mvc.Rendering.SelectList(Model.Courses, nameof(QLTTTA_WEB.Models.SimpleCourseViewModel.CourseId), nameof(QLTTTA_WEB.Models.SimpleCourseViewModel.CourseName), Model.SelectedCourseId),
+                        new { @class = "form-select", onchange = "this.form.submit()" }
+                    )
+                }
+                else
+                {
+                    <select name="courseId" class="form-select"><option value="">-- Không có khóa học --</option></select>
+                }
+            </div>
+            <div class="col-md-5">
+                <label class="form-label"><i class="fas fa-chalkboard"></i> Chọn lớp</label>
+                @if (Model.Classes != null && Model.Classes.Any())
+                {
+                    @Html.DropDownList(
+                        "classId",
+                        new Microsoft.AspNetCore.Mvc.Rendering.SelectList(Model.Classes, nameof(QLTTTA_WEB.Models.AdminClassItem.ClassId), nameof(QLTTTA_WEB.Models.AdminClassItem.ClassName), Model.SelectedClassId),
+                        "-- Tất cả lớp --",
+                        new { @class = "form-select", onchange = "this.form.submit()" }
+                    )
+                }
+                else
+                {
+                    <select name="classId" class="form-select"><option value="">-- Không có lớp --</option></select>
+                }
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-primary w-100"><i class="fas fa-search"></i> Lọc</button>
+            </div>
+        </form>
+
+        <div class="vintage-divider"></div>
+
+        @* Hiển thị danh sách lớp như giao diện nhân viên *@
+        <div class="course-grid" style="margin-top:1rem;">
+            @if (Model.Classes != null && Model.Classes.Any())
+            {
+                foreach (var cls in Model.Classes)
+                {
+                    <div class="course-item">
+                        <div class="course-title">
+                            <i class="fas fa-chalkboard"></i> @cls.ClassName (@cls.ClassCode)
+                        </div>
+                        <div class="course-meta">
+                            <i class="fas fa-calendar-alt"></i>
+                            @(cls.StartDate?.ToString("dd/MM/yyyy")) - @(cls.EndDate?.ToString("dd/MM/yyyy"))
+                        </div>
+                        <div class="course-meta">
+                            <i class="fas fa-users"></i> Sĩ số tối đa: @cls.MaxSize
+                        </div>
+                        <div class="course-meta">
+                            <i class="fas fa-info-circle"></i> @cls.Status
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="retro-alert retro-alert-info text-center" style="grid-column: 1 / -1;">
+                    <div class="retro-alert-content">
+                        <i class="fas fa-info-circle"></i> Không có lớp cho khóa học đã chọn.
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="vintage-divider"></div>
+
+        <div class="table-responsive">
+            <table class="table table-striped align-middle">
+                <thead>
+                    <tr>
+                        <th>Học viên</th>
+                        <th>Email</th>
+                        <th>SĐT</th>
+                        <th>Khóa học</th>
+                        <th>Lớp</th>
+                        <th>Ngày ĐK</th>
+                        <th>Trạng thái</th>
+                        <th style="width:160px">Hóa đơn</th>
+                        <th style="width:140px">In hóa đơn</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @if (Model.Registrations != null && Model.Registrations.Any())
+                {
+                    foreach (var r in Model.Registrations)
+                    {
+                        <tr>
+                            <td><strong>@r.StudentName</strong></td>
+                            <td>@r.Email</td>
+                            <td>@r.PhoneNumber</td>
+                            <td>@r.CourseName</td>
+                            <td>@r.ClassName</td>
+                            <td>@(r.RegistrationDate?.ToString("dd/MM/yyyy"))</td>
+                            <td>
+                                <span class="retro-badge @(r.Status == "Đã duyệt" ? "retro-badge-success" : r.Status == "Đã từ chối" ? "retro-badge-danger" : "retro-badge-info")">@r.Status</span>
+                            </td>
+                            <td>
+                                @if (string.Equals(r.Status, "Đã duyệt", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <a class="btn btn-sm btn-success" asp-controller="Accountant" asp-action="Invoice" asp-route-id="@r.RegistrationId">
+                                        <i class="fas fa-file-invoice"></i> Tạo hóa đơn
+                                    </a>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-sm btn-secondary" disabled title="Chỉ xuất khi đơn đã duyệt">
+                                        <i class="fas fa-ban"></i> Chưa duyệt
+                                    </button>
+                                }
+                            </td>
+                            <td>
+                                @if (string.Equals(r.Status, "Đã duyệt", StringComparison.OrdinalIgnoreCase) && r.InvoiceId.HasValue)
+                                {
+                                    @* Nút Ký số và In (tự động ký nếu chưa ký, hoặc in lại nếu đã ký) *@
+                                    <button type="button" class="btn btn-sm btn-primary" 
+                                            onclick="showSignAndPrintModal(@r.InvoiceId, '@r.StudentName', '@(r.InvoiceCode ?? "HD_" + r.InvoiceId)')"
+                                            title="Ký số (nếu chưa ký) và in hóa đơn với giao diện đẹp">
+                                        <i class="fas fa-signature"></i> Ký số & In
+                                    </button>
+                                }
+                                else if (string.Equals(r.Status, "Đã duyệt", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <button class="btn btn-sm btn-warning" disabled title="Chưa có hóa đơn để in">
+                                        <i class="fas fa-exclamation-triangle"></i> Chưa có HD
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-sm btn-secondary" disabled title="Chỉ in khi đơn đã duyệt và có hóa đơn">
+                                        <i class="fas fa-ban"></i> Không khả dụng
+                                    </button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr><td colspan="9" class="text-center text-muted">Không có dữ liệu</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@* Modal Ký số và In hóa đơn *@
+<div class="modal fade" id="signAndPrintModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-signature"></i> Ký số và In hóa đơn</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="signAndPrintForm" method="post" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <input type="hidden" id="modalInvoiceId" name="invoiceId" />
+                    <input type="hidden" id="modalAccountantId" name="accountantId" value="@Context.Session.GetString("UserId")" />
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> 
+                        <strong>Học viên:</strong> <span id="modalStudentName"></span><br/>
+                        <strong>Mã hóa đơn:</strong> <span id="modalInvoiceCode"></span>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label"><i class="fas fa-key"></i> Chọn file Private Key (.pem)</label>
+                        <input type="file" name="privateKey" class="form-control" accept=".pem,.key,.txt" required />
+                        <div class="form-text">File private key để ký số hóa đơn</div>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i> 
+                        Sau khi ký số, hệ thống sẽ tự động tạo PDF với giao diện đẹp và gửi qua email cho học viên.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times"></i> Hủy
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-signature"></i> Ký số và In
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function showSignAndPrintModal(invoiceId, studentName, invoiceCode) {
+    document.getElementById('modalInvoiceId').value = invoiceId;
+    document.getElementById('modalStudentName').textContent = studentName;
+    document.getElementById('modalInvoiceCode').textContent = invoiceCode;
+    
+    // Set form action to API endpoint
+    document.getElementById('signAndPrintForm').action = '@Url.Action("SignAndPrintInvoice", "Accountant")';
+    
+    var modal = new bootstrap.Modal(document.getElementById('signAndPrintModal'));
+    modal.show();
+}
+</script>

@@ -1,0 +1,92 @@
+@model IEnumerable<QLTTTA_WEB.Models.AdminRegistrationItem>
+@{
+    ViewData["Title"] = "Kết quả tra cứu QR";
+    var items = Model?.ToList() ?? new List<QLTTTA_WEB.Models.AdminRegistrationItem>();
+    var q = (string?)ViewBag.Query ?? string.Empty;
+}
+<div class="retro-card">
+    <div class="retro-card-header d-flex justify-content-between align-items-center">
+        <h2 class="retro-title"><i class="fas fa-search"></i> Kết quả tra cứu QR</h2>
+        <div>
+            @{
+                var ru = (string?)ViewBag.ReturnUrl;
+            }
+            @if (!string.IsNullOrWhiteSpace(ru))
+            {
+                <a href="@Url.Action("QrLookup", "Manage")?returnUrl=@Uri.EscapeDataString(ru)" class="btn btn-outline-secondary me-2"><i class="fas fa-qrcode"></i> Quét lại</a>
+                <a href="@ru" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Quay lại</a>
+            }
+            else
+            {
+                <a asp-controller="Manage" asp-action="QrLookup" class="btn btn-outline-secondary me-2"><i class="fas fa-qrcode"></i> Quét lại</a>
+                <a asp-controller="Manage" asp-action="Registrations" class="btn btn-secondary"><i class="fas fa-list"></i> Danh sách duyệt</a>
+            }
+        </div>
+    </div>
+    <div class="retro-card-body">
+        <div class="alert alert-info">Nội dung tra cứu: <code>@q</code></div>
+        @if (items.Count == 0)
+        {
+            <div class="alert alert-warning"><i class="fas fa-info-circle"></i> Không tìm thấy đăng ký phù hợp.</div>
+        }
+        else
+        {
+            <table class="table table-bordered table-striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Mã đăng ký</th>
+                        <th>Học viên</th>
+                        <th>Lớp</th>
+                        <th>Khóa học</th>
+                        <th>Trạng thái</th>
+                        <th>Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in items)
+                    {
+                        <tr>
+                            <td>@r.RegistrationId</td>
+                            <td>@(string.IsNullOrWhiteSpace(r.RegistrationCode) ? "-" : r.RegistrationCode)</td>
+                            <td>ID: @r.StudentId</td>
+                            <td>@(r.ClassName ?? (r.ClassId > 0 ? ("Lớp #" + r.ClassId) : "-"))</td>
+                            <td>@(r.CourseName ?? "-")</td>
+                            <td>
+                                @if (string.Equals(r.Status, "Chờ duyệt", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <span class="badge bg-warning text-dark">@r.Status</span>
+                                }
+                                else if (string.Equals(r.Status, "Đã duyệt", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <span class="badge bg-success">@r.Status</span>
+                                }
+                                else if (string.Equals(r.Status, "Từ chối", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <span class="badge bg-danger">@r.Status</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">@r.Status</span>
+                                }
+                            </td>
+                            <td>
+                                <form asp-action="ApproveRegistration" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@r.RegistrationId" />
+                                    <input type="number" name="classId" placeholder="ID Lớp" value="@r.ClassId" class="form-control d-inline me-1" style="width:110px;" />
+                                    <button type="submit" class="btn btn-sm btn-success"><i class="fas fa-check"></i> Duyệt</button>
+                                </form>
+                                <form asp-action="RejectRegistration" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@r.RegistrationId" />
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Bạn có chắc muốn từ chối đơn này?');"><i class="fas fa-times"></i> Từ chối</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>

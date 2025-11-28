@@ -1,0 +1,151 @@
+﻿@{
+    ViewData["Title"] = "Chính sách bảo mật";
+}
+
+<style>
+    .privacy-backdrop {
+        background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAA6fptVAAAADElEQVR42mP8/5+hHgAHgwJFY7RUTgAAAABJRU5ErkJggg==') repeat;
+        padding: 40px 0;
+    }
+    .privacy-card {
+        max-width: 960px;
+        margin: 0 auto;
+        background: #faf6f1;
+        border: 4px solid #c79a63;
+        border-radius: 24px;
+        box-shadow: 0 25px 60px rgba(77, 46, 12, 0.18);
+        position: relative;
+        overflow: hidden;
+    }
+    .privacy-card::before,
+    .privacy-card::after {
+        content: '';
+        position: absolute;
+        width: 60px;
+        height: 60px;
+        border: 4px solid #c79a63;
+        border-radius: 12px;
+        opacity: 0.6;
+    }
+    .privacy-card::before { top: 18px; left: 18px; }
+    .privacy-card::after { bottom: 18px; right: 18px; }
+    .privacy-body { padding: 60px 70px; position: relative; z-index: 2; }
+    .privacy-section + .privacy-section { margin-top: 32px; }
+    .privacy-section h2 {
+        color: #8b4513;
+        font-size: 1.35rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .privacy-section ul { margin-left: 1.4rem; }
+    .privacy-section li { margin-bottom: 0.4rem; }
+    .privacy-lead {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        color: #a35719;
+        font-weight: 600;
+        letter-spacing: 0.3em;
+        text-transform: uppercase;
+        font-size: 0.95rem;
+    }
+    .privacy-lead::before,
+    .privacy-lead::after {
+        content: '';
+        flex: 1;
+        max-width: 120px;
+        height: 1px;
+        background: rgba(163, 87, 25, 0.35);
+    }
+    @@media (max-width: 768px) {
+        .privacy-body { padding: 40px 24px; }
+        .privacy-lead { letter-spacing: 0.2em; }
+    }
+</style>
+
+<div class="privacy-backdrop">
+    <div class="privacy-card">
+        <div class="privacy-body">
+            <header style="text-align: center; margin-bottom: 40px;">
+                <div class="privacy-lead">LDA ENGLISH ACADEMY</div>
+                <h1 style="font-size: 2.6rem; color: #7a3d0c; margin: 12px 0;">CHÍNH SÁCH BẢO MẬT</h1>
+                <p style="color: #6f5b4b; font-style: italic;">Cập nhật lần cuối: 17/11/2025</p>
+            </header>
+
+            <section class="privacy-section">
+                <h2><i class="fas fa-info-circle"></i> 1. THU THẬP THÔNG TIN</h2>
+                <p>Chúng tôi thu thập thông tin sau khi bạn đăng ký học hoặc tương tác với hệ thống:</p>
+                <ul>
+                    <li>Họ tên, ngày sinh, giới tính và mã học viên.</li>
+                    <li>Số điện thoại, email và địa chỉ liên hệ.</li>
+                    <li>Trình độ tiếng Anh hiện tại, lịch học đã đăng ký.</li>
+                    <li>Lịch sử thanh toán, hóa đơn điện tử (nếu có).</li>
+                    <li>Dữ liệu đăng nhập gồm thời điểm, thiết bị và IP để bảo vệ tài khoản.</li>
+                </ul>
+            </section>
+
+            <section class="privacy-section">
+                <h2><i class="fas fa-bullseye"></i> 2. MỤC ĐÍCH SỬ DỤNG</h2>
+                <p>Thông tin chỉ phục vụ hoạt động đào tạo tại LDA:</p>
+                <ul>
+                    <li>Quản lý hồ sơ học viên, lớp học và kết quả đánh giá.</li>
+                    <li>Thông báo lịch học, thay đổi chương trình và nhắc học phí.</li>
+                    <li>Cấp chứng nhận, hợp đồng và hỗ trợ hậu kiểm tra.</li>
+                    <li>Cải thiện trải nghiệm qua thống kê ẩn danh và khảo sát.</li>
+                    <li>Gửi ưu đãi/khoá học mới khi bạn bật đồng ý nhận thông tin.</li>
+                </ul>
+            </section>
+
+            <section class="privacy-section">
+                <h2><i class="fas fa-lock"></i> 3. BẢO MẬT & LƯU TRỮ</h2>
+                <p>LDA áp dụng các lớp bảo vệ sau:</p>
+                <ul>
+                    <li>Mã hóa phiên đăng nhập, sao lưu định kỳ và kiểm soát truy cập nhiều lớp.</li>
+                    <li>Đánh giá bảo mật hằng quý, ghi nhận nhật ký thay đổi dữ liệu.</li>
+                    <li>Thời gian lưu trữ: suốt quá trình học và 5 năm sau khi kết thúc để đảm bảo tra cứu chứng chỉ.</li>
+                </ul>
+            </section>
+
+            <section class="privacy-section">
+                <h2><i class="fas fa-share-alt"></i> 4. CHIA SẺ THÔNG TIN</h2>
+                <p>Chúng tôi không bán hoặc cho thuê dữ liệu cá nhân. Việc chia sẻ chỉ diễn ra khi:</p>
+                <ul>
+                    <li>Bạn cho phép bằng văn bản hoặc thao tác xác nhận.</li>
+                    <li>Cơ quan nhà nước, tòa án yêu cầu theo quy định pháp luật.</li>
+                    <li>Đối tác tổ chức thi/ cấp chứng chỉ quốc tế, nhà cung cấp cổng thanh toán.</li>
+                </ul>
+            </section>
+
+            <section class="privacy-section">
+                <h2><i class="fas fa-user-shield"></i> 5. QUYỀN CỦA BẠN</h2>
+                <p>Bạn có thể:</p>
+                <ul>
+                    <li>Xem, tải xuống, yêu cầu chỉnh sửa hoặc xóa dữ liệu không còn cần thiết.</li>
+                    <li>Tắt email marketing, rút lại sự đồng ý xử lý dữ liệu bất kỳ lúc nào.</li>
+                    <li>Yêu cầu khóa tài khoản hoặc báo cáo hành vi truy cập bất thường.</li>
+                </ul>
+            </section>
+
+            <section class="privacy-section" style="background: rgba(199, 154, 99, 0.12); padding: 24px; border-radius: 16px;">
+                <h2><i class="fas fa-phone-alt"></i> 6. LIÊN HỆ & HỖ TRỢ</h2>
+                <p>Trung tâm sẽ phản hồi yêu cầu liên quan đến dữ liệu trong vòng 03 ngày làm việc.</p>
+                <ul style="list-style: none; margin-left: 0; padding-left: 0;">
+                    <li><strong>Email:</strong> privacy@lda.edu.vn</li>
+                    <li><strong>Hotline:</strong> 1900 636 123</li>
+                    <li><strong>Địa chỉ:</strong> 84 Nguyễn Văn Thủ, Q.1, TP.HCM</li>
+                </ul>
+            </section>
+
+            <footer style="text-align: center; margin-top: 50px; border-top: 2px solid rgba(0,0,0,0.08); padding-top: 24px;">
+                <a asp-action="Index" asp-controller="Home" class="btn-retro btn-retro-primary" style="padding: 0.85rem 2.5rem; font-weight: 600;">
+                    <i class="fas fa-home"></i> Quay về trang chủ
+                </a>
+            </footer>
+        </div>
+    </div>
+</div>

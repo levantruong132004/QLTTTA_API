@@ -1,0 +1,49 @@
+@model IEnumerable<QLTTTA_WEB.Models.StudentMyRegistrationItem>
+@{
+    ViewData["Title"] = "Đơn đăng ký của tôi";
+}
+<div class="retro-card">
+    <div class="retro-card-header">
+        <h2 class="retro-title"><i class="fas fa-list"></i> Đơn đăng ký của tôi</h2>
+    </div>
+    <div class="retro-card-body">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success">@TempData["SuccessMessage"]</div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+        }
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Lớp</th>
+                    <th>Khóa</th>
+                    <th>Trạng thái</th>
+                    <th>Ngày đăng ký</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model != null && Model.Any())
+                {
+                    foreach (var r in Model)
+                    {
+                        <tr>
+                            <td>@r.RegistrationId</td>
+                            <td>@(string.IsNullOrWhiteSpace(r.ClassName) ? (r.ClassId > 0 ? ("#" + r.ClassId.ToString()) : "-") : r.ClassName)</td>
+                            <td>@(string.IsNullOrWhiteSpace(r.CourseName) ? "-" : r.CourseName)</td>
+                            <td>@r.Status</td>
+                            <td>@(r.RegistrationDate.HasValue ? r.RegistrationDate.Value.ToString("dd/MM/yyyy") : "-")</td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr><td colspan="5">Chưa có đơn đăng ký nào.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
