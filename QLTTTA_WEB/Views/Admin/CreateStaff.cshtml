@@ -1,0 +1,68 @@
+@{
+    ViewData["Title"] = "Tạo nhân viên mới";
+}
+
+<div class="retro-card corner-decorated" style="max-width: 600px; margin: 0 auto;">
+    <div class="retro-card-header text-center">
+        <h2 class="retro-card-title"><i class="fas fa-user-plus"></i> Tạo nhân viên mới</h2>
+    </div>
+    <div class="retro-card-body">
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-danger"><div class="retro-alert-content">@TempData["ErrorMessage"]</div></div>
+        }
+
+        <form asp-action="CreateStaff" method="post">
+            @Html.AntiForgeryToken()
+            
+            <div class="mb-3">
+                <label class="form-label">Tên đăng nhập <span class="text-danger">*</span></label>
+                <input class="form-control" name="Username" required />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Mật khẩu <span class="text-danger">*</span></label>
+                <input class="form-control" type="password" name="Password" required />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Email <span class="text-danger">*</span></label>
+                <input class="form-control" type="email" name="Email" required />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Vai trò</label>
+                <select class="form-select" name="RoleId">
+                    <option value="4">Nhân viên học vụ</option>
+                    <option value="3">Kế toán</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Họ tên</label>
+                <input class="form-control" name="FullName" />
+            </div>
+
+
+
+            <div class="mb-3">
+                <label class="form-label">Giới tính</label>
+                <select class="form-select" name="Sex">
+                    <option value="">-- Chọn giới tính --</option>
+                    <option value="Nam">Nam</option>
+                    <option value="Nữ">Nữ</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Số điện thoại</label>
+                <input class="form-control" name="Phone" />
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <a asp-action="Staff" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Quay lại</a>
+                <button type="submit" class="btn btn-success"><i class="fas fa-save"></i> Lưu nhân viên</button>
+            </div>
+        </form>
+    </div>
+</div>

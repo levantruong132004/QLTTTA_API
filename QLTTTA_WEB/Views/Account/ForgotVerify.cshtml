@@ -7,6 +7,15 @@
     <div class="retro-form corner-decorated">
         <h2 class="vintage-title"><i class="fas fa-shield-alt"></i> Nhập OTP và mật khẩu mới</h2>
 
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-danger"><div class="retro-alert-content">@TempData["ErrorMessage"]</div></div>
+        }
+        @if (TempData["InfoMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-info"><div class="retro-alert-content">@TempData["InfoMessage"]</div></div>
+        }
+
         <form asp-action="ForgotVerify" method="post">
             @Html.AntiForgeryToken()
             <input type="hidden" asp-for="CorrelationId" />

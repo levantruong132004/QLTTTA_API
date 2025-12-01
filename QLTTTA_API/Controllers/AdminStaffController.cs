@@ -24,6 +24,14 @@ namespace QLTTTA_API.Controllers
             return Ok(new { Success = true, Data = list });
         }
 
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById([FromRoute] int id)
+        {
+            var item = await _service.GetStaffByIdAsync(id);
+            if (item == null) return NotFound(new { Success = false, Message = "Không tìm thấy nhân viên" });
+            return Ok(new { Success = true, Data = item });
+        }
+
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] StaffCreateDto dto)
         {
@@ -50,6 +58,13 @@ namespace QLTTTA_API.Controllers
         {
             var res = await _service.UnlockStaffAsync(id);
             return Ok(res);
+        }
+
+        [HttpGet("teachers")]
+        public async Task<IActionResult> GetTeachers()
+        {
+            var list = await _service.GetTeachersAsync();
+            return Ok(new { Success = true, Data = list });
         }
     }
 }

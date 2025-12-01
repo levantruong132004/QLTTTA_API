@@ -12,6 +12,7 @@ import 'package:qlttta_app_mobile/services/auth_service.dart';
 import 'package:qlttta_app_mobile/services/dashboard_service.dart';
 import 'package:qlttta_app_mobile/theme/retro_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:qlttta_app_mobile/screens/qr_scan_registration_screen.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -89,19 +90,19 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
           _StatCard(
-            icon: Icons.class_rounded,
-            title: 'Lớp học',
-            value: stats.totalClasses.toString(),
-            color: RetroColors.warning,
+            icon: Icons.person_rounded,
+            title: 'Thông tin cá nhân',
+            value: 'Xem',
+            color: RetroColors.primary,
             onTap: () {
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ClassesScreen()),
+                MaterialPageRoute(builder: (_) => const MyProfileScreen()),
               );
             },
           ),
           _StatCard(
             icon: Icons.assignment_outlined,
-            title: 'Đơn ĐK',
+            title: 'Đơn đăng ký',
             value: stats.myRegistrations.toString(),
             color: RetroColors.accent,
             onTap: () {
@@ -111,13 +112,13 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
           _StatCard(
-            icon: Icons.receipt_long_outlined,
-            title: 'Hóa đơn',
-            value: stats.myInvoices.toString(),
-            color: RetroColors.success,
+            icon: Icons.qr_code_scanner_rounded,
+            title: 'Tra cứu đơn',
+            value: 'QR',
+            color: RetroColors.warning,
             onTap: () {
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const RegistrationsInvoicesScreen()),
+                MaterialPageRoute(builder: (_) => const QrScanRegistrationScreen()),
               );
             },
           ),
@@ -526,9 +527,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         fontSize: 14, fontWeight: FontWeight.normal),
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const Text(
-                    'TRANG CHỦ',
-                    style: TextStyle(fontSize: 12, letterSpacing: 1.5),
+                  Text(
+                    'TRANG CHỦ (Role: $_roleId)',
+                    style: const TextStyle(fontSize: 12, letterSpacing: 1.5),
                   ),
                 ],
               ),

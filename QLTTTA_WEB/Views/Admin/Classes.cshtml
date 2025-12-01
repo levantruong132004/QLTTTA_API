@@ -47,23 +47,13 @@
                 </div>
             </div>
 
-        <form asp-action="CreateClass" method="post" class="row g-2">
-            <div class="col-md-2"><input name="classCode" class="form-control" placeholder="Mã lớp" required /></div>
-            <div class="col-md-3"><input name="className" class="form-control" placeholder="Tên lớp" required /></div>
-            <div class="col-md-2"><input name="startDate" type="date" class="form-control" required /></div>
-            <div class="col-md-2"><input name="endDate" type="date" class="form-control" required /></div>
-            <div class="col-md-1"><input name="maxSize" type="number" class="form-control" placeholder="Sĩ số"
-                    required /></div>
-            <div class="col-md-1"><input name="courseId" type="number" class="form-control" placeholder="Khóa"
-                    required /></div>
-            <div class="col-md-1"><input name="teacherId" type="number" class="form-control" placeholder="GV"
-                    required /></div>
-            <div class="col-md-1"><button type="submit" class="btn btn-success w-100">Thêm</button></div>
-        </form>
+        <div class="mb-3 text-end">
+            <a asp-action="CreateClass" asp-route-courseId="@ViewBag.CourseId" class="btn btn-success"><i class="fas fa-plus-circle"></i> Thêm lớp học mới</a>
+        </div>
 
         <div class="vintage-divider"></div>
 
-                <table class="table table-striped align-middle">
+        <table class="table table-striped align-middle">
             <thead>
                 <tr>
                     <th>Mã</th>
@@ -71,7 +61,7 @@
                     <th>Khóa</th>
                     <th>Ngày</th>
                     <th>Sĩ số</th>
-                                        <th>Đã TT</th>
+                    <th>Đã TT</th>
                     <th>Trạng thái</th>
                     <th></th>
                 </tr>
@@ -86,14 +76,14 @@
                             <td>@c.ClassName</td>
                             <td>@c.CourseId</td>
                             <td>@(c.StartDate?.ToString("dd/MM/yyyy")) - @(c.EndDate?.ToString("dd/MM/yyyy"))</td>
-                                                        <td>@c.MaxSize</td>
-                                                        <td>
-                                                                <span class="badge bg-success">@c.ApprovedCount</span>
-                                                        </td>
+                            <td>@c.MaxSize</td>
+                            <td>
+                                <span class="badge bg-success">@c.ApprovedCount</span>
+                            </td>
                             <td>@(c.Status ?? "-")</td>
                             <td class="text-nowrap">
                                 <a class="btn btn-sm btn-primary" asp-action="EditClassPage" asp-route-id="@c.ClassId">Sửa</a>
-                                                                <a class="btn btn-sm btn-info text-white" href="#" data-class-id="@c.ClassId" data-class-name="@c.ClassName" onclick="loadRoster(this)">Học viên</a>
+                                <a class="btn btn-sm btn-info text-white" asp-action="ClassRoster" asp-route-id="@c.ClassId">Học viên</a>
                                 <form asp-action="DeleteClass" method="post" class="d-inline"
                                     onsubmit="return confirm('Xóa lớp này?');">
                                     <input type="hidden" name="classId" value="@c.ClassId" />
@@ -108,69 +98,3 @@
         </table>
     </div>
 </div>
-
-<!-- Modal roster -->
-<div class="modal fade" id="rosterModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-users"></i> Danh sách học viên đã thanh toán</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div id="rosterLoading" class="text-center py-3" style="display:none;">
-                        <div class="spinner-border text-primary"></div>
-                </div>
-                <div id="rosterError" class="alert alert-danger d-none"></div>
-                <table class="table table-sm" id="rosterTable" style="display:none;">
-                    <thead>
-                        <tr>
-                            <th>ID</th><th>Mã HV</th><th>Họ tên</th><th>Giới tính</th><th>Ngày sinh</th><th>Điện thoại</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-async function loadRoster(el){
-    const classId = el.getAttribute('data-class-id');
-    const className = el.getAttribute('data-class-name');
-    const modalEl = document.getElementById('rosterModal');
-    modalEl.querySelector('.modal-title').innerHTML = `<i class="fas fa-users"></i> Học viên lớp: ${className}`;
-    const rosterLoading = document.getElementById('rosterLoading');
-    const rosterError = document.getElementById('rosterError');
-    const rosterTable = document.getElementById('rosterTable');
-    rosterError.classList.add('d-none');
-    rosterTable.style.display='none';
-    rosterLoading.style.display='block';
-    const bsModal = new bootstrap.Modal(modalEl); bsModal.show();
-    try{
-        const res = await fetch(`/api/classes/${classId}/paid-roster`, { headers: { 'X-Requested-With':'fetch' } });
-        if(!res.ok){ throw new Error('HTTP '+res.status); }
-        const data = await res.json();
-        // If API returns array directly
-        const arr = Array.isArray(data) ? data : (Array.isArray(data.data)? data.data : []);
-        const tbody = rosterTable.querySelector('tbody');
-        tbody.innerHTML='';
-        arr.forEach(s=>{
-            tbody.innerHTML += `<tr><td>${s.studentId}</td><td>${s.studentCode??''}</td><td>${s.fullName??''}</td><td>${s.sex??''}</td><td>${s.dateOfBirth? new Date(s.dateOfBirth).toLocaleDateString('vi-VN'):''}</td><td>${s.phoneNumber??''}</td></tr>`;
-        });
-        rosterLoading.style.display='none';
-        rosterTable.style.display='table';
-        if(arr.length===0){ rosterError.textContent='Chưa có học viên đã thanh toán.'; rosterError.classList.remove('d-none'); }
-    }catch(err){
-        rosterLoading.style.display='none';
-        rosterError.textContent='Lỗi tải danh sách: '+err.message;
-        rosterError.classList.remove('d-none');
-    }
-}
-</script>
-
-@* Dynamic helper functions removed after strong typing *@

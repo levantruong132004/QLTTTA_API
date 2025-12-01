@@ -1,6 +1,7 @@
 using QLTTTA_API.Models;
 using QLTTTA_API.Models.DTOs;
 using Oracle.ManagedDataAccess.Client;
+using System.Data;
 
 namespace QLTTTA_API.Services
 {
@@ -32,43 +33,42 @@ namespace QLTTTA_API.Services
             : base(configuration, logger, userConnProvider) { }
 
         /// <summary>
-        /// Lấy danh sách học viên phân trang. Hiện tại đơn giản là SELECT toàn bộ rồi thực hiện Skip/Take ở memory.
-        /// Có thể tối ưu bằng ROWNUM/ROW_NUMBER trong SQL nếu dữ liệu lớn.
+        /// Lấy danh sách học viên phân trang. Sử dụng SP_GET_STUDENTS.
         /// </summary>
         public async Task<PaginatedResponse<Student>> GetStudentsAsync(int pageNumber = 1, int pageSize = 10, string? search = null)
         {
             try
             {
-                // Đơn giản hóa: lấy tất cả trước, sau đó phân trang
-                string sql;
-                object? parameters = null;
+                using var connection = await GetConnectionAsync();
+                using var command = new OracleCommand("SP_GET_STUDENTS", connection);
+                command.CommandType = CommandType.StoredProcedure;
 
-                if (string.IsNullOrEmpty(search))
+                command.Parameters.Add("p_page_number", OracleDbType.Int32).Value = pageNumber;
+                command.Parameters.Add("p_page_size", OracleDbType.Int32).Value = pageSize;
+                command.Parameters.Add("p_search", OracleDbType.Varchar2).Value = string.IsNullOrEmpty(search) ? DBNull.Value : search;
+                
+                command.Parameters.Add("p_cursor", OracleDbType.RefCursor).Direction = ParameterDirection.Output;
+                var pTotal = command.Parameters.Add("p_total", OracleDbType.Int32);
+                pTotal.Direction = ParameterDirection.Output;
+
+                var students = new List<Student>();
+                using (var reader = await command.ExecuteReaderAsync())
                 {
-                    sql = @"SELECT s.* FROM QLTT_ADMIN.STUDENTS s 
-                            INNER JOIN QLTT_ADMIN.ACCOUNTS a ON a.USER_ID = s.STUDENT_ID
-                            WHERE a.IS_ACTIVE = 1
-                            ORDER BY s.STUDENT_ID";
+                    while (await reader.ReadAsync())
+                    {
+                        students.Add(MapToObject<Student>(reader));
+                    }
                 }
-                else
+
+                int totalRecords = 0;
+                if (pTotal.Value != null && int.TryParse(pTotal.Value.ToString(), out var t))
                 {
-                    sql = @"SELECT s.* FROM QLTT_ADMIN.STUDENTS s 
-                            INNER JOIN QLTT_ADMIN.ACCOUNTS a ON a.USER_ID = s.STUDENT_ID
-                            WHERE a.IS_ACTIVE = 1
-                              AND (UPPER(s.FULL_NAME) LIKE UPPER(:search) OR UPPER(s.STUDENT_CODE) LIKE UPPER(:search))
-                            ORDER BY s.STUDENT_ID";
-                    parameters = new { search = $"%{search}%" };
+                    totalRecords = t;
                 }
-
-                var allStudents = await ExecuteQueryAsync<Student>(sql, parameters);
-                var totalRecords = allStudents.Count;
-
-                var skip = (pageNumber - 1) * pageSize;
-                var pagedStudents = allStudents.Skip(skip).Take(pageSize).ToList();
 
                 return new PaginatedResponse<Student>
                 {
-                    Data = pagedStudents,
+                    Data = students,
                     TotalRecords = totalRecords,
                     PageNumber = pageNumber,
                     PageSize = pageSize
@@ -92,137 +92,115 @@ namespace QLTTTA_API.Services
         /// </summary>
         public async Task<Student?> GetStudentByIdAsync(int id)
         {
-            var sql = @"SELECT s.* FROM QLTT_ADMIN.STUDENTS s
-                        INNER JOIN QLTT_ADMIN.ACCOUNTS a ON a.USER_ID = s.STUDENT_ID
-                        WHERE s.STUDENT_ID = :id AND a.IS_ACTIVE = 1";
-            return await ExecuteQuerySingleAsync<Student>(sql, new { id });
+            var students = await ExecuteStoredProcedureQueryAsync<Student>("SP_GET_STUDENT_BY_ID", new { p_id = id });
+            return students.FirstOrDefault();
         }
 
         /// <summary>
-        /// Tạo học viên mới kèm tạo tài khoản. Gồm các bước:
-        /// 1) Kiểm tra trùng username/email
-        /// 2) Lấy ROLE_ID cho STUDENT
-        /// 3) INSERT ACCOUNT (lấy USER_ID)
-        /// 4) INSERT STUDENT (STUDENT_ID = USER_ID), trigger sẽ sinh STUDENT_CODE nếu có.
-        /// 5) Commit hoặc rollback nếu lỗi.
+        /// Tạo học viên mới kèm tạo tài khoản. Sử dụng các Stored Procedures trong transaction.
         /// </summary>
         public async Task<ApiResponse<Student>> CreateStudentAsync(StudentCreateDto dto)
         {
             try
             {
-                // Kiểm tra các trường account bổ sung
                 if (string.IsNullOrWhiteSpace(dto.Username) || string.IsNullOrWhiteSpace(dto.Password) || string.IsNullOrWhiteSpace(dto.Email))
                 {
-                    return new ApiResponse<Student>
-                    {
-                        Success = false,
-                        Message = "Thiếu thông tin tài khoản (username / password / email)"
-                    };
+                    return new ApiResponse<Student> { Success = false, Message = "Thiếu thông tin tài khoản (username / password / email)" };
                 }
 
                 using var connection = await GetConnectionAsync();
                 using var transaction = connection.BeginTransaction();
                 try
                 {
-                    // 1. Kiểm tra trùng USERNAME / EMAIL
-                    using (var checkUserCmd = new OracleCommand("SELECT COUNT(*) FROM QLTT_ADMIN.ACCOUNTS WHERE USERNAME = :u", connection))
+                    // 1. Check Username
+                    using (var cmd = new OracleCommand("SP_CHECK_USERNAME_EXISTS", connection))
                     {
-                        checkUserCmd.Transaction = transaction;
-                        checkUserCmd.Parameters.Add(":u", OracleDbType.Varchar2).Value = dto.Username.Trim();
-                        var exists = Convert.ToInt32(await checkUserCmd.ExecuteScalarAsync());
-                        if (exists > 0)
+                        cmd.Transaction = transaction;
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.Add("p_username", OracleDbType.Varchar2).Value = dto.Username.Trim();
+                        var pCount = cmd.Parameters.Add("p_count", OracleDbType.Int32);
+                        pCount.Direction = ParameterDirection.Output;
+                        await cmd.ExecuteNonQueryAsync();
+                        if (Convert.ToInt32(pCount.Value.ToString()) > 0)
                         {
                             return new ApiResponse<Student> { Success = false, Message = "Tên đăng nhập đã tồn tại" };
                         }
                     }
-                    using (var checkEmailCmd = new OracleCommand("SELECT COUNT(*) FROM QLTT_ADMIN.ACCOUNTS WHERE EMAIL = :e", connection))
+
+                    // 2. Check Email
+                    using (var cmd = new OracleCommand("SP_CHECK_EMAIL_EXISTS", connection))
                     {
-                        checkEmailCmd.Transaction = transaction;
-                        checkEmailCmd.Parameters.Add(":e", OracleDbType.Varchar2).Value = dto.Email.Trim();
-                        var exists = Convert.ToInt32(await checkEmailCmd.ExecuteScalarAsync());
-                        if (exists > 0)
+                        cmd.Transaction = transaction;
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.Add("p_email", OracleDbType.Varchar2).Value = dto.Email.Trim();
+                        var pCount = cmd.Parameters.Add("p_count", OracleDbType.Int32);
+                        pCount.Direction = ParameterDirection.Output;
+                        await cmd.ExecuteNonQueryAsync();
+                        if (Convert.ToInt32(pCount.Value.ToString()) > 0)
                         {
                             return new ApiResponse<Student> { Success = false, Message = "Email đã được sử dụng" };
                         }
                     }
 
-                    // 2. Lấy ROLE_ID của STUDENT (fallback 1)
+                    // 3. Get Role ID
                     int roleId = 1;
-                    try
+                    using (var cmd = new OracleCommand("SP_GET_ROLE_ID_BY_NAME", connection))
                     {
-                        using var roleCmd = new OracleCommand("SELECT ROLE_ID FROM QLTT_ADMIN.ROLES WHERE UPPER(ROLE_NAME) IN ('STUDENT','HỌC VIÊN','HOC VIEN') FETCH FIRST 1 ROWS ONLY", connection);
-                        roleCmd.Transaction = transaction;
-                        var roleObj = await roleCmd.ExecuteScalarAsync();
-                        if (roleObj != null && int.TryParse(roleObj.ToString(), out var rid) && rid > 0)
+                        cmd.Transaction = transaction;
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.Add("p_role_name", OracleDbType.Varchar2).Value = "HOC VIEN";
+                        var pRoleId = cmd.Parameters.Add("p_role_id", OracleDbType.Int32);
+                        pRoleId.Direction = ParameterDirection.Output;
+                        await cmd.ExecuteNonQueryAsync();
+                        if (pRoleId.Value != null && int.TryParse(pRoleId.Value.ToString(), out var rid) && rid > 0)
+                        {
                             roleId = rid;
+                        }
                     }
-                    catch { /* ignore, fallback 1 */ }
 
-                    // 3. Insert ACCOUNT (identity) + lấy USER_ID
+                    // 4. Create Account
                     int newUserId = 0;
-                    using (var accCmd = new OracleCommand(@"INSERT INTO QLTT_ADMIN.ACCOUNTS (USERNAME,PASSWORD,EMAIL,ROLE_ID,IS_ACTIVE)
-                                                             VALUES (:username,:password,:email,:roleId,1)
-                                                             RETURNING USER_ID INTO :p_user_id", connection))
+                    using (var cmd = new OracleCommand("SP_CREATE_ACCOUNT", connection))
                     {
-                        accCmd.Transaction = transaction;
-                        accCmd.Parameters.Add(":username", OracleDbType.Varchar2).Value = dto.Username.Trim();
-                        accCmd.Parameters.Add(":password", OracleDbType.Varchar2).Value = dto.Password; // TODO: hash
-                        accCmd.Parameters.Add(":email", OracleDbType.Varchar2).Value = dto.Email.Trim();
-                        accCmd.Parameters.Add(":roleId", OracleDbType.Int32).Value = roleId;
-                        var outParam = new OracleParameter(":p_user_id", OracleDbType.Int32, System.Data.ParameterDirection.Output);
-                        accCmd.Parameters.Add(outParam);
-                        await accCmd.ExecuteNonQueryAsync();
-                        if (outParam.Value != null && int.TryParse(outParam.Value.ToString(), out var tmpId))
-                            newUserId = tmpId;
+                        cmd.Transaction = transaction;
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.Add("p_username", OracleDbType.Varchar2).Value = dto.Username.Trim();
+                        cmd.Parameters.Add("p_password", OracleDbType.Varchar2).Value = dto.Password;
+                        cmd.Parameters.Add("p_email", OracleDbType.Varchar2).Value = dto.Email.Trim();
+                        cmd.Parameters.Add("p_role_id", OracleDbType.Int32).Value = roleId;
+                        var pUserId = cmd.Parameters.Add("p_user_id", OracleDbType.Int32);
+                        pUserId.Direction = ParameterDirection.Output;
+                        await cmd.ExecuteNonQueryAsync();
+                        if (pUserId.Value != null && int.TryParse(pUserId.Value.ToString(), out var uid))
+                        {
+                            newUserId = uid;
+                        }
                     }
+
                     if (newUserId <= 0)
                     {
                         transaction.Rollback();
                         return new ApiResponse<Student> { Success = false, Message = "Không lấy được USER_ID sau khi tạo tài khoản" };
                     }
 
-                    // 4. Insert STUDENT (STUDENT_ID = USER_ID) - bỏ STUDENT_CODE để trigger tự sinh
-                    using (var stuCmd = new OracleCommand(@"INSERT INTO QLTT_ADMIN.STUDENTS (STUDENT_ID,FULL_NAME,SEX,DATE_OF_BIRTH,PHONE_NUMBER,ADDRESS)
-                                                            VALUES (:id,:fullName,:sex,:dob,:phone,:addr)", connection))
+                    // 5. Create Student
+                    using (var cmd = new OracleCommand("SP_CREATE_STUDENT", connection))
                     {
-                        stuCmd.Transaction = transaction;
-                        stuCmd.Parameters.Add(":id", OracleDbType.Int32).Value = newUserId;
-                        stuCmd.Parameters.Add(":fullName", OracleDbType.NVarchar2).Value = dto.FullName;
-                        stuCmd.Parameters.Add(":sex", OracleDbType.NVarchar2).Value = (object?)dto.Sex ?? DBNull.Value;
-                        stuCmd.Parameters.Add(":dob", OracleDbType.Date).Value = dto.DateOfBirth;
-                        stuCmd.Parameters.Add(":phone", OracleDbType.Varchar2).Value = dto.PhoneNumber;
-                        stuCmd.Parameters.Add(":addr", OracleDbType.NVarchar2).Value = (object?)dto.Address ?? DBNull.Value;
-                        await stuCmd.ExecuteNonQueryAsync();
+                        cmd.Transaction = transaction;
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.Add("p_id", OracleDbType.Int32).Value = newUserId;
+                        cmd.Parameters.Add("p_fullname", OracleDbType.NVarchar2).Value = dto.FullName;
+                        cmd.Parameters.Add("p_sex", OracleDbType.NVarchar2).Value = (object?)dto.Sex ?? DBNull.Value;
+                        cmd.Parameters.Add("p_dob", OracleDbType.Date).Value = dto.DateOfBirth;
+                        cmd.Parameters.Add("p_phone", OracleDbType.Varchar2).Value = dto.PhoneNumber;
+                        cmd.Parameters.Add("p_addr", OracleDbType.NVarchar2).Value = (object?)dto.Address ?? DBNull.Value;
+                        await cmd.ExecuteNonQueryAsync();
                     }
 
-                    // 5. Commit transaction
                     transaction.Commit();
 
-                    // 6. Lấy lại student vừa tạo (bao gồm STUDENT_CODE do trigger sinh)
-                    Student? newStudent;
-                    using (var fetchCmd = new OracleCommand("SELECT * FROM QLTT_ADMIN.STUDENTS WHERE STUDENT_ID = :sid", connection))
-                    {
-                        fetchCmd.Parameters.Add(":sid", OracleDbType.Int32).Value = newUserId;
-                        using var reader = await fetchCmd.ExecuteReaderAsync();
-                        if (await reader.ReadAsync())
-                        {
-                            newStudent = new Student
-                            {
-                                StudentId = newUserId,
-                                FullName = reader.IsDBNull(reader.GetOrdinal("FULL_NAME")) ? null : reader.GetString(reader.GetOrdinal("FULL_NAME")),
-                                StudentCode = reader.IsDBNull(reader.GetOrdinal("STUDENT_CODE")) ? null : reader.GetString(reader.GetOrdinal("STUDENT_CODE")),
-                                Sex = reader.IsDBNull(reader.GetOrdinal("SEX")) ? null : reader.GetString(reader.GetOrdinal("SEX")),
-                                DateOfBirth = reader.IsDBNull(reader.GetOrdinal("DATE_OF_BIRTH")) ? null : reader.GetDateTime(reader.GetOrdinal("DATE_OF_BIRTH")),
-                                PhoneNumber = reader.IsDBNull(reader.GetOrdinal("PHONE_NUMBER")) ? null : reader.GetString(reader.GetOrdinal("PHONE_NUMBER")),
-                                Address = reader.IsDBNull(reader.GetOrdinal("ADDRESS")) ? null : reader.GetString(reader.GetOrdinal("ADDRESS"))
-                            };
-                        }
-                        else
-                        {
-                            newStudent = null;
-                        }
-                    }
-
+                    // 6. Get created student
+                    var newStudent = await GetStudentByIdAsync(newUserId);
                     return new ApiResponse<Student>
                     {
                         Success = true,
@@ -247,7 +225,6 @@ namespace QLTTTA_API.Services
                 return new ApiResponse<Student>
                 {
                     Success = false,
-                    //Message = "Có lỗi xảy ra khi tạo học viên"
                     Message = "Lỗi: " + ex.Message
                 };
             }
@@ -260,58 +237,40 @@ namespace QLTTTA_API.Services
         {
             try
             {
-                // Kiểm tra học viên tồn tại
                 var student = await GetStudentByIdAsync(dto.StudentId);
                 if (student == null)
                 {
-                    return new ApiResponse<Student>
-                    {
-                        Success = false,
-                        Message = "Không tìm thấy học viên"
-                    };
+                    return new ApiResponse<Student> { Success = false, Message = "Không tìm thấy học viên" };
                 }
 
-                // Kiểm tra mã học viên trùng (ngoại trừ chính nó)
-                var existingSql = @"
-                    SELECT COUNT(*) FROM QLTT_ADMIN.STUDENTS 
-                    WHERE STUDENT_CODE = :studentcode AND STUDENT_ID != :studentid";
-                var exists = Convert.ToInt32(await ExecuteScalarAsync(existingSql,
-                    new { studentcode = dto.StudentCode, studentid = dto.StudentId }));
+                // Check duplicate code
+                using var connection = await GetConnectionAsync();
+                using var cmdCheck = new OracleCommand("SP_CHECK_STUDENT_CODE_EXISTS", connection);
+                cmdCheck.CommandType = CommandType.StoredProcedure;
+                cmdCheck.Parameters.Add("p_code", OracleDbType.Varchar2).Value = dto.StudentCode;
+                cmdCheck.Parameters.Add("p_exclude_id", OracleDbType.Int32).Value = dto.StudentId;
+                var pCount = cmdCheck.Parameters.Add("p_count", OracleDbType.Int32);
+                pCount.Direction = ParameterDirection.Output;
+                await cmdCheck.ExecuteNonQueryAsync();
 
-                if (exists > 0)
+                if (Convert.ToInt32(pCount.Value.ToString()) > 0)
                 {
-                    return new ApiResponse<Student>
-                    {
-                        Success = false,
-                        Message = "Mã học viên đã tồn tại"
-                    };
+                    return new ApiResponse<Student> { Success = false, Message = "Mã học viên đã tồn tại" };
                 }
 
-                var sql = @"
-                    UPDATE QLTT_ADMIN.STUDENTS SET
-                        FULL_NAME = :fullname,
-                        STUDENT_CODE = :studentcode,
-                        SEX = :sex,
-                        DATE_OF_BIRTH = :dateofbirth,
-                        PHONE_NUMBER = :phonenumber,
-                        ADDRESS = :address
-                    WHERE STUDENT_ID = :studentid";
-
-                var parameters = new
-                {
-                    fullname = dto.FullName,
-                    studentcode = dto.StudentCode,
-                    sex = dto.Sex,
-                    dateofbirth = dto.DateOfBirth,
-                    phonenumber = dto.PhoneNumber,
-                    address = dto.Address,
-                    studentid = dto.StudentId
-                };
-
-                await ExecuteNonQueryAsync(sql, parameters);
+                // Update
+                using var cmdUpdate = new OracleCommand("SP_UPDATE_STUDENT", connection);
+                cmdUpdate.CommandType = CommandType.StoredProcedure;
+                cmdUpdate.Parameters.Add("p_id", OracleDbType.Int32).Value = dto.StudentId;
+                cmdUpdate.Parameters.Add("p_fullname", OracleDbType.NVarchar2).Value = dto.FullName;
+                cmdUpdate.Parameters.Add("p_code", OracleDbType.Varchar2).Value = dto.StudentCode;
+                cmdUpdate.Parameters.Add("p_sex", OracleDbType.NVarchar2).Value = dto.Sex;
+                cmdUpdate.Parameters.Add("p_dob", OracleDbType.Date).Value = dto.DateOfBirth;
+                cmdUpdate.Parameters.Add("p_phone", OracleDbType.Varchar2).Value = dto.PhoneNumber;
+                cmdUpdate.Parameters.Add("p_addr", OracleDbType.NVarchar2).Value = dto.Address;
+                await cmdUpdate.ExecuteNonQueryAsync();
 
                 var updatedStudent = await GetStudentByIdAsync(dto.StudentId);
-
                 return new ApiResponse<Student>
                 {
                     Success = true,
@@ -322,32 +281,28 @@ namespace QLTTTA_API.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error updating student");
-                return new ApiResponse<Student>
-                {
-                    Success = false,
-                    Message = "Có lỗi xảy ra khi cập nhật học viên"
-                };
+                return new ApiResponse<Student> { Success = false, Message = "Có lỗi xảy ra khi cập nhật học viên" };
             }
         }
 
         /// <summary>
-        /// Vô hiệu hóa học viên bằng cách đặt IS_ACTIVE = 0 trên ACCOUNTS thay vì xóa dữ liệu STUDENTS (soft delete).
+        /// Vô hiệu hóa học viên bằng cách đặt IS_ACTIVE = 0 trên ACCOUNTS.
         /// </summary>
         public async Task<ApiResponse<bool>> DeleteStudentAsync(int id)
         {
             try
             {
-                // Kiểm tra học viên có đăng ký học không
-                // Soft delete: đặt IS_ACTIVE = 0 cho ACCOUNT tương ứng (không xóa dữ liệu STUDENTS)
                 using var connection = await GetConnectionAsync();
-                using var command = new OracleCommand("BEGIN UPDATE QLTT_ADMIN.ACCOUNTS SET IS_ACTIVE = 0 WHERE USER_ID = :id; :rowcount := SQL%ROWCOUNT; END;", connection);
-                var idParam = new OracleParameter(":id", OracleDbType.Int32) { Value = id };
-                var outParam = new OracleParameter(":rowcount", OracleDbType.Int32, System.Data.ParameterDirection.Output);
-                command.Parameters.Add(idParam);
-                command.Parameters.Add(outParam);
+                using var command = new OracleCommand("SP_SOFT_DELETE_STUDENT", connection);
+                command.CommandType = CommandType.StoredProcedure;
+                command.Parameters.Add("p_id", OracleDbType.Int32).Value = id;
+                var pRowCount = command.Parameters.Add("p_rowcount", OracleDbType.Int32);
+                pRowCount.Direction = ParameterDirection.Output;
+                
                 await command.ExecuteNonQueryAsync();
+                
                 int affected = 0;
-                if (outParam.Value != null && int.TryParse(outParam.Value.ToString(), out var tmp)) affected = tmp;
+                if (pRowCount.Value != null && int.TryParse(pRowCount.Value.ToString(), out var tmp)) affected = tmp;
 
                 if (affected == 0)
                 {
@@ -358,11 +313,7 @@ namespace QLTTTA_API.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error deleting student");
-                return new ApiResponse<bool>
-                {
-                    Success = false,
-                    Message = "Có lỗi xảy ra khi vô hiệu hóa học viên"
-                };
+                return new ApiResponse<bool> { Success = false, Message = "Có lỗi xảy ra khi vô hiệu hóa học viên" };
             }
         }
 
@@ -371,12 +322,7 @@ namespace QLTTTA_API.Services
         /// </summary>
         public async Task<List<Student>> SearchStudentsAsync(string keyword)
         {
-            var sql = @"SELECT s.* FROM QLTT_ADMIN.STUDENTS s
-                        INNER JOIN QLTT_ADMIN.ACCOUNTS a ON a.USER_ID = s.STUDENT_ID
-                        WHERE a.IS_ACTIVE = 1
-                          AND (UPPER(s.FULL_NAME) LIKE UPPER(:keyword) OR UPPER(s.STUDENT_CODE) LIKE UPPER(:keyword))
-                        ORDER BY s.FULL_NAME";
-            return await ExecuteQueryAsync<Student>(sql, new { keyword = $"%{keyword}%" });
+            return await ExecuteStoredProcedureQueryAsync<Student>("SP_SEARCH_STUDENTS", new { p_keyword = $"%{keyword}%" });
         }
     }
 }

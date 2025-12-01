@@ -97,6 +97,13 @@ namespace QLTTTA_WEB.Controllers.Admin
             return RedirectToAction("Courses");
         }
 
+        [HttpGet]
+        public IActionResult CreateCourse()
+        {
+            if (!IsStaff()) return RedirectToAction("Index", "Home");
+            return View("~/Views/Admin/CreateCourse.cshtml");
+        }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateCourse(string courseCode, string courseName, string description, int standardFee)
@@ -106,6 +113,68 @@ namespace QLTTTA_WEB.Controllers.Admin
             var res = await _http.PostAsync("api/courses", new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json"));
             TempData[res.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] = await res.Content.ReadAsStringAsync();
             return RedirectToAction("Courses");
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> EditCoursePage(int id)
+        {
+            if (!IsStaff()) return RedirectToAction("Index", "Home");
+            var res = await _http.GetAsync($"api/courses/{id}");
+            var body = await res.Content.ReadAsStringAsync();
+            if (!res.IsSuccessStatusCode)
+            {
+                TempData["ErrorMessage"] = string.IsNullOrWhiteSpace(body) ? "Không tải được khóa học" : body;
+                return RedirectToAction("Courses");
+            }
+            try
+            {
+                var item = JsonSerializer.Deserialize<QLTTTA_WEB.Models.CourseViewModel>(body, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                return View("~/Views/Admin/EditCourse.cshtml", item);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Deserialize course item failed. Body: {Body}", body);
+                TempData["ErrorMessage"] = "Dữ liệu khóa học không hợp lệ.";
+                return RedirectToAction("Courses");
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ClassRoster(int id)
+        {
+            if (!IsStaff()) return RedirectToAction("Index", "Home");
+            
+            // Get Class Info for Title
+            string className = "Lớp học";
+            var clsRes = await _http.GetAsync($"api/classes/{id}");
+            if (clsRes.IsSuccessStatusCode)
+            {
+                var clsBody = await clsRes.Content.ReadAsStringAsync();
+                try {
+                    var cls = JsonSerializer.Deserialize<QLTTTA_WEB.Models.AdminClassItem>(clsBody, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    if (cls != null) className = cls.ClassName;
+                } catch { }
+            }
+            ViewBag.ClassName = className;
+
+            var res = await _http.GetAsync($"api/classes/{id}/paid-roster");
+            var body = await res.Content.ReadAsStringAsync();
+            if (!res.IsSuccessStatusCode)
+            {
+                TempData["ErrorMessage"] = string.IsNullOrWhiteSpace(body) ? "Không tải được danh sách học viên" : body;
+                return View("~/Views/Admin/ClassRoster.cshtml", new List<QLTTTA_WEB.Models.RosterStudentItem>());
+            }
+            try
+            {
+                var list = JsonSerializer.Deserialize<List<QLTTTA_WEB.Models.RosterStudentItem>>(body, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                return View("~/Views/Admin/ClassRoster.cshtml", list);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Deserialize roster failed. Body: {Body}", body);
+                TempData["ErrorMessage"] = "Dữ liệu danh sách học viên không hợp lệ.";
+                return View("~/Views/Admin/ClassRoster.cshtml", new List<QLTTTA_WEB.Models.RosterStudentItem>());
+            }
         }
 
         public async Task<IActionResult> Classes(int? courseId, string? search)
@@ -146,6 +215,37 @@ namespace QLTTTA_WEB.Controllers.Admin
             return View("~/Views/Admin/Classes.cshtml", data);
         }
 
+        [HttpGet]
+        public async Task<IActionResult> CreateClass(int? courseId)
+        {
+            if (!IsStaff()) return RedirectToAction("Index", "Home");
+            ViewBag.CourseId = courseId;
+
+            // Load Courses
+            var coursesRes = await _http.GetAsync("api/courses");
+            if (coursesRes.IsSuccessStatusCode)
+            {
+                var body = await coursesRes.Content.ReadAsStringAsync();
+                var courses = JsonSerializer.Deserialize<List<QLTTTA_WEB.Models.CourseViewModel>>(body, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                ViewBag.Courses = courses;
+            }
+
+            // Load Teachers
+            var teachersRes = await _http.GetAsync("api/admin/staff/teachers");
+            if (teachersRes.IsSuccessStatusCode)
+            {
+                var body = await teachersRes.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(body);
+                if (doc.RootElement.TryGetProperty("data", out var dataEl))
+                {
+                    var teachers = JsonSerializer.Deserialize<List<QLTTTA_WEB.Models.TeacherViewModel>>(dataEl.GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    ViewBag.Teachers = teachers;
+                }
+            }
+
+            return View("~/Views/Admin/CreateClass.cshtml");
+        }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateClass(string classCode, string className, DateTime startDate, DateTime endDate, int maxSize, int courseId, int teacherId)
@@ -165,7 +265,10 @@ namespace QLTTTA_WEB.Controllers.Admin
         {
             if (!IsStaff()) return RedirectToAction("Classes", new { courseId });
             var res = await _http.DeleteAsync($"api/classes/{classId}");
-            TempData[res.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] = await res.Content.ReadAsStringAsync();
+            var body = await res.Content.ReadAsStringAsync();
+            string msg = res.IsSuccessStatusCode ? "Xóa lớp thành công" : "Xóa lớp thất bại";
+            try { using var doc = JsonDocument.Parse(body); if (doc.RootElement.TryGetProperty("message", out var m)) msg = m.GetString() ?? msg; } catch { }
+            TempData[res.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] = msg;
             return RedirectToAction("Classes", new { courseId });
         }
 
@@ -557,6 +660,30 @@ namespace QLTTTA_WEB.Controllers.Admin
         }
 
         [HttpGet]
+        public IActionResult CreateStaffPage()
+        {
+            if (!IsAdmin()) return RedirectToAction("Index", "Home");
+            return View("~/Views/Admin/CreateStaff.cshtml");
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> EditStaffPage(int id)
+        {
+            if (!IsAdmin()) return RedirectToAction("Index", "Home");
+            var res = await _http.GetAsync($"api/admin/staff/{id}");
+            var body = await res.Content.ReadAsStringAsync();
+            if (!res.IsSuccessStatusCode)
+            {
+                TempData["ErrorMessage"] = "Không tìm thấy nhân viên";
+                return RedirectToAction("Staff");
+            }
+            using var doc = JsonDocument.Parse(body);
+            var dataEl = doc.RootElement.TryGetProperty("data", out var d) ? d : doc.RootElement;
+            var item = JsonSerializer.Deserialize<QLTTTA_WEB.Models.StaffAdminItem>(dataEl.GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            return View("~/Views/Admin/EditStaff.cshtml", item);
+        }
+
+        [HttpGet]
         public async Task<IActionResult> Staff()
         {
             if (!IsAdmin()) return RedirectToAction("Index", "Home");
@@ -603,14 +730,12 @@ namespace QLTTTA_WEB.Controllers.Admin
                 };
                 var res = await _http.PostAsync("api/admin/staff", new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json"));
                 var body = await res.Content.ReadAsStringAsync();
-                if (res.IsSuccessStatusCode)
-                {
-                    TempData["SuccessMessage"] = "Tạo nhân viên thành công";
-                }
-                else
-                {
-                    TempData["ErrorMessage"] = string.IsNullOrWhiteSpace(body) ? "Không thể tạo nhân viên" : body;
-                }
+                
+                string msg = "Không thể tạo nhân viên";
+                try { using var doc = JsonDocument.Parse(body); if (doc.RootElement.TryGetProperty("message", out var m)) msg = m.GetString() ?? msg; } catch { }
+
+                if (res.IsSuccessStatusCode) TempData["SuccessMessage"] = msg;
+                else TempData["ErrorMessage"] = msg;
             }
             catch (Exception ex)
             {
@@ -637,7 +762,12 @@ namespace QLTTTA_WEB.Controllers.Admin
                 };
                 var res = await _http.PutAsync($"api/admin/staff/{model.UserId}", new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json"));
                 var body = await res.Content.ReadAsStringAsync();
-                TempData[res.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] = string.IsNullOrWhiteSpace(body) ? (res.IsSuccessStatusCode ? "Cập nhật thành công" : "Cập nhật thất bại") : body;
+                
+                string msg = "Cập nhật thất bại";
+                try { using var doc = JsonDocument.Parse(body); if (doc.RootElement.TryGetProperty("message", out var m)) msg = m.GetString() ?? msg; } catch { }
+
+                if (res.IsSuccessStatusCode) TempData["SuccessMessage"] = msg;
+                else TempData["ErrorMessage"] = msg;
             }
             catch (Exception ex)
             {
@@ -653,7 +783,14 @@ namespace QLTTTA_WEB.Controllers.Admin
         {
             if (!IsAdmin()) return RedirectToAction("Staff");
             var res = await _http.PostAsync($"api/admin/staff/{userId}/lock", new StringContent("", Encoding.UTF8, "application/json"));
-            TempData[res.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] = await res.Content.ReadAsStringAsync();
+            var body = await res.Content.ReadAsStringAsync();
+            
+            string msg = "Khóa tài khoản thất bại";
+            try { using var doc = JsonDocument.Parse(body); if (doc.RootElement.TryGetProperty("message", out var m)) msg = m.GetString() ?? msg; } catch { }
+
+            if (res.IsSuccessStatusCode) TempData["SuccessMessage"] = msg;
+            else TempData["ErrorMessage"] = msg;
+            
             return RedirectToAction("Staff");
         }
 
@@ -663,7 +800,14 @@ namespace QLTTTA_WEB.Controllers.Admin
         {
             if (!IsAdmin()) return RedirectToAction("Staff");
             var res = await _http.PostAsync($"api/admin/staff/{userId}/unlock", new StringContent("", Encoding.UTF8, "application/json"));
-            TempData[res.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] = await res.Content.ReadAsStringAsync();
+            var body = await res.Content.ReadAsStringAsync();
+
+            string msg = "Mở khóa tài khoản thất bại";
+            try { using var doc = JsonDocument.Parse(body); if (doc.RootElement.TryGetProperty("message", out var m)) msg = m.GetString() ?? msg; } catch { }
+
+            if (res.IsSuccessStatusCode) TempData["SuccessMessage"] = msg;
+            else TempData["ErrorMessage"] = msg;
+
             return RedirectToAction("Staff");
         }
     }

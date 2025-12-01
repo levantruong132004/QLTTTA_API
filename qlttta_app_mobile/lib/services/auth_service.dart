@@ -5,60 +5,46 @@ import 'package:shared_preferences/shared_preferences.dart';
 class AuthService {
   final ApiService _apiService = ApiService();
 
-  Future<bool> login(String username, String password) async {
-    final response = await _apiService.post(
-      'auth/login',
-      {
-        'username': username,
-        'password': password,
-        'deviceType': 'mobile',
-      },
-    );
+  Future<Map<String, dynamic>> login(String username, String password) async {
+    try {
+      final response = await _apiService.post(
+        'auth/login',
+        {
+          'username': username,
+          'password': password,
+          'deviceType': 'mobile',
+        },
+      );
 
-    if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) {
-        final sid = data['sessionId'] as String?;
-        if (sid != null && sid.isNotEmpty) {
+      print("DEBUG LOGIN RESPONSE: $data"); // Debug print
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        if (data['user'] != null) {
+          final roleId = data['user']['roleId'];
+          print("DEBUG PARSED ROLE ID: $roleId"); // Debug print
+
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('sessionId', sid);
-          await prefs.setString('username', username);
-          // Lưu họ tên (fullName) nếu backend trả về
-          try {
-            final fullName = (data['user'] != null) ? (data['user']['fullName'] ?? '') : '';
-            if (fullName is String && fullName.isNotEmpty) {
-              await prefs.setString('fullName', fullName);
-            }
-            // Lưu roleId để phân quyền
-            final roleId = (data['user'] != null) ? (data['user']['roleId']) : null;
-            if (roleId != null) {
-              await prefs.setInt('roleId', roleId is int ? roleId : int.tryParse(roleId.toString()) ?? 0);
-            }
-          } catch (_) {
-            // ignore parse errors
+          await prefs.setString('sessionId', data['sessionId']);
+          await prefs.setString('username', data['user']['username']);
+          await prefs.setString('fullName', data['user']['fullName'] ?? '');
+          
+          if (roleId != null) {
+            await prefs.setInt('roleId', roleId is int ? roleId : int.tryParse(roleId.toString()) ?? 0);
           }
         }
-        return true;
+        return {'success': true, 'message': data['message']};
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Đăng nhập thất bại',
+        };
       }
-      // In ra thông báo lỗi từ backend nếu có
-      try {
-        final msg = data['message'];
-        if (msg != null) {
-          // ignore: avoid_print
-          print('Login failed (200 with success=false): $msg');
-        }
-      } catch (_) {}
-      return false;
-    } else {
-      // Ghi log chi tiết để debug (status + body)
-      try {
-        final body = response.body;
-        // ignore: avoid_print
-        print('Login HTTP ${response.statusCode}: $body');
-      } catch (_) {
-        // ignore
-      }
-      return false;
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Lỗi kết nối: ${e.toString()}',
+      };
     }
   }
 

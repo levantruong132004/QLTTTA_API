@@ -25,12 +25,12 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoading = true;
     });
 
-    final success = await _authService.login(
+    final result = await _authService.login(
       _usernameController.text,
       _passwordController.text,
     );
 
-    if (success) {
+    if (result['success'] == true) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('username', _usernameController.text);
       if (!mounted) return;
@@ -41,7 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Đăng nhập thất bại!'),
+          content: Text(result['message'] ?? 'Đăng nhập thất bại!'),
           backgroundColor: RetroColors.vintageBurgundy,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(

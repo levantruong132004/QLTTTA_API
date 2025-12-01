@@ -16,14 +16,9 @@
             <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
         }
 
-        <form asp-action="CreateCourse" method="post" class="row g-2">
-            <div class="col-md-2"><input name="courseCode" class="form-control" placeholder="Mã khóa" required /></div>
-            <div class="col-md-3"><input name="courseName" class="form-control" placeholder="Tên khóa" required /></div>
-            <div class="col-md-4"><input name="description" class="form-control" placeholder="Mô tả" /></div>
-            <div class="col-md-2"><input name="standardFee" type="number" min="0" class="form-control"
-                    placeholder="Học phí" required /></div>
-            <div class="col-md-1"><button type="submit" class="btn btn-success w-100">Thêm</button></div>
-        </form>
+        <div class="mb-3 text-end">
+            <a asp-action="CreateCourse" class="btn btn-success"><i class="fas fa-plus-circle"></i> Thêm khóa học mới</a>
+        </div>
 
         <div class="vintage-divider"></div>
 
@@ -33,6 +28,7 @@
                     <th>Mã</th>
                     <th>Tên</th>
                     <th>Mô tả</th>
+                    <th>Học phí</th>
                     <th></th>
                 </tr>
             </thead>
@@ -43,19 +39,9 @@
                         <td>@c.CourseCode</td>
                         <td>@c.CourseName</td>
                         <td>@c.Description</td>
+                        <td>@c.StandardFee.ToString("N0")</td>
                         <td class="text-nowrap">
-                            <form asp-action="EditCourse" method="post" class="d-inline">
-                                <input type="hidden" name="courseId" value="@c.CourseId" />
-                                <input type="text" name="courseCode" value="@c.CourseCode" class="form-control d-inline"
-                                    style="width:120px;display:inline-block;" />
-                                <input type="text" name="courseName" value="@c.CourseName" class="form-control d-inline"
-                                    style="width:160px;display:inline-block;" />
-                                <input type="text" name="description" value="@c.Description" class="form-control d-inline"
-                                    style="width:200px;display:inline-block;" />
-                                <input type="number" name="standardFee" value="@c.StandardFee" class="form-control d-inline"
-                                    style="width:120px;display:inline-block;" />
-                                <button class="btn btn-sm btn-primary">Lưu</button>
-                            </form>
+                            <a class="btn btn-sm btn-primary" asp-action="EditCoursePage" asp-route-id="@c.CourseId">Sửa</a>
                             <form asp-action="DeleteCourse" method="post" class="d-inline"
                                 onsubmit="return confirm('Xóa khóa này?');">
                                 <input type="hidden" name="courseId" value="@c.CourseId" />
@@ -66,7 +52,7 @@
                         </td>
                     </tr>
                     <tr id="qr-row-@c.CourseId" style="display:none;">
-                        <td colspan="4">
+                        <td colspan="5">
                             <div class="d-flex align-items-center">
                                 <div id="qrcode-@c.CourseId"></div>
                                 <div class="ms-3 small text-muted">Quét mã để xem thông tin khóa học công khai</div>

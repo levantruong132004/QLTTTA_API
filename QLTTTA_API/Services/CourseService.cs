@@ -5,320 +5,194 @@ using System.Data;
 
 namespace QLTTTA_API.Services
 {
-    /// <summary>
-    /// Interface dịch vụ quản lý khóa học (CRUD + danh sách phân trang).
-    /// </summary>
     public interface ICourseService
     {
-        /// <summary>Lấy danh sách khóa học phân trang kèm tìm kiếm tên/mã.</summary>
         Task<PaginatedResponse<Course>> GetCoursesAsync(int pageNumber = 1, int pageSize = 10, string? search = null);
-        /// <summary>Lấy chi tiết một khóa học theo ID.</summary>
         Task<Course?> GetCourseByIdAsync(int id);
-        /// <summary>Tạo khóa học mới.</summary>
         Task<ApiResponse<Course>> CreateCourseAsync(CourseCreateDto dto);
-        /// <summary>Cập nhật khóa học.</summary>
         Task<ApiResponse<Course>> UpdateCourseAsync(CourseUpdateDto dto);
-        /// <summary>Xóa khóa học nếu không ràng buộc lớp học.</summary>
         Task<ApiResponse<bool>> DeleteCourseAsync(int id);
-        /// <summary>Lấy tất cả khóa học (không phân trang) - dùng cho hiển thị tổng quan.</summary>
         Task<List<Course>> GetAllCoursesAsync();
     }
 
-    /// <summary>
-    /// Triển khai ICourseService dùng BaseService (per-user connection nếu có) để truy vấn dữ liệu khóa học.
-    /// </summary>
     public class CourseService : BaseService, ICourseService
     {
         public CourseService(IConfiguration configuration, ILogger<CourseService> logger, IOracleConnectionProvider userConnProvider)
             : base(configuration, logger, userConnProvider) { }
 
-        /// <summary>
-        /// Lấy danh sách khóa học phân trang. Có hỗ trợ tìm kiếm theo COURSE_NAME hoặc COURSE_CODE (không phân biệt hoa thường).
-        /// </summary>
         public async Task<PaginatedResponse<Course>> GetCoursesAsync(int pageNumber = 1, int pageSize = 10, string? search = null)
         {
-            var offset = (pageNumber - 1) * pageSize;
-            var whereClause = string.IsNullOrEmpty(search) ? "" :
-                "WHERE UPPER(COURSE_NAME) LIKE UPPER(:search) OR UPPER(COURSE_CODE) LIKE UPPER(:search)";
-
-            var countSql = $@"
-                SELECT COUNT(*) 
-                FROM QLTT_ADMIN.KHOA_HOC 
-                {whereClause.Replace("COURSE_NAME", "TEN_KHOA_HOC").Replace("COURSE_CODE", "MA_KHOA_HOC")}";
-
-            var dataSql = $@"
-                SELECT * FROM (
-                    SELECT 
-                        c.ID_KHOA_HOC       AS COURSE_ID,
-                        c.MA_KHOA_HOC       AS COURSE_CODE,
-                        c.TEN_KHOA_HOC      AS COURSE_NAME,
-                        c.MO_TA             AS DESCRIPTION,
-                        c.HOC_PHI_TIEU_CHUAN AS STANDARD_FEE,
-                        ROW_NUMBER() OVER (ORDER BY c.ID_KHOA_HOC) as rn
-                    FROM QLTT_ADMIN.KHOA_HOC c
-                    {whereClause.Replace("COURSE_NAME", "TEN_KHOA_HOC").Replace("COURSE_CODE", "MA_KHOA_HOC")}
-                ) WHERE rn BETWEEN :offset + 1 AND :offset + :pagesize";
-
-            var parameters = new { search = $"%{search}%", offset, pagesize = pageSize };
-
-            var totalRecords = Convert.ToInt32(await ExecuteScalarAsync(countSql,
-                string.IsNullOrEmpty(search) ? null : new { search = $"%{search}%" }));
-
-            var courses = await ExecuteQueryAsync<Course>(dataSql,
-                string.IsNullOrEmpty(search) ? new { offset, pagesize = pageSize } : parameters);
-
-            return new PaginatedResponse<Course>
+            try
             {
-                Data = courses,
-                TotalRecords = totalRecords,
-                PageNumber = pageNumber,
-                PageSize = pageSize
-            };
-        }
+                using var connection = await GetConnectionAsync();
+                using var command = new OracleCommand("SP_GET_COURSES", connection);
+                command.CommandType = CommandType.StoredProcedure;
+                command.Parameters.Add("p_page_number", OracleDbType.Int32).Value = pageNumber;
+                command.Parameters.Add("p_page_size", OracleDbType.Int32).Value = pageSize;
+                command.Parameters.Add("p_search", OracleDbType.Varchar2).Value = string.IsNullOrEmpty(search) ? DBNull.Value : $"%{search}%";
+                
+                command.Parameters.Add("p_cursor", OracleDbType.RefCursor).Direction = ParameterDirection.Output;
+                var pTotal = command.Parameters.Add("p_total", OracleDbType.Int32);
+                pTotal.Direction = ParameterDirection.Output;
 
-        /// <summary>
-        /// Lấy thông tin một khóa học theo ID (không có xử lý đặc biệt).
-        /// </summary>
-        public async Task<Course?> GetCourseByIdAsync(int id)
-        {
-            var sql = @"SELECT 
-                                     ID_KHOA_HOC       AS COURSE_ID,
-                                     MA_KHOA_HOC       AS COURSE_CODE,
-                                     TEN_KHOA_HOC      AS COURSE_NAME,
-                                     MO_TA             AS DESCRIPTION,
-                                     HOC_PHI_TIEU_CHUAN AS STANDARD_FEE
-                                 FROM QLTT_ADMIN.KHOA_HOC WHERE ID_KHOA_HOC = :id";
-
-            using (var conn = await GetConnectionAsync())
-            using (var cmd = new Oracle.ManagedDataAccess.Client.OracleCommand(sql, conn))
-            {
-                cmd.Parameters.Add(":id", id);
-                using var reader = await cmd.ExecuteReaderAsync(System.Data.CommandBehavior.SingleRow);
-                if (await reader.ReadAsync())
+                var courses = new List<Course>();
+                using (var reader = await command.ExecuteReaderAsync())
                 {
-                    return new Course
+                    while (await reader.ReadAsync())
                     {
-                        CourseId = reader.GetInt32(reader.GetOrdinal("COURSE_ID")),
-                        CourseCode = reader.IsDBNull(reader.GetOrdinal("COURSE_CODE")) ? null : reader.GetString(reader.GetOrdinal("COURSE_CODE")),
-                        CourseName = reader.IsDBNull(reader.GetOrdinal("COURSE_NAME")) ? null : reader.GetString(reader.GetOrdinal("COURSE_NAME")),
-                        Description = reader.IsDBNull(reader.GetOrdinal("DESCRIPTION")) ? string.Empty : reader.GetString(reader.GetOrdinal("DESCRIPTION")),
-                        StandardFee = reader.IsDBNull(reader.GetOrdinal("STANDARD_FEE")) ? 0 : Convert.ToInt32(Math.Round(Convert.ToDecimal(reader["STANDARD_FEE"])))
-                    };
+                        courses.Add(MapToObject<Course>(reader));
+                    }
                 }
-                return null;
+
+                int totalRecords = 0;
+                if (pTotal.Value != null && int.TryParse(pTotal.Value.ToString(), out var t)) totalRecords = t;
+
+                return new PaginatedResponse<Course>
+                {
+                    Data = courses,
+                    TotalRecords = totalRecords,
+                    PageNumber = pageNumber,
+                    PageSize = pageSize
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in GetCoursesAsync");
+                return new PaginatedResponse<Course> { Data = new List<Course>(), TotalRecords = 0, PageNumber = pageNumber, PageSize = pageSize };
             }
         }
 
-        /// <summary>
-        /// Tạo khóa học mới: kiểm tra mã khóa học trùng trước, sau khi INSERT truy vấn lại bản ghi vừa tạo.
-        /// </summary>
+        public async Task<Course?> GetCourseByIdAsync(int id)
+        {
+            try
+            {
+                var list = await ExecuteStoredProcedureQueryAsync<Course>("SP_GET_COURSE_BY_ID", new { p_id = id });
+                return list.FirstOrDefault();
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Fallback to Admin connection for public access (e.g. QR scan without login)
+                var results = new List<Course>();
+                using var connection = await GetAdminConnectionAsync();
+                using var command = new OracleCommand("SP_GET_COURSE_BY_ID", connection);
+                command.CommandType = CommandType.StoredProcedure;
+                command.Parameters.Add("p_id", OracleDbType.Int32).Value = id;
+                
+                // Manually add cursor if not added by helper (helper adds it if missing, here we do it manually)
+                command.Parameters.Add("p_cursor", OracleDbType.RefCursor).Direction = ParameterDirection.Output;
+
+                using var reader = await command.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    results.Add(MapToObject<Course>(reader));
+                }
+                return results.FirstOrDefault();
+            }
+        }
+
         public async Task<ApiResponse<Course>> CreateCourseAsync(CourseCreateDto dto)
         {
             try
             {
-                // Kiểm tra mã khóa học đã tồn tại
-                var existingSql = "SELECT COUNT(*) FROM QLTT_ADMIN.KHOA_HOC WHERE MA_KHOA_HOC = :coursecode";
-                var exists = Convert.ToInt32(await ExecuteScalarAsync(existingSql, new { coursecode = dto.CourseCode }));
-
-                if (exists > 0)
+                using var conn = await GetConnectionAsync();
+                using var cmdCheck = new OracleCommand("SP_CHECK_COURSE_CODE_EXISTS", conn);
+                cmdCheck.CommandType = CommandType.StoredProcedure;
+                cmdCheck.Parameters.Add("p_code", OracleDbType.Varchar2).Value = dto.CourseCode;
+                cmdCheck.Parameters.Add("p_exclude_id", OracleDbType.Int32).Value = DBNull.Value;
+                var pCount = cmdCheck.Parameters.Add("p_count", OracleDbType.Int32);
+                pCount.Direction = ParameterDirection.Output;
+                await cmdCheck.ExecuteNonQueryAsync();
+                
+                if (Convert.ToInt32(pCount.Value.ToString()) > 0)
                 {
-                    return new ApiResponse<Course>
-                    {
-                        Success = false,
-                        Message = "Mã khóa học đã tồn tại"
-                    };
+                    return new ApiResponse<Course> { Success = false, Message = "Mã khóa học đã tồn tại" };
                 }
 
-                var sql = @"
-                    INSERT INTO QLTT_ADMIN.KHOA_HOC 
-                    (MA_KHOA_HOC, TEN_KHOA_HOC, MO_TA, HOC_PHI_TIEU_CHUAN)
-                    VALUES (:coursecode, :coursename, :description, :standardfee)";
-
-                var parameters = new
-                {
-                    coursecode = dto.CourseCode,
-                    coursename = dto.CourseName,
-                    description = dto.Description,
-                    standardfee = dto.StandardFee
-                };
-
-                await ExecuteNonQueryAsync(sql, parameters);
-
-                // Lấy thông tin khóa học vừa tạo
-                var newCourse = await ExecuteQuerySingleAsync<Course>(
-                        @"SELECT ID_KHOA_HOC AS COURSE_ID, MA_KHOA_HOC AS COURSE_CODE, TEN_KHOA_HOC AS COURSE_NAME, MO_TA AS DESCRIPTION, HOC_PHI_TIEU_CHUAN AS STANDARD_FEE 
-                                            FROM QLTT_ADMIN.KHOA_HOC WHERE MA_KHOA_HOC = :coursecode",
-                        new { coursecode = dto.CourseCode });
-
-                return new ApiResponse<Course>
-                {
-                    Success = true,
-                    Message = "Tạo khóa học thành công",
-                    Data = newCourse
-                };
+                var list = await ExecuteStoredProcedureQueryAsync<Course>("SP_CREATE_COURSE", new { 
+                    p_code = dto.CourseCode,
+                    p_name = dto.CourseName,
+                    p_desc = dto.Description,
+                    p_fee = dto.StandardFee
+                });
+                
+                return new ApiResponse<Course> { Success = true, Message = "Tạo khóa học thành công", Data = list.FirstOrDefault() };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error creating course");
-                return new ApiResponse<Course>
-                {
-                    Success = false,
-                    Message = "Có lỗi xảy ra khi tạo khóa học"
-                };
+                return new ApiResponse<Course> { Success = false, Message = "Có lỗi xảy ra khi tạo khóa học" };
             }
         }
 
-        /// <summary>
-        /// Cập nhật khóa học: kiểm tra tồn tại, kiểm tra trùng mã (trừ chính nó) rồi thực hiện UPDATE.
-        /// </summary>
         public async Task<ApiResponse<Course>> UpdateCourseAsync(CourseUpdateDto dto)
         {
             try
             {
-                // Kiểm tra khóa học tồn tại
                 var course = await GetCourseByIdAsync(dto.CourseId);
-                if (course == null)
+                if (course == null) return new ApiResponse<Course> { Success = false, Message = "Không tìm thấy khóa học" };
+
+                using var conn = await GetConnectionAsync();
+                using var cmdCheck = new OracleCommand("SP_CHECK_COURSE_CODE_EXISTS", conn);
+                cmdCheck.CommandType = CommandType.StoredProcedure;
+                cmdCheck.Parameters.Add("p_code", OracleDbType.Varchar2).Value = dto.CourseCode;
+                cmdCheck.Parameters.Add("p_exclude_id", OracleDbType.Int32).Value = dto.CourseId;
+                var pCount = cmdCheck.Parameters.Add("p_count", OracleDbType.Int32);
+                pCount.Direction = ParameterDirection.Output;
+                await cmdCheck.ExecuteNonQueryAsync();
+                
+                if (Convert.ToInt32(pCount.Value.ToString()) > 0)
                 {
-                    return new ApiResponse<Course>
-                    {
-                        Success = false,
-                        Message = "Không tìm thấy khóa học"
-                    };
+                    return new ApiResponse<Course> { Success = false, Message = "Mã khóa học đã tồn tại" };
                 }
 
-                // Kiểm tra mã khóa học trùng (ngoại trừ chính nó)
-                var existingSql = @"
-                    SELECT COUNT(*) FROM QLTT_ADMIN.KHOA_HOC 
-                    WHERE MA_KHOA_HOC = :coursecode AND ID_KHOA_HOC != :courseid";
-                var exists = Convert.ToInt32(await ExecuteScalarAsync(existingSql,
-                    new { coursecode = dto.CourseCode, courseid = dto.CourseId }));
+                using var cmdUp = new OracleCommand("SP_UPDATE_COURSE", conn);
+                cmdUp.CommandType = CommandType.StoredProcedure;
+                cmdUp.Parameters.Add("p_id", OracleDbType.Int32).Value = dto.CourseId;
+                cmdUp.Parameters.Add("p_code", OracleDbType.Varchar2).Value = dto.CourseCode;
+                cmdUp.Parameters.Add("p_name", OracleDbType.NVarchar2).Value = dto.CourseName;
+                cmdUp.Parameters.Add("p_desc", OracleDbType.NVarchar2).Value = dto.Description;
+                cmdUp.Parameters.Add("p_fee", OracleDbType.Decimal).Value = dto.StandardFee;
+                await cmdUp.ExecuteNonQueryAsync();
 
-                if (exists > 0)
-                {
-                    return new ApiResponse<Course>
-                    {
-                        Success = false,
-                        Message = "Mã khóa học đã tồn tại"
-                    };
-                }
-
-                var sql = @"
-                    UPDATE QLTT_ADMIN.KHOA_HOC SET
-                        MA_KHOA_HOC = :coursecode,
-                        TEN_KHOA_HOC = :coursename,
-                        MO_TA = :description,
-                        HOC_PHI_TIEU_CHUAN = :standardfee
-                    WHERE ID_KHOA_HOC = :courseid";
-
-                var parameters = new
-                {
-                    coursecode = dto.CourseCode,
-                    coursename = dto.CourseName,
-                    description = dto.Description,
-                    standardfee = dto.StandardFee,
-                    courseid = dto.CourseId
-                };
-
-                await ExecuteNonQueryAsync(sql, parameters);
-
-                var updatedCourse = await GetCourseByIdAsync(dto.CourseId);
-
-                return new ApiResponse<Course>
-                {
-                    Success = true,
-                    Message = "Cập nhật khóa học thành công",
-                    Data = updatedCourse
-                };
+                var updated = await GetCourseByIdAsync(dto.CourseId);
+                return new ApiResponse<Course> { Success = true, Message = "Cập nhật khóa học thành công", Data = updated };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error updating course");
-                return new ApiResponse<Course>
-                {
-                    Success = false,
-                    Message = "Có lỗi xảy ra khi cập nhật khóa học"
-                };
+                return new ApiResponse<Course> { Success = false, Message = "Có lỗi xảy ra khi cập nhật khóa học" };
             }
         }
 
-        /// <summary>
-        /// Xóa khóa học: chỉ cho phép nếu chưa có bản ghi lớp học (CLASSES) tham chiếu.
-        /// </summary>
         public async Task<ApiResponse<bool>> DeleteCourseAsync(int id)
         {
+            using var conn = await GetConnectionAsync();
+            using var cmd = new OracleCommand("SP_DELETE_COURSE", conn);
+            cmd.CommandType = CommandType.StoredProcedure;
+            cmd.Parameters.Add("p_id", OracleDbType.Int32).Value = id;
+            var pRow = cmd.Parameters.Add("p_rowcount", OracleDbType.Int32);
+            pRow.Direction = ParameterDirection.Output;
+            
             try
             {
-                // Kiểm tra khóa học có lớp học không
-                var classSql = "SELECT COUNT(*) FROM QLTT_ADMIN.LOP_HOC WHERE ID_KHOA_HOC = :id";
-                var hasClasses = Convert.ToInt32(await ExecuteScalarAsync(classSql, new { id }));
-
-                if (hasClasses > 0)
-                {
-                    return new ApiResponse<bool>
-                    {
-                        Success = false,
-                        Message = "Không thể xóa khóa học đã có lớp học"
-                    };
-                }
-
-                var sql = "DELETE FROM QLTT_ADMIN.KHOA_HOC WHERE ID_KHOA_HOC = :id";
-                var rowsAffected = await ExecuteNonQueryAsync(sql, new { id });
-
-                if (rowsAffected == 0)
-                {
-                    return new ApiResponse<bool>
-                    {
-                        Success = false,
-                        Message = "Không tìm thấy khóa học"
-                    };
-                }
-
-                return new ApiResponse<bool>
-                {
-                    Success = true,
-                    Message = "Xóa khóa học thành công",
-                    Data = true
-                };
+                await cmd.ExecuteNonQueryAsync();
             }
-            catch (Exception ex)
+            catch (OracleException oex) when (oex.Number == 2292)
             {
-                _logger.LogError(ex, "Error deleting course");
-                return new ApiResponse<bool>
-                {
-                    Success = false,
-                    Message = "Có lỗi xảy ra khi xóa khóa học"
-                };
+                return new ApiResponse<bool> { Success = false, Message = "Không thể xóa khóa học đã có lớp học" };
             }
+
+            int affected = 0;
+            if (pRow.Value != null && int.TryParse(pRow.Value.ToString(), out var a)) affected = a;
+            
+            if (affected == 0) return new ApiResponse<bool> { Success = false, Message = "Không tìm thấy khóa học" };
+            
+            return new ApiResponse<bool> { Success = true, Message = "Xóa khóa học thành công", Data = true };
         }
 
-        /// <summary>
-        /// Lấy danh sách tất cả khóa học (có thể dùng cho hiển thị tổng quan). Fallback admin nếu phiên user hết hạn.
-        /// </summary>
         public async Task<List<Course>> GetAllCoursesAsync()
         {
-            var sql = @"SELECT 
-                            ID_KHOA_HOC       AS COURSE_ID,
-                            MA_KHOA_HOC       AS COURSE_CODE,
-                            TEN_KHOA_HOC      AS COURSE_NAME,
-                            MO_TA             AS DESCRIPTION,
-                            HOC_PHI_TIEU_CHUAN AS STANDARD_FEE
-                        FROM QLTT_ADMIN.KHOA_HOC ORDER BY TEN_KHOA_HOC";
-            using var conn = await GetConnectionAsync();
-            using var cmd = new OracleCommand(sql, conn);
-            using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.Default);
-            var list = new List<Course>();
-            while (await reader.ReadAsync())
-            {
-                list.Add(new Course
-                {
-                    CourseId = reader.GetInt32(reader.GetOrdinal("COURSE_ID")),
-                    CourseCode = reader.IsDBNull(reader.GetOrdinal("COURSE_CODE")) ? null : reader.GetString(reader.GetOrdinal("COURSE_CODE")),
-                    CourseName = reader.IsDBNull(reader.GetOrdinal("COURSE_NAME")) ? null : reader.GetString(reader.GetOrdinal("COURSE_NAME")),
-                    Description = reader.IsDBNull(reader.GetOrdinal("DESCRIPTION")) ? string.Empty : reader.GetString(reader.GetOrdinal("DESCRIPTION")),
-                    StandardFee = reader.IsDBNull(reader.GetOrdinal("STANDARD_FEE")) ? 0 : Convert.ToInt32(Math.Round(Convert.ToDecimal(reader["STANDARD_FEE"])))
-                });
-            }
-            return list;
+            return await ExecuteStoredProcedureQueryAsync<Course>("SP_GET_ALL_COURSES");
         }
     }
 }

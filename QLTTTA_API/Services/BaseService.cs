@@ -131,38 +131,6 @@ namespace QLTTTA_API.Services
             return results;
         }
 
-        /// <summary>
-        /// Thực thi SELECT nhưng luôn dùng kết nối admin (bỏ qua per-user). Dùng cho fallback quyền.
-        /// </summary>
-        protected async Task<List<T>> ExecuteQueryAdminAsync<T>(string sql, object? parameters = null,
-            Func<OracleDataReader, T>? mapper = null) where T : new()
-        {
-            var results = new List<T>();
-            try
-            {
-                using var connection = await GetAdminConnectionAsync();
-                using var command = new OracleCommand(sql, connection);
-                if (parameters != null)
-                {
-                    AddParameters(command, parameters);
-                }
-                using var reader = await command.ExecuteReaderAsync();
-                while (await reader.ReadAsync())
-                {
-                    results.Add(mapper != null ? mapper(reader) : MapToObject<T>(reader));
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error executing admin query: {SQL}", sql);
-                throw;
-            }
-            return results;
-        }
-
-        /// <summary>
-        /// Thực thi SELECT lấy duy nhất 1 dòng (hoặc null nếu không có). Mapper tùy chọn.
-        /// </summary>
         protected async Task<T?> ExecuteQuerySingleAsync<T>(string sql, object? parameters = null,
             Func<OracleDataReader, T>? mapper = null) where T : class, new()
         {
@@ -240,11 +208,60 @@ namespace QLTTTA_API.Services
             }
         }
 
+        protected async Task<List<T>> ExecuteStoredProcedureQueryAsync<T>(string spName, object? parameters = null) where T : new()
+        {
+            var results = new List<T>();
+            try
+            {
+                using var connection = await GetConnectionAsync();
+                using var command = new OracleCommand(spName, connection);
+                command.CommandType = CommandType.StoredProcedure;
+
+                if (parameters != null)
+                {
+                    AddParameters(command, parameters);
+                }
+
+                // Assume output cursor is named p_cursor if not provided?
+                // Or just execute reader?
+                // If the SP returns a cursor, we need to bind it?
+                // Most of my SPs use p_cursor OUT SYS_REFCURSOR.
+                // But OracleCommand.ExecuteReaderAsync can automatically pick up the first cursor?
+                // No, usually need to bind it.
+                // But if I use `ExecuteReader`, I need to bind the RefCursor parameter.
+                // I'll assume the caller handles parameters if complex, but for simple query SPs, I need to add p_cursor.
+                // I'll add "p_cursor" as Output RefCursor.
+                
+                var hasCursor = false;
+                foreach (OracleParameter p in command.Parameters)
+                {
+                    if (p.OracleDbType == OracleDbType.RefCursor) hasCursor = true;
+                }
+                
+                if (!hasCursor)
+                {
+                    command.Parameters.Add("p_cursor", OracleDbType.RefCursor).Direction = ParameterDirection.Output;
+                }
+
+                using var reader = await command.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    results.Add(MapToObject<T>(reader));
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error executing SP query: {SP}", spName);
+                throw;
+            }
+            return results;
+        }
+
         /// <summary>
         /// Thêm parameters vào OracleCommand: lấy tất cả property của object truyền vào và tạo tham số :propertyname.
         /// Chuyển Null sang DBNull.Value.
         /// </summary>
-        private void AddParameters(OracleCommand command, object parameters)
+        protected void AddParameters(OracleCommand command, object parameters)
         {
             var properties = parameters.GetType().GetProperties();
             foreach (var property in properties)
@@ -257,7 +274,7 @@ namespace QLTTTA_API.Services
         /// <summary>
         /// Ánh xạ một dòng OracleDataReader sang object kiểu T bằng reflection, có xử lý Nullable.
         /// </summary>
-        private T MapToObject<T>(OracleDataReader reader) where T : new()
+        protected T MapToObject<T>(OracleDataReader reader) where T : new()
         {
             var obj = new T();
             var properties = typeof(T).GetProperties();
@@ -305,7 +322,7 @@ namespace QLTTTA_API.Services
         }
 
         // Provide alias + base names for known properties so mapping works regardless of SELECT aliases.
-        private IEnumerable<string> GetPossibleColumnNames(string propertyName)
+        protected IEnumerable<string> GetPossibleColumnNames(string propertyName)
         {
             // Normalize switch for known models
             switch (propertyName)
@@ -318,16 +335,6 @@ namespace QLTTTA_API.Services
                 case "DateOfBirth": return new[] { "DATE_OF_BIRTH", "NGAY_SINH", GetColumnName(propertyName) };
                 case "PhoneNumber": return new[] { "PHONE_NUMBER", "SO_DIEN_THOAI", GetColumnName(propertyName) };
                 case "Address": return new[] { "ADDRESS", "DIA_CHI", GetColumnName(propertyName) };
-
-                // Course
-                case "CourseId": return new[] { "ID_KHOA_HOC", "COURSE_ID", GetColumnName(propertyName) };
-                case "CourseCode": return new[] { "MA_KHOA_HOC", "COURSE_CODE", GetColumnName(propertyName) };
-                case "CourseName": return new[] { "COURSE_NAME", "TEN_KHOA_HOC", GetColumnName(propertyName) };
-                case "Description": return new[] { "DESCRIPTION", "MO_TA", GetColumnName(propertyName) };
-                case "StandardFee": return new[] { "STANDARD_FEE", "HOC_PHI_TIEU_CHUAN", GetColumnName(propertyName) };
-
-                // Class
-                case "ClassId": return new[] { "CLASS_ID", "ID_LOP_HOC", GetColumnName(propertyName) };
                 case "ClassCode": return new[] { "CLASS_CODE", "MA_LOP_HOC", GetColumnName(propertyName) };
                 case "ClassName": return new[] { "CLASS_NAME", "TEN_LOP_HOC", GetColumnName(propertyName) };
                 case "StartDate": return new[] { "START_DATE", "NGAY_BAT_DAU", GetColumnName(propertyName) };
@@ -335,22 +342,29 @@ namespace QLTTTA_API.Services
                 case "MaxSize": return new[] { "MAX_SIZE", "SI_SO_TOI_DA", GetColumnName(propertyName) };
                 case "TeacherId": return new[] { "TEACHER_ID", "ID_GIANG_VIEN", GetColumnName(propertyName) };
                 case "ApprovedCount": return new[] { "APPROVED_COUNT", GetColumnName(propertyName) };
-
-                // Schedule
-                case "ScheduleId": return new[] { "SCHEDULE_ID", "ID_LICH_HOC", GetColumnName(propertyName) };
-                case "DayOfWeek": return new[] { "DAY_OF_WEEK", "THU_TRONG_TUAN", GetColumnName(propertyName) };
-                case "StartTime": return new[] { "START_TIME", "GIO_BAT_DAU", GetColumnName(propertyName) };
-                case "EndTime": return new[] { "END_TIME", "GIO_KET_THUC", GetColumnName(propertyName) };
-                case "ScheduleText": return new[] { "SCHEDULE_TEXT", GetColumnName(propertyName) };
-
-                // Registration
-                case "RegistrationId": return new[] { "REGISTRATION_ID", "ID_DANG_KY", GetColumnName(propertyName) };
-                case "RegistrationCode": return new[] { "REGISTRATION_CODE", "MA_DANG_KY", GetColumnName(propertyName) };
-                case "RegistrationDate": return new[] { "REGISTRATION_DATE", "NGAY_DANG_KY", GetColumnName(propertyName) };
                 case "Status": return new[] { "STATUS", "TRANG_THAI", GetColumnName(propertyName) };
                 case "StudyDate": return new[] { "STUDY_DATE", "NGAY_HOC", GetColumnName(propertyName) };
                 case "StudentName": return new[] { "STUDENT_NAME", "HO_TEN", GetColumnName(propertyName) };
                 case "StaffId": return new[] { "STAFF_ID", "ID_NHAN_VIEN_DUYET", GetColumnName(propertyName) };
+                case "StandardFee": return new[] { "HOC_PHI_TIEU_CHUAN", "HOC_PHI", GetColumnName(propertyName) };
+
+                // Invoice / Payment
+                case "InvoiceId": return new[] { "INVOICE_ID", "ID_HOA_DON", GetColumnName(propertyName) };
+                case "InvoiceCode": return new[] { "INVOCE_CODE", "MA_HOA_DON", GetColumnName(propertyName) };
+                case "CreatedDate": return new[] { "CREATED_DATE", "NGAY_TAO", GetColumnName(propertyName) };
+                case "DueDate": return new[] { "DUE_DATE", "NGAY_HET_HAN", GetColumnName(propertyName) };
+                case "Amount": return new[] { "AMOUNT", "SO_TIEN", GetColumnName(propertyName) };
+                case "PaymentId": return new[] { "PAYMENT_ID", "ID_THANH_TOAN", GetColumnName(propertyName) };
+                case "PaymentDate": return new[] { "PAYMENT_DATE", "NGAY_THANH_TOAN", GetColumnName(propertyName) };
+                case "PaymentMethod": return new[] { "PAYMENT_METHOD", "PHUONG_THUC_THANH_TOAN", GetColumnName(propertyName) };
+                
+                // Signature fields
+                case "SignatureBase64": return new[] { "SIGNATURE_BASE64", "CHU_KY_BASE64", GetColumnName(propertyName) };
+                case "Algorithm": return new[] { "ALGORITHM", "THUAT_TOAN", GetColumnName(propertyName) };
+                case "AccountantId": return new[] { "ACCOUNTANT_ID", "ID_KE_TOAN_KY", GetColumnName(propertyName) };
+                case "SignedDate": return new[] { "SIGNED_DATE", "NGAY_KY", GetColumnName(propertyName) };
+                case "SignatureImageBase64": return new[] { "SIGNATURE_IMAGE_BASE64", "CHU_KY_HINH_BASE64", GetColumnName(propertyName) };
+                case "IsPrinted": return new[] { "IS_PRINTED", "DA_IN", GetColumnName(propertyName) };
 
                 // Account / Role
                 case "UserId": return new[] { "USER_ID", "ID_NGUOI_DUNG", GetColumnName(propertyName) };
@@ -358,6 +372,8 @@ namespace QLTTTA_API.Services
                 case "Password": return new[] { "PASSWORD", "MAT_KHAU", GetColumnName(propertyName) };
                 case "Email": return new[] { "EMAIL", GetColumnName(propertyName) };
                 case "Role": return new[] { "ROLE", "TEN_VAI_TRO", GetColumnName(propertyName) };
+                case "RoleId": return new[] { "ROLE_ID", "ID_VAI_TRO", GetColumnName(propertyName) };
+                case "IsActive": return new[] { "IS_ACTIVE", "TRANG_THAI_KICH_HOAT", GetColumnName(propertyName) };
 
                 default:
                     return new[] { GetColumnName(propertyName) };
@@ -367,7 +383,7 @@ namespace QLTTTA_API.Services
         /// <summary>
         /// Chuyển tên property C# sang tên cột Oracle tương ứng (mapping đặc biệt một số thuộc tính).
         /// </summary>
-        private string GetColumnName(string propertyName)
+        protected string GetColumnName(string propertyName)
         {
             // Map C# property names to Oracle column names
             return propertyName switch
@@ -412,6 +428,23 @@ namespace QLTTTA_API.Services
                 "Password" => "MAT_KHAU",
                 "Email" => "EMAIL",
                 "Role" => "TEN_VAI_TRO",
+                "IsActive" => "TRANG_THAI_KICH_HOAT",
+                // INVOICE / PAYMENT
+                "InvoiceId" => "ID_HOA_DON",
+                "InvoiceCode" => "MA_HOA_DON",
+                "CreatedDate" => "NGAY_TAO",
+                "DueDate" => "NGAY_HET_HAN",
+                "Amount" => "SO_TIEN",
+                "PaymentId" => "ID_THANH_TOAN",
+                "PaymentDate" => "NGAY_THANH_TOAN",
+                "PaymentMethod" => "PHUONG_THUC_THANH_TOAN",
+                // Signature fields
+                "SignatureBase64" => "CHU_KY_BASE64",
+                "Algorithm" => "THUAT_TOAN",
+                "AccountantId" => "ID_KE_TOAN_KY",
+                "SignedDate" => "NGAY_KY",
+                "SignatureImageBase64" => "CHU_KY_HINH_BASE64",
+                "IsPrinted" => "DA_IN",
                 _ => propertyName.ToUpper()
             };
         }
@@ -419,7 +452,7 @@ namespace QLTTTA_API.Services
         /// <summary>
         /// Kiểm tra reader có chứa cột tên columnName (không phân biệt hoa thường).
         /// </summary>
-        private bool HasColumn(OracleDataReader reader, string columnName)
+        protected bool HasColumn(OracleDataReader reader, string columnName)
         {
             for (int i = 0; i < reader.FieldCount; i++)
             {

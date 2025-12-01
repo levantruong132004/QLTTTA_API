@@ -13,7 +13,7 @@ namespace QLTTTA_API.Services
         void Set(string sessionId, string username, string password, TimeSpan ttl);
         /// <summary>Thử lấy credential theo SessionId. Trả về false nếu hết hạn hoặc không tồn tại.</summary>
         bool TryGet(string sessionId, out (string Username, string Password, DateTime Expiry) cred);
-        /// <summary>Xóa credential theo SessionId (ví dụ khi logout).</summary>
+        /// <summary>Xóa credential theo SessionId (khi logout).</summary>
         void Remove(string sessionId);
     }
 
@@ -225,7 +225,7 @@ namespace QLTTTA_API.Services
             {
                 using var tag = new OracleCommand("BEGIN DBMS_SESSION.SET_IDENTIFIER(:id); DBMS_APPLICATION_INFO.SET_CLIENT_INFO(:info); END;", userConn)
                 { BindByName = true };
-                tag.Parameters.Add(":id", OracleDbType.Varchar2).Value = sessionId;
+                tag.Parameters.Add(":id", OracleDbType.Varchar2).Value = cred.Username;
                 var info = $"sid={sessionId};device={deviceType};user={cred.Username}";
                 tag.Parameters.Add(":info", OracleDbType.Varchar2).Value = info;
                 await tag.ExecuteNonQueryAsync(ct);

@@ -1,0 +1,43 @@
+@model QLTTTA_WEB.Models.CourseViewModel
+@{
+    ViewData["Title"] = "Sửa khóa học";
+}
+<div class="retro-card">
+    <div class="retro-card-header">
+        <h2 class="retro-title"><i class="fas fa-edit"></i> Sửa khóa học</h2>
+    </div>
+    <div class="retro-card-body">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success">@TempData["SuccessMessage"]</div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+        }
+
+        <form asp-action="EditCourse" method="post" class="row g-3">
+            <input type="hidden" name="courseId" value="@Model.CourseId" />
+            <div class="col-md-3">
+                <label class="form-label">Mã khóa học</label>
+                <input type="text" name="courseCode" value="@Model.CourseCode" class="form-control" readonly style="background-color: #e9ecef;" />
+            </div>
+            <div class="col-md-5">
+                <label class="form-label">Tên khóa học</label>
+                <input type="text" name="courseName" value="@Model.CourseName" class="form-control" readonly style="background-color: #e9ecef;" />
+            </div>
+            <div class="col-md-12">
+                <label class="form-label">Mô tả</label>
+                <textarea name="description" class="form-control" rows="3">@Model.Description</textarea>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Học phí chuẩn</label>
+                <input type="number" name="standardFee" value="@Model.StandardFee" class="form-control" required />
+            </div>
+            <div class="col-12">
+                <button class="btn btn-primary">Lưu</button>
+                <a class="btn btn-secondary" asp-action="Courses">Quay lại</a>
+            </div>
+        </form>
+    </div>
+</div>

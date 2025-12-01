@@ -75,6 +75,7 @@ namespace QLTTTA_API.Models
         public string Email { get; set; } = string.Empty;
         public int RoleId { get; set; }
         public string Role { get; set; } = string.Empty;
+        public int IsActive { get; set; }
     }
 
     // ===== OTP + Forgot Password DTOs =====

@@ -1,0 +1,79 @@
+@model QLTTTA_WEB.Models.AdminClassItem
+@{
+    ViewData["Title"] = "Thêm lớp học";
+}
+<div class="retro-card">
+    <div class="retro-card-header">
+        <h2 class="retro-title"><i class="fas fa-plus-circle"></i> Thêm lớp học mới</h2>
+    </div>
+    <div class="retro-card-body">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success">@TempData["SuccessMessage"]</div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+        }
+
+        <form asp-action="CreateClass" method="post" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Mã lớp</label>
+                <input type="text" name="classCode" class="form-control" required />
+            </div>
+            <div class="col-md-5">
+                <label class="form-label">Tên lớp</label>
+                <input type="text" name="className" class="form-control" required />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Khóa học</label>
+                <select name="courseId" class="form-select" required>
+                    <option value="">-- Chọn khóa học --</option>
+                    @if (ViewBag.Courses != null)
+                    {
+                        foreach (var c in ViewBag.Courses)
+                        {
+                            if (ViewBag.CourseId != null && (int)ViewBag.CourseId == c.CourseId)
+                            {
+                                <option value="@c.CourseId" selected>@c.CourseName (@c.CourseCode)</option>
+                            }
+                            else
+                            {
+                                <option value="@c.CourseId">@c.CourseName (@c.CourseCode)</option>
+                            }
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Giảng viên</label>
+                <select name="teacherId" class="form-select" required>
+                    <option value="">-- Chọn giảng viên --</option>
+                    @if (ViewBag.Teachers != null)
+                    {
+                        foreach (var t in ViewBag.Teachers)
+                        {
+                            <option value="@t.TeacherId">@t.FullName (@t.TeacherCode)</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Sĩ số tối đa</label>
+                <input type="number" name="maxSize" class="form-control" value="30" required />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Ngày bắt đầu</label>
+                <input type="date" name="startDate" class="form-control" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Ngày kết thúc</label>
+                <input type="date" name="endDate" class="form-control" />
+            </div>
+            <div class="col-12">
+                <button class="btn btn-success">Thêm mới</button>
+                <a class="btn btn-secondary" asp-action="Classes">Quay lại</a>
+            </div>
+        </form>
+    </div>
+</div>

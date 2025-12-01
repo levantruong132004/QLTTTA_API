@@ -1,3 +1,5 @@
+
+-----------------------------------------------------------------------------------------------------
 -- ============================================================================
 -- Student-only auditing for HOC_VIEN
 -- Components:
@@ -18,78 +20,56 @@
 --   - Other roles are unaffected because function guards both trigger and FGA condition.
 -- ============================================================================
 
-   set serveroutput on
+set serveroutput on
 
 -- 1) Helper function: detect Student based on session identity
-begin
-   execute immediate 'DROP FUNCTION IS_STUDENT_CTX';
-exception
-   when others then
-      null;
-end;
+BEGIN
+  EXECUTE IMMEDIATE 'DROP FUNCTION IS_STUDENT_CTX';
+EXCEPTION WHEN OTHERS THEN NULL; END;
 /
 
-create or replace function is_student_ctx return number
-   authid current_user
-as
-   v_ident     varchar2(128);
-   v_user      varchar2(128);
-   v_role_id   number;
-   v_role_name nvarchar2(100);
-   v_user_id   number;
-begin
-   v_ident := sys_context(
-      'USERENV',
-      'CLIENT_IDENTIFIER'
-   );
-   v_user := sys_context(
-      'USERENV',
-      'SESSION_USER'
-   );
-   if v_ident is null
-   or length(trim(v_ident)) = 0 then
-      v_ident := v_user;
-   end if;
+CREATE OR REPLACE FUNCTION IS_STUDENT_CTX RETURN NUMBER
+AUTHID CURRENT_USER
+AS
+  v_ident       VARCHAR2(128);
+  v_user        VARCHAR2(128);
+  v_role_id     NUMBER;
+  v_role_name   NVARCHAR2(100);
+  v_user_id     NUMBER;
+BEGIN
+  v_ident := SYS_CONTEXT('USERENV','CLIENT_IDENTIFIER');
+  v_user  := SYS_CONTEXT('USERENV','SESSION_USER');
+  IF v_ident IS NULL OR LENGTH(TRIM(v_ident)) = 0 THEN
+    v_ident := v_user;
+  END IF;
 
-   begin
-      select tk.id_nguoi_dung,
-             tk.id_vai_tro,
-             vt.ten_vai_tro
-        into
-         v_user_id,
-         v_role_id,
-         v_role_name
-        from qltt_admin.tai_khoan tk
-        join qltt_admin.vai_tro vt
-      on vt.id_vai_tro = tk.id_vai_tro
-       where upper(tk.ten_dang_nhap) = upper(v_ident)
-         and tk.trang_thai_kich_hoat = 1;
-   exception
-      when no_data_found then
-         return 0; -- unknown -> not student
-   end;
+  BEGIN
+    SELECT tk.ID_NGUOI_DUNG, tk.ID_VAI_TRO, vt.TEN_VAI_TRO
+      INTO v_user_id, v_role_id, v_role_name
+      FROM QLTT_ADMIN.TAI_KHOAN tk
+      JOIN QLTT_ADMIN.VAI_TRO vt ON vt.ID_VAI_TRO = tk.ID_VAI_TRO
+     WHERE UPPER(tk.TEN_DANG_NHAP) = UPPER(v_ident)
+       AND tk.TRANG_THAI_KICH_HOAT = 1;
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      RETURN 0; -- unknown -> not student
+  END;
 
-   if v_role_id = 1
-   or upper(v_role_name) in ( 'HOCVIEN',
-                              'HỌC VIÊN',
-                              'HOC VIEN' ) then
-      return 1; -- student
-   end if;
-   return 0; -- not student (staff/admin/accountant...)
-end;
+  IF v_role_id = 1 OR UPPER(v_role_name) IN ('HOCVIEN','HỌC VIÊN','HOC VIEN') THEN
+    RETURN 1; -- student
+  END IF;
+  RETURN 0; -- not student (staff/admin/accountant...)
+END;
 /
 SHOW ERRORS FUNCTION IS_STUDENT_CTX
 
 -- 2) Audit table + sequence for DML history
-declare
-   v_cnt number;
-begin
-   select count(*)
-     into v_cnt
-     from user_tables
-    where table_name = 'HOC_VIEN_AUDIT';
-   if v_cnt = 0 then
-      execute immediate q'[
+DECLARE
+  v_cnt NUMBER;
+BEGIN
+  SELECT COUNT(*) INTO v_cnt FROM user_tables WHERE table_name = 'HOC_VIEN_AUDIT';
+  IF v_cnt = 0 THEN
+    EXECUTE IMMEDIATE q'[
       CREATE TABLE HOC_VIEN_AUDIT (
         AUDIT_ID         NUMBER PRIMARY KEY,
         ACTION           VARCHAR2(10),
@@ -107,277 +87,142 @@ begin
         OLD_DATA         CLOB,
         NEW_DATA         CLOB
       )]';
-   end if;
-   select count(*)
-     into v_cnt
-     from user_sequences
-    where sequence_name = 'HOC_VIEN_AUDIT_SEQ';
-   if v_cnt = 0 then
-      execute immediate 'CREATE SEQUENCE HOC_VIEN_AUDIT_SEQ START WITH 1 INCREMENT BY 1 NOCACHE';
-   end if;
-end;
+  END IF;
+  SELECT COUNT(*) INTO v_cnt FROM user_sequences WHERE sequence_name = 'HOC_VIEN_AUDIT_SEQ';
+  IF v_cnt = 0 THEN
+    EXECUTE IMMEDIATE 'CREATE SEQUENCE HOC_VIEN_AUDIT_SEQ START WITH 1 INCREMENT BY 1 NOCACHE';
+  END IF;
+END;
 /
 
 -- 3) Row-level trigger: only logs when current session is Student
-begin
-   execute immediate 'DROP TRIGGER TR_AUD_HOC_VIEN_DML';
-exception
-   when others then
-      null;
-end;
+BEGIN
+  EXECUTE IMMEDIATE 'DROP TRIGGER TR_AUD_HOC_VIEN_DML';
+EXCEPTION WHEN OTHERS THEN NULL; END;
 /
 
-create or replace trigger tr_aud_hoc_vien_dml before
-   insert or update or delete on hoc_vien
-   for each row
-declare
-   v_is_student number := 0;
-   v_username   varchar2(128) := sys_context(
-      'USERENV',
-      'SESSION_USER'
-   );
-   v_client     varchar2(128) := sys_context(
-      'USERENV',
-      'CLIENT_IDENTIFIER'
-   );
-   v_module     varchar2(64) := sys_context(
-      'USERENV',
-      'MODULE'
-   );
-   v_prog       varchar2(64) := sys_context(
-      'USERENV',
-      'PROGRAM'
-   );
-   v_ip         varchar2(64) := sys_context(
-      'USERENV',
-      'IP_ADDRESS'
-   );
-   v_role_id    number;
-   v_role_name  nvarchar2(100);
-   v_student_id number;
-   v_changed    varchar2(4000);
-   v_old        clob;
-   v_new        clob;
-   v_action     varchar2(10);
-   v_row_id     number;
-   procedure detect_role is
-   begin
-      v_is_student := is_student_ctx();
-      if v_is_student = 1 then
-         begin
-            select tk.id_vai_tro,
-                   vt.ten_vai_tro,
-                   tk.id_nguoi_dung
-              into
-               v_role_id,
-               v_role_name,
-               v_student_id
-              from qltt_admin.tai_khoan tk
-              join qltt_admin.vai_tro vt
-            on vt.id_vai_tro = tk.id_vai_tro
-             where upper(tk.ten_dang_nhap) = upper(coalesce(
-                  v_client,
-                  v_username
-               ))
-               and tk.trang_thai_kich_hoat = 1;
-         exception
-            when no_data_found then
-               v_is_student := 0;
-         end;
-      end if;
-   end;
-begin
-   detect_role;
-   if v_is_student <> 1 then
-      return; -- no logging for non-students
-   end if;
+CREATE OR REPLACE TRIGGER TR_AUD_HOC_VIEN_DML
+BEFORE INSERT OR UPDATE OR DELETE ON HOC_VIEN
+FOR EACH ROW
+DECLARE
+  v_is_student NUMBER := 0;
+  v_username   VARCHAR2(128) := SYS_CONTEXT('USERENV','SESSION_USER');
+  v_client     VARCHAR2(128) := SYS_CONTEXT('USERENV','CLIENT_IDENTIFIER');
+  v_module     VARCHAR2(64)  := SYS_CONTEXT('USERENV','MODULE');
+  v_prog       VARCHAR2(64)  := SYS_CONTEXT('USERENV','PROGRAM');
+  v_ip         VARCHAR2(64)  := SYS_CONTEXT('USERENV','IP_ADDRESS');
+  v_role_id    NUMBER;
+  v_role_name  NVARCHAR2(100);
+  v_student_id NUMBER;
+  v_changed    VARCHAR2(4000);
+  v_old        CLOB;
+  v_new        CLOB;
+  v_action     VARCHAR2(10);
+  v_row_id     NUMBER;
+  PROCEDURE detect_role IS
+  BEGIN
+    v_is_student := IS_STUDENT_CTX();
+    IF v_is_student = 1 THEN
+      BEGIN
+        SELECT tk.ID_VAI_TRO, vt.TEN_VAI_TRO, tk.ID_NGUOI_DUNG
+          INTO v_role_id, v_role_name, v_student_id
+          FROM QLTT_ADMIN.TAI_KHOAN tk
+          JOIN QLTT_ADMIN.VAI_TRO vt ON vt.ID_VAI_TRO = tk.ID_VAI_TRO
+         WHERE UPPER(tk.TEN_DANG_NHAP) = UPPER(COALESCE(v_client, v_username))
+           AND tk.TRANG_THAI_KICH_HOAT = 1;
+      EXCEPTION WHEN NO_DATA_FOUND THEN
+        v_is_student := 0;
+      END;
+    END IF;
+  END;
+BEGIN
+  detect_role;
+  IF v_is_student <> 1 THEN
+    RETURN; -- no logging for non-students
+  END IF;
 
   -- Build changed columns (for UPDATE only) -- exclude EMAIL to be schema-agnostic
-   if updating then
-      v_changed := null;
-      if nvl(
-         :old.ho_ten,
-         '¤'
-      ) <> nvl(
-         :new.ho_ten,
-         '¤'
-      ) then
-         v_changed := v_changed || 'HO_TEN,';
-      end if;
-      if nvl(
-         :old.so_dien_thoai,
-         '¤'
-      ) <> nvl(
-         :new.so_dien_thoai,
-         '¤'
-      ) then
-         v_changed := v_changed || 'SO_DIEN_THOAI,';
-      end if;
-      if nvl(
-         :old.dia_chi,
-         '¤'
-      ) <> nvl(
-         :new.dia_chi,
-         '¤'
-      ) then
-         v_changed := v_changed || 'DIA_CHI,';
-      end if;
-      if nvl(
-         :old.gioi_tinh,
-         '¤'
-      ) <> nvl(
-         :new.gioi_tinh,
-         '¤'
-      ) then
-         v_changed := v_changed || 'GIOI_TINH,';
-      end if;
-      if nvl(
-         :old.ngay_sinh,
-         date '0001-01-01'
-      ) <> nvl(
-         :new.ngay_sinh,
-         date '0001-01-01'
-      ) then
-         v_changed := v_changed || 'NGAY_SINH,';
-      end if;
-      if v_changed is not null then
-         v_changed := rtrim(
-            v_changed,
-            ','
-         );
-      end if;
-   end if;
+  IF UPDATING THEN
+    v_changed := NULL;
+    IF NVL(:OLD.HO_TEN, '¤')       <> NVL(:NEW.HO_TEN, '¤')       THEN v_changed := v_changed||'HO_TEN,'; END IF;
+    IF NVL(:OLD.SO_DIEN_THOAI,'¤') <> NVL(:NEW.SO_DIEN_THOAI,'¤') THEN v_changed := v_changed||'SO_DIEN_THOAI,'; END IF;
+    IF NVL(:OLD.DIA_CHI, '¤')      <> NVL(:NEW.DIA_CHI, '¤')      THEN v_changed := v_changed||'DIA_CHI,'; END IF;
+    IF NVL(:OLD.GIOI_TINH,'¤')     <> NVL(:NEW.GIOI_TINH,'¤')     THEN v_changed := v_changed||'GIOI_TINH,'; END IF;
+    IF NVL(:OLD.NGAY_SINH, DATE '0001-01-01') <> NVL(:NEW.NGAY_SINH, DATE '0001-01-01') THEN v_changed := v_changed||'NGAY_SINH,'; END IF;
+    IF v_changed IS NOT NULL THEN v_changed := RTRIM(v_changed, ','); END IF;
+  END IF;
 
   -- Produce OLD/NEW as JSON (works in 21c)
-   if inserting then
-      select
-         json_object(
-            'HO_TEN' value :new.ho_ten,
-                     'SO_DIEN_THOAI' value :new.so_dien_thoai,
-                     'DIA_CHI' value :new.dia_chi,
-                     'GIOI_TINH' value :new.gioi_tinh,
-                     'NGAY_SINH' value to_char(
-               :new.ngay_sinh,
-               'YYYY-MM-DD'
-            )
-         )
-        into v_new
-        from dual;
-   elsif updating then
-      select
-         json_object(
-            'HO_TEN' value :old.ho_ten,
-                     'SO_DIEN_THOAI' value :old.so_dien_thoai,
-                     'DIA_CHI' value :old.dia_chi,
-                     'GIOI_TINH' value :old.gioi_tinh,
-                     'NGAY_SINH' value to_char(
-               :old.ngay_sinh,
-               'YYYY-MM-DD'
-            )
-         )
-        into v_old
-        from dual;
-      select
-         json_object(
-            'HO_TEN' value :new.ho_ten,
-                     'SO_DIEN_THOAI' value :new.so_dien_thoai,
-                     'DIA_CHI' value :new.dia_chi,
-                     'GIOI_TINH' value :new.gioi_tinh,
-                     'NGAY_SINH' value to_char(
-               :new.ngay_sinh,
-               'YYYY-MM-DD'
-            )
-         )
-        into v_new
-        from dual;
-   elsif deleting then
-      select
-         json_object(
-            'HO_TEN' value :old.ho_ten,
-                     'SO_DIEN_THOAI' value :old.so_dien_thoai,
-                     'DIA_CHI' value :old.dia_chi,
-                     'GIOI_TINH' value :old.gioi_tinh,
-                     'NGAY_SINH' value to_char(
-               :old.ngay_sinh,
-               'YYYY-MM-DD'
-            )
-         )
-        into v_old
-        from dual;
-   end if;
+  IF INSERTING THEN
+    SELECT JSON_OBJECT('HO_TEN' VALUE :NEW.HO_TEN,
+                       'SO_DIEN_THOAI' VALUE :NEW.SO_DIEN_THOAI,
+                       'DIA_CHI' VALUE :NEW.DIA_CHI, 'GIOI_TINH' VALUE :NEW.GIOI_TINH,
+                       'NGAY_SINH' VALUE TO_CHAR(:NEW.NGAY_SINH,'YYYY-MM-DD'))
+      INTO v_new FROM dual;
+  ELSIF UPDATING THEN
+    SELECT JSON_OBJECT('HO_TEN' VALUE :OLD.HO_TEN,
+                       'SO_DIEN_THOAI' VALUE :OLD.SO_DIEN_THOAI,
+                       'DIA_CHI' VALUE :OLD.DIA_CHI, 'GIOI_TINH' VALUE :OLD.GIOI_TINH,
+                       'NGAY_SINH' VALUE TO_CHAR(:OLD.NGAY_SINH,'YYYY-MM-DD'))
+      INTO v_old FROM dual;
+    SELECT JSON_OBJECT('HO_TEN' VALUE :NEW.HO_TEN,
+                       'SO_DIEN_THOAI' VALUE :NEW.SO_DIEN_THOAI,
+                       'DIA_CHI' VALUE :NEW.DIA_CHI, 'GIOI_TINH' VALUE :NEW.GIOI_TINH,
+                       'NGAY_SINH' VALUE TO_CHAR(:NEW.NGAY_SINH,'YYYY-MM-DD'))
+      INTO v_new FROM dual;
+  ELSIF DELETING THEN
+    SELECT JSON_OBJECT('HO_TEN' VALUE :OLD.HO_TEN,
+                       'SO_DIEN_THOAI' VALUE :OLD.SO_DIEN_THOAI,
+                       'DIA_CHI' VALUE :OLD.DIA_CHI, 'GIOI_TINH' VALUE :OLD.GIOI_TINH,
+                       'NGAY_SINH' VALUE TO_CHAR(:OLD.NGAY_SINH,'YYYY-MM-DD'))
+      INTO v_old FROM dual;
+  END IF;
 
   -- Determine action and row id for the audit row (can't use INSERTING/UPDATING inside SQL)
-   if inserting then
-      v_action := 'INSERT';
-      v_row_id := :new.id_hoc_vien;
-   elsif updating then
-      v_action := 'UPDATE';
-      v_row_id := :old.id_hoc_vien;
-   elsif deleting then
-      v_action := 'DELETE';
-      v_row_id := :old.id_hoc_vien;
-   end if;
+  IF INSERTING THEN
+    v_action := 'INSERT';
+    v_row_id := :NEW.ID_HOC_VIEN;
+  ELSIF UPDATING THEN
+    v_action := 'UPDATE';
+    v_row_id := :OLD.ID_HOC_VIEN;
+  ELSIF DELETING THEN
+    v_action := 'DELETE';
+    v_row_id := :OLD.ID_HOC_VIEN;
+  END IF;
 
-   insert into hoc_vien_audit (
-      audit_id,
-      action,
-      row_id_hv,
-      student_id,
-      username,
-      role_id,
-      role_name,
-      client_identifier,
-      action_ts,
-      ip_address,
-      module,
-      program,
-      changed_columns,
-      old_data,
-      new_data
-   ) values ( hoc_vien_audit_seq.nextval,
-              v_action,
-              v_row_id,
-              v_student_id,
-              v_username,
-              v_role_id,
-              v_role_name,
-              v_client,
-              systimestamp,
-              v_ip,
-              v_module,
-              v_prog,
-              v_changed,
-              v_old,
-              v_new );
-end;
+  INSERT INTO HOC_VIEN_AUDIT(
+    AUDIT_ID, ACTION, ROW_ID_HV, STUDENT_ID, USERNAME, ROLE_ID, ROLE_NAME,
+    CLIENT_IDENTIFIER, ACTION_TS, IP_ADDRESS, MODULE, PROGRAM,
+    CHANGED_COLUMNS, OLD_DATA, NEW_DATA)
+  VALUES(
+    HOC_VIEN_AUDIT_SEQ.NEXTVAL,
+    v_action,
+    v_row_id,
+    v_student_id, v_username, v_role_id, v_role_name,
+    v_client, SYSTIMESTAMP, v_ip, v_module, v_prog,
+    v_changed, v_old, v_new);
+END;
 /
 SHOW ERRORS TRIGGER TR_AUD_HOC_VIEN_DML
 
 -- 4) FGA policy: audit only when IS_STUDENT_CTX() = 1
-begin
-   dbms_fga.drop_policy(
-      object_schema => 'QLTT_ADMIN',
-      object_name   => 'HOC_VIEN',
-      policy_name   => 'FGA_HV_STUDENT'
-   );
-exception
-   when others then
-      null;
-end;
+BEGIN
+  DBMS_FGA.DROP_POLICY(object_schema => 'QLTT_ADMIN', object_name => 'HOC_VIEN', policy_name => 'FGA_HV_STUDENT');
+EXCEPTION WHEN OTHERS THEN NULL; END;
 /
 
-begin
-   dbms_fga.add_policy(
-      object_schema   => 'QLTT_ADMIN',
-      object_name     => 'HOC_VIEN',
-      policy_name     => 'FGA_HV_STUDENT',
-      audit_condition => 'QLTT_ADMIN.IS_STUDENT_CTX() = 1',
-      statement_types => 'SELECT,UPDATE,DELETE',
-      audit_trail     => dbms_fga.db + dbms_fga.extended,
-      audit_column    => null
-   );
-   dbms_output.put_line('Added FGA policy FGA_HV_STUDENT on HOC_VIEN (student-only).');
-end;
+BEGIN
+  DBMS_FGA.ADD_POLICY(
+    object_schema   => 'QLTT_ADMIN',
+    object_name     => 'HOC_VIEN',
+    policy_name     => 'FGA_HV_STUDENT',
+    audit_condition => 'QLTT_ADMIN.IS_STUDENT_CTX() = 1',
+    statement_types => 'SELECT,UPDATE,DELETE',
+    audit_trail     => DBMS_FGA.DB + DBMS_FGA.EXTENDED,
+    audit_column    => NULL
+  );
+  DBMS_OUTPUT.PUT_LINE('Added FGA policy FGA_HV_STUDENT on HOC_VIEN (student-only).');
+END;
 /
 
 -- 5) Quick verification cheatsheet

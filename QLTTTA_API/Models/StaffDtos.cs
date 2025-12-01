@@ -36,4 +36,11 @@ namespace QLTTTA_API.Models.DTOs
         public string? Sex { get; set; }
         public string? Phone { get; set; }
     }
+
+    public class TeacherDto
+    {
+        public int TeacherId { get; set; }
+        public string FullName { get; set; } = string.Empty;
+        public string TeacherCode { get; set; } = string.Empty;
+    }
 }

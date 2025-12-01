@@ -1,0 +1,63 @@
+@model QLTTTA_WEB.Models.StaffAdminItem
+@{
+    ViewData["Title"] = "Cập nhật nhân viên";
+}
+
+<div class="retro-card corner-decorated" style="max-width: 600px; margin: 0 auto;">
+    <div class="retro-card-header text-center">
+        <h2 class="retro-card-title"><i class="fas fa-user-edit"></i> Cập nhật nhân viên</h2>
+    </div>
+    <div class="retro-card-body">
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="retro-alert retro-alert-danger"><div class="retro-alert-content">@TempData["ErrorMessage"]</div></div>
+        }
+
+        <form asp-action="UpdateStaff" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="UserId" value="@Model.UserId" />
+            
+            <div class="mb-3">
+                <label class="form-label">Tên đăng nhập</label>
+                <input class="form-control" value="@Model.Username" disabled />
+                <small class="text-muted">Không thể thay đổi tên đăng nhập</small>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Email <span class="text-danger">*</span></label>
+                <input class="form-control" type="email" name="Email" value="@Model.Email" required />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Vai trò</label>
+                <input class="form-control" value="@Model.RoleName" disabled />
+                <input type="hidden" name="RoleId" value="@Model.RoleId" />
+                <small class="text-muted">Không thể thay đổi vai trò</small>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Họ tên</label>
+                <input class="form-control" value="@Model.FullName" disabled />
+                <input type="hidden" name="FullName" value="@Model.FullName" />
+                <small class="text-muted">Không thể thay đổi họ tên</small>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Giới tính</label>
+                <input class="form-control" value="@Model.Sex" disabled />
+                <input type="hidden" name="Sex" value="@Model.Sex" />
+                <small class="text-muted">Không thể thay đổi giới tính</small>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Số điện thoại</label>
+                <input class="form-control" name="Phone" value="@Model.Phone" />
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <a asp-action="Staff" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Quay lại</a>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Cập nhật</button>
+            </div>
+        </form>
+    </div>
+</div>

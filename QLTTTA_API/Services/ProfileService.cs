@@ -57,114 +57,59 @@ namespace QLTTTA_API.Services
         /// </summary>
         public async Task<StudentProfileDto?> GetMyProfileAsync()
         {
-            // Lấy session (header trước, cookie sau)
-            var sessionHeader = _httpContextAccessor.HttpContext?.Request?.Headers["X-Session-Id"].FirstOrDefault();
-            var sessionCookie = _httpContextAccessor.HttpContext?.Request?.Cookies["SessionId"];
-            var sessionId = !string.IsNullOrWhiteSpace(sessionHeader) ? sessionHeader : sessionCookie;
-            var deviceType = _httpContextAccessor.HttpContext?.Request?.Headers["X-Device-Type"].FirstOrDefault()?.Trim().ToLowerInvariant() ?? "pc";
-            if (deviceType != "pc" && deviceType != "mobile") deviceType = "pc";
-            
-            if (string.IsNullOrWhiteSpace(sessionId))
-            {
-                _logger.LogWarning("GetMyProfileAsync: thiếu sessionId");
-                return null;
-            }
-
-            // Sử dụng kết nối Admin để đảm bảo quyền truy cập bảng TAI_KHOAN và HOC_VIEN
-            using var conn = await GetAdminConnectionAsync();
-
-            // Tra ID người dùng từ session per-device
-            var columnName = deviceType == "mobile" ? "SESSION_ID_MOBILE" : "SESSION_ID_PC";
-            int? userId = null;
-            string? username = null;
-            string? email = null;
+            // Sử dụng kết nối User (đã được định danh qua OracleUserConnectionProvider)
+            // Nếu không có session hoặc hết hạn, GetConnectionAsync sẽ throw UnauthorizedAccessException
             try
             {
-                using var cmdFind = new OracleCommand($"SELECT ID_NGUOI_DUNG, TEN_DANG_NHAP, EMAIL FROM QLTT_ADMIN.TAI_KHOAN WHERE {columnName} = :sid", conn) { BindByName = true };
-                cmdFind.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sessionId;
-                using var r = await cmdFind.ExecuteReaderAsync(System.Data.CommandBehavior.SingleRow);
+                using var conn = await GetConnectionAsync();
+
+                // Lấy thông tin từ HOC_VIEN. 
+                // Do đã có VPD (Virtual Private Database) hoặc logic quyền, 
+                // query này sẽ chỉ trả về dòng của chính user đó (hoặc ta filter theo user hiện tại).
+                // Tuy nhiên, để chắc chắn và đơn giản, ta có thể join với TAI_KHOAN hoặc chỉ select từ HOC_VIEN 
+                // nếu VPD đã đảm bảo. Ở đây ta query an toàn bằng cách join TAI_KHOAN theo USER.
+                
+                // Cách đơn giản: Query view V_THONGTIN_CANHAN_HV (đã có sẵn logic filter theo user)
+                // Hoặc query bảng HOC_VIEN.
+                // Vì user request yêu cầu "select update học viên" và check audit trên bảng HOC_VIEN,
+                // ta sẽ query bảng HOC_VIEN.
+                
+                // Lấy username hiện tại từ session context DB (do provider đã set)
+                // SELECT SYS_CONTEXT('USERENV', 'SESSION_USER') ...
+                
+                // Sử dụng VIEW V_THONGTIN_CANHAN_HV như user đã kiểm tra thành công.
+                // View này đã có logic filter theo USER hiện tại.
+                var sql = @"SELECT HO_TEN, MA_HOC_VIEN, GIOI_TINH, NGAY_SINH, SO_DIEN_THOAI, DIA_CHI, EMAIL
+                            FROM QLTT_ADMIN.V_THONGTIN_CANHAN_HV";
+
+                using var cmd = new OracleCommand(sql, conn) { BindByName = true };
+                using var r = await cmd.ExecuteReaderAsync(System.Data.CommandBehavior.SingleRow);
+                
                 if (await r.ReadAsync())
                 {
-                    userId = r.IsDBNull(0) ? null : (int?)r.GetInt32(0);
-                    username = r.IsDBNull(1) ? null : r.GetString(1);
-                    email = r.IsDBNull(2) ? null : r.GetString(2);
+                    return new StudentProfileDto
+                    {
+                        HoTen = r.IsDBNull(0) ? null : r.GetString(0),
+                        MaHocVien = r.IsDBNull(1) ? null : r.GetString(1),
+                        GioiTinh = r.IsDBNull(2) ? null : r.GetString(2),
+                        NgaySinh = r.IsDBNull(3) ? null : r.GetDateTime(3),
+                        SoDienThoai = r.IsDBNull(4) ? null : r.GetString(4),
+                        DiaChi = r.IsDBNull(5) ? null : r.GetString(5),
+                        Email = r.IsDBNull(6) ? null : r.GetString(6)
+                    };
                 }
+                
+                return null;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return null;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "GetMyProfileAsync: lỗi tìm user theo session");
+                _logger.LogError(ex, "GetMyProfileAsync: lỗi");
                 return null;
             }
-
-            if (!userId.HasValue)
-            {
-                _logger.LogWarning("GetMyProfileAsync: không tìm thấy userId theo session {SessionId}", sessionId);
-                return null;
-            }
-
-            // Lấy thông tin từ HOC_VIEN dựa vào ID
-            StudentProfileDto? dto = null;
-            try
-            {
-                using var cmdHV = new OracleCommand(@"SELECT HO_TEN, MA_HOC_VIEN, GIOI_TINH, NGAY_SINH, SO_DIEN_THOAI, DIA_CHI FROM QLTT_ADMIN.HOC_VIEN WHERE ID_HOC_VIEN = :id", conn) { BindByName = true };
-                cmdHV.Parameters.Add(":id", OracleDbType.Int32).Value = userId.Value;
-                using var rHV = await cmdHV.ExecuteReaderAsync(System.Data.CommandBehavior.SingleRow);
-                if (await rHV.ReadAsync())
-                {
-                    dto = new StudentProfileDto
-                    {
-                        HoTen = rHV.IsDBNull(0) ? null : rHV.GetString(0),
-                        MaHocVien = rHV.IsDBNull(1) ? null : rHV.GetString(1),
-                        GioiTinh = rHV.IsDBNull(2) ? null : rHV.GetString(2),
-                        NgaySinh = rHV.IsDBNull(3) ? null : rHV.GetDateTime(3),
-                        SoDienThoai = rHV.IsDBNull(4) ? null : rHV.GetString(4),
-                        DiaChi = rHV.IsDBNull(5) ? null : rHV.GetString(5),
-                        Email = email
-                    };
-                }
-            }
-            catch (OracleException oex)
-            {
-                _logger.LogWarning(oex, "GetMyProfileAsync: lỗi đọc HOC_VIEN userId={UserId}", userId);
-            }
-
-            // Nếu chưa có bản ghi HOC_VIEN -> tạo tối thiểu
-            if (dto == null)
-            {
-                try
-                {
-                    // Check exist
-                    using var chk = new OracleCommand("SELECT COUNT(*) FROM QLTT_ADMIN.HOC_VIEN WHERE ID_HOC_VIEN = :id", conn) { BindByName = true };
-                    chk.Parameters.Add(":id", OracleDbType.Int32).Value = userId.Value;
-                    var cnt = Convert.ToInt32(await chk.ExecuteScalarAsync());
-                    if (cnt == 0)
-                    {
-                        var ma = $"STU_{userId.Value}";
-                        var hoten = !string.IsNullOrWhiteSpace(username) ? username : "Chưa cập nhật";
-                        using var ins = new OracleCommand(@"INSERT INTO QLTT_ADMIN.HOC_VIEN(ID_HOC_VIEN, HO_TEN, MA_HOC_VIEN, GIOI_TINH) VALUES (:id,:hoten,:ma,:sex)", conn) { BindByName = true };
-                        ins.Parameters.Add(":id", OracleDbType.Int32).Value = userId.Value;
-                        ins.Parameters.Add(":hoten", OracleDbType.NVarchar2).Value = hoten;
-                        ins.Parameters.Add(":ma", OracleDbType.Varchar2).Value = ma;
-                        ins.Parameters.Add(":sex", OracleDbType.NVarchar2).Value = "Khác";
-                        await ins.ExecuteNonQueryAsync();
-                        _logger.LogInformation("GetMyProfileAsync: auto tạo HOC_VIEN cho user {UserId}", userId);
-                        dto = new StudentProfileDto { HoTen = hoten, MaHocVien = ma, Email = email };
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "GetMyProfileAsync: lỗi tạo bản ghi HOC_VIEN tối thiểu");
-                    dto = new StudentProfileDto { HoTen = username, MaHocVien = $"STU_{userId.Value}", Email = email };
-                }
-            }
-
-            if (dto != null)
-            {
-                dto.HoTen ??= username;
-                dto.MaHocVien ??= $"STU_{userId.Value}";
-                dto.Email ??= email;
-            }
-            return dto;
         }
 
         /// <summary>
@@ -172,51 +117,27 @@ namespace QLTTTA_API.Services
         /// </summary>
         public async Task<bool> UpdateMyProfileAsync(StudentProfileUpdateDto dto)
         {
-            // Lấy userId theo session
-            var sessionId = _httpContextAccessor.HttpContext?.Request?.Headers["X-Session-Id"].FirstOrDefault();
-            var deviceType = _httpContextAccessor.HttpContext?.Request?.Headers["X-Device-Type"].FirstOrDefault()?.Trim().ToLowerInvariant() ?? "pc";
-            if (deviceType != "pc" && deviceType != "mobile") deviceType = "pc";
-            
-            if (string.IsNullOrWhiteSpace(sessionId)) return false;
-
-            // Sử dụng kết nối Admin để đảm bảo quyền update
-            using var conn = await GetAdminConnectionAsync();
-            int? userId = null;
-
-            try 
-            {
-                var columnName = deviceType == "mobile" ? "SESSION_ID_MOBILE" : "SESSION_ID_PC";
-                using var findUser = new OracleCommand($"SELECT ID_NGUOI_DUNG FROM QLTT_ADMIN.TAI_KHOAN WHERE {columnName} = :sid", conn) { BindByName = true };
-                findUser.Parameters.Add(":sid", OracleDbType.Varchar2).Value = sessionId;
-                var obj = await findUser.ExecuteScalarAsync();
-                if (obj != null && obj != DBNull.Value) userId = Convert.ToInt32(obj);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "UpdateMyProfileAsync: Lỗi lấy userId từ session");
-                return false;
-            }
-
-            if (!userId.HasValue) return false;
-
             try
             {
-                // Cập nhật đầy đủ thông tin
-                var sql = @"UPDATE QLTT_ADMIN.HOC_VIEN 
-                            SET HO_TEN = :hoten,
-                                GIOI_TINH = :sex,
-                                NGAY_SINH = :dob,
-                                SO_DIEN_THOAI = :sdt, 
-                                DIA_CHI = :dc 
-                            WHERE ID_HOC_VIEN = :id";
+                // Sử dụng kết nối User
+                using var conn = await GetConnectionAsync();
+
+                // Cập nhật thông tin qua VIEW V_THONGTIN_CANHAN_HV.
+                // Quyền hạn chỉ cho phép update SO_DIEN_THOAI và DIA_CHI.
+                // View này đã có logic filter theo USER (dựa trên proxy user hoặc user hiện tại),
+                // nên không cần WHERE ID nếu view chỉ trả về 1 dòng của chính user đó.
+                // Tuy nhiên, để đúng cú pháp update view, ta vẫn có thể update trực tiếp.
+                
+                var sql = @"UPDATE QLTT_ADMIN.V_THONGTIN_CANHAN_HV 
+                            SET SO_DIEN_THOAI = :sdt, 
+                                DIA_CHI = :dc";
+                // Lưu ý: Không cần WHERE vì View này (thường) chỉ hiển thị dòng của chính user đó.
+                // Nếu View trả về nhiều dòng (lỗi logic view), lệnh này sẽ update tất cả dòng user thấy.
+                // Với V_THONGTIN_CANHAN_HV định nghĩa: WHERE upper(tk.ten_dang_nhap) = ... -> chỉ 1 dòng.
 
                 using var upHV = new OracleCommand(sql, conn) { BindByName = true };
-                upHV.Parameters.Add(":hoten", OracleDbType.NVarchar2).Value = (object?)dto.HoTen ?? DBNull.Value;
-                upHV.Parameters.Add(":sex", OracleDbType.NVarchar2).Value = (object?)dto.GioiTinh ?? DBNull.Value;
-                upHV.Parameters.Add(":dob", OracleDbType.Date).Value = (object?)dto.NgaySinh ?? DBNull.Value;
                 upHV.Parameters.Add(":sdt", OracleDbType.Varchar2).Value = (object?)dto.SoDienThoai ?? DBNull.Value;
                 upHV.Parameters.Add(":dc", OracleDbType.NVarchar2).Value = (object?)dto.DiaChi ?? DBNull.Value;
-                upHV.Parameters.Add(":id", OracleDbType.Int32).Value = userId.Value;
                 
                 var aff = await upHV.ExecuteNonQueryAsync();
                 return aff >= 1;

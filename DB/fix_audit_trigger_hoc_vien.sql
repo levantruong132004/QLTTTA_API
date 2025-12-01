@@ -70,9 +70,10 @@ BEGIN
   safe_sys_context('IP_ADDRESS', v_ip);
 
   detect_role;
-  IF v_is_student <> 1 THEN
-    RETURN; -- only audit students
-  END IF;
+  -- Removed student-only check to audit all users (Staff, Admin, Student)
+  -- IF v_is_student <> 1 THEN
+  --   RETURN; 
+  -- END IF;
 
   -- For UPDATE build changed columns list
   IF UPDATING THEN
@@ -144,6 +145,3 @@ BEGIN
   EXCEPTION WHEN OTHERS THEN NULL; END;
 END;
 /
-
--- Optional: enable trigger if it was disabled
--- ALTER TRIGGER TR_AUD_HOC_VIEN_DML ENABLE;

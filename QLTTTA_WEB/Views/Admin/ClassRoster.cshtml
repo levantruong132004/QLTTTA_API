@@ -1,0 +1,60 @@
+@model List<QLTTTA_WEB.Models.RosterStudentItem>
+@{
+    ViewData["Title"] = "Danh sách học viên";
+}
+
+<div class="retro-card">
+    <div class="retro-card-header d-flex justify-content-between align-items-center">
+        <h2 class="retro-title"><i class="fas fa-users"></i> Danh sách học viên lớp: @ViewBag.ClassName</h2>
+        <a asp-action="Classes" class="btn btn-sm btn-outline-light"><i class="fas fa-arrow-left"></i> Quay lại</a>
+    </div>
+    <div class="retro-card-body">
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+        }
+
+        @if (Model != null && Model.Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-striped align-middle">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Mã HV</th>
+                            <th>Họ tên</th>
+                            <th>Giới tính</th>
+                            <th>Ngày sinh</th>
+                            <th>Điện thoại</th>
+                            <th>Địa chỉ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in Model)
+                        {
+                            <tr>
+                                <td>@s.StudentId</td>
+                                <td>@s.StudentCode</td>
+                                <td class="fw-bold">@s.FullName</td>
+                                <td>@s.Sex</td>
+                                <td>@(s.DateOfBirth?.ToString("dd/MM/yyyy"))</td>
+                                <td>@s.PhoneNumber</td>
+                                <td>@s.Address</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="mt-3 text-muted small">
+                Tổng số: <strong>@Model.Count</strong> học viên
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-5 text-muted">
+                <i class="fas fa-user-slash fa-3x mb-3"></i>
+                <p>Chưa có học viên nào trong lớp này.</p>
+            </div>
+        }
+    </div>
+</div>

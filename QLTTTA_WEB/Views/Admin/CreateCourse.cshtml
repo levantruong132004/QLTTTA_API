@@ -1,0 +1,41 @@
+@model QLTTTA_WEB.Models.CourseViewModel
+@{
+    ViewData["Title"] = "Thêm khóa học mới";
+}
+
+<div class="retro-card">
+    <div class="retro-card-header">
+        <h2 class="retro-title"><i class="fas fa-plus-circle"></i> Thêm khóa học mới</h2>
+    </div>
+    <div class="retro-card-body">
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+        }
+
+        <form asp-action="CreateCourse" method="post">
+            @Html.AntiForgeryToken()
+            <div class="mb-3">
+                <label class="form-label">Mã khóa học</label>
+                <input name="courseCode" class="form-control" required placeholder="Ví dụ: KH001" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Tên khóa học</label>
+                <input name="courseName" class="form-control" required placeholder="Ví dụ: Tiếng Anh Giao Tiếp" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Mô tả</label>
+                <textarea name="description" class="form-control" rows="3"></textarea>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Học phí chuẩn (VNĐ)</label>
+                <input name="standardFee" type="number" class="form-control" required placeholder="0" />
+            </div>
+            
+            <div class="d-flex justify-content-between">
+                <a asp-action="Courses" class="btn btn-secondary">Hủy bỏ</a>
+                <button type="submit" class="btn btn-success"><i class="fas fa-save"></i> Lưu khóa học</button>
+            </div>
+        </form>
+    </div>
+</div>
