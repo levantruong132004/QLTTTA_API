@@ -12,7 +12,11 @@ class InvoiceService {
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
         if (body['success'] == true && body['data'] != null) {
-          return Invoice.fromJson(body['data']);
+          final data = body['data'];
+          if (data['invoice'] != null) {
+            return Invoice.fromJson(data['invoice']);
+          }
+          return Invoice.fromJson(data);
         }
       }
       return null;

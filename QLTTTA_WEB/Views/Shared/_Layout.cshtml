@@ -128,11 +128,10 @@
                         </li>
                     }
                     <li class="retro-nav-item">
-                        <form asp-controller="Account" asp-action="Logout" method="post" style="display: inline;">
-                            <button type="submit" class="retro-nav-link" style="border: none; cursor: pointer;">
-                                <i class="fas fa-sign-out-alt"></i> Đăng xuất (@Context.Session.GetString("Username"))
-                            </button>
-                        </form>
+                        @* Modified to trigger modal *@
+                        <a href="javascript:void(0);" class="retro-nav-link" onclick="showLogoutModal()">
+                            <i class="fas fa-sign-out-alt"></i> Đăng xuất (@Context.Session.GetString("Username"))
+                        </a>
                     </li>
                 }
             </ul>
@@ -240,11 +239,10 @@
                         }
                     }
                     <li class="mb-2">
-                        <form asp-controller="Account" asp-action="Logout" method="post">
-                            <button type="submit" class="retro-nav-link" style="border:none; background:none; padding:0;">
-                                <i class="fas fa-sign-out-alt"></i> Đăng xuất (@Context.Session.GetString("Username"))
-                            </button>
-                        </form>
+                        @* Modified to trigger modal *@
+                        <a href="javascript:void(0);" class="retro-nav-link" onclick="showLogoutModal()">
+                            <i class="fas fa-sign-out-alt"></i> Đăng xuất (@Context.Session.GetString("Username"))
+                        </a>
                     </li>
                 }
             </ul>
@@ -257,6 +255,36 @@
         </main>
     </div>
 
+    <!-- Logout Confirmation Modal -->
+    <div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="logoutModalLabel">
+                        <i class="fas fa-sign-out-alt"></i> Đăng xuất
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Bạn muốn đăng xuất khỏi thiết bị này hay tất cả các thiết bị?
+                </div>
+                <div class="modal-footer justify-content-between">
+                   <form asp-controller="Account" asp-action="Logout" method="post" style="display:inline; width: 48%;">
+                        <button type="submit" class="btn btn-secondary w-100">
+                            Chỉ thiết bị này
+                        </button>
+                    </form>
+                    <form asp-controller="Account" asp-action="Logout" method="post" style="display:inline; width: 48%;">
+                        <input type="hidden" name="logoutAll" value="true" />
+                        <button type="submit" class="btn btn-primary w-100">
+                            Tất cả thiết bị
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <footer class="retro-footer">
         <div class="vintage-ornament"></div>
         <p><strong>TRUNG TÂM TIẾNG ANH LDA</strong></p>
@@ -266,6 +294,12 @@
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    <script>
+        function showLogoutModal() {
+            var myModal = new bootstrap.Modal(document.getElementById('logoutModal'));
+            myModal.show();
+        }
+    </script>
     <script>
         // Base URL used to generate QR links for mobile devices (set in appsettings)
         window.publicBaseUrl = '@(Configuration["PublicBaseUrl"] ?? "")';

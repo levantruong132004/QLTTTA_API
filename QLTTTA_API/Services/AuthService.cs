@@ -14,7 +14,7 @@ namespace QLTTTA_API.Services
         Task<RegisterResponse> RegisterAsync(RegisterRequest request);
         Task<string> TestDatabaseAsync();
         Task<bool> CheckSessionAsync(string username, string sessionId, string? deviceType = null);
-        Task LogoutAsync(string username, string sessionId);
+        Task LogoutAsync(string username, string sessionId, bool logoutAll = false);
         Task<OtpInitiateResponse> InitiateRegisterOtpAsync(RegisterRequest request);
         Task<RegisterResponse> VerifyRegisterOtpAsync(OtpVerifyRequest request);
         Task<ForgotPasswordInitiateResponse> InitiateForgotPasswordAsync(ForgotPasswordInitiateRequest request);
@@ -401,7 +401,7 @@ namespace QLTTTA_API.Services
             }
         }
 
-        public async Task LogoutAsync(string username, string sessionId)
+        public async Task LogoutAsync(string username, string sessionId, bool logoutAll = false)
         {
             if (string.IsNullOrWhiteSpace(sessionId)) return;
             _credCache.Remove(sessionId);
@@ -423,11 +423,21 @@ namespace QLTTTA_API.Services
                     username = pUser.Value?.ToString() ?? string.Empty;
                 }
 
-                using var cmdClear = new OracleCommand("SP_CLEAR_SESSION", conn);
-                cmdClear.CommandType = CommandType.StoredProcedure;
-                cmdClear.Parameters.Add("p_session_id", OracleDbType.Varchar2).Value = sessionId;
-                cmdClear.Parameters.Add("p_device_type", OracleDbType.Varchar2).Value = deviceType;
-                await cmdClear.ExecuteNonQueryAsync();
+                if (logoutAll)
+                {
+                    // Update both columns to NULL
+                    using var cmdAll = new OracleCommand("UPDATE TAI_KHOAN SET SESSION_ID_PC = NULL, SESSION_ID_MOBILE = NULL WHERE TEN_DANG_NHAP = :username", conn);
+                    cmdAll.Parameters.Add(":username", OracleDbType.Varchar2).Value = username;
+                    await cmdAll.ExecuteNonQueryAsync();
+                }
+                else
+                {
+                    using var cmdClear = new OracleCommand("SP_CLEAR_SESSION", conn);
+                    cmdClear.CommandType = CommandType.StoredProcedure;
+                    cmdClear.Parameters.Add("p_session_id", OracleDbType.Varchar2).Value = sessionId;
+                    cmdClear.Parameters.Add("p_device_type", OracleDbType.Varchar2).Value = deviceType;
+                    await cmdClear.ExecuteNonQueryAsync();
+                }
 
                 // Kill session logic
                 using var cmdKill = new OracleCommand("SP_KILL_USER_SESSION", conn);

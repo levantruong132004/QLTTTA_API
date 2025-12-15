@@ -48,7 +48,8 @@ namespace QLTTTA_API.Controllers
         {
             var sid = Request.Headers["X-Session-Id"].FirstOrDefault() ?? Request.Query["sessionId"].FirstOrDefault();
             var username = Request.Query["username"].FirstOrDefault() ?? string.Empty;
-            await _authService.LogoutAsync(username, sid ?? "");
+            var logoutAll = Request.Query["logoutAll"].FirstOrDefault()?.ToLower() == "true";
+            await _authService.LogoutAsync(username, sid ?? "", logoutAll);
             return Ok(new { Success = true, Message = "Đăng xuất thành công" });
         }
 

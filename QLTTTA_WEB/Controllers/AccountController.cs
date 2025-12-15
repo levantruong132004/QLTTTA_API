@@ -216,7 +216,7 @@ namespace QLTTTA_WEB.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> Logout()
+        public async Task<IActionResult> Logout(bool logoutAll = false)
         {
             try
             {
@@ -224,6 +224,7 @@ namespace QLTTTA_WEB.Controllers
                 var username = HttpContext.Session.GetString("Username") ?? string.Empty;
                 var sid = Request.Cookies["SessionId"];
                 var url = $"api/auth/logout?username={Uri.EscapeDataString(username)}";
+                if (logoutAll) url += "&logoutAll=true";
                 var req = new HttpRequestMessage(HttpMethod.Post, url);
                 if (!string.IsNullOrEmpty(sid))
                 {

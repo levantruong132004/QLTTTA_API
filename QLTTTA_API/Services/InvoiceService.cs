@@ -11,7 +11,7 @@ namespace QLTTTA_API.Services
     public interface IInvoiceService
     {
         Task<ApiResponse<Invoice>> CreateAsync(int registrationId, DateTime dueDate, int amount);
-        Task<Invoice?> GetByRegistrationAsync(int registrationId);
+        Task<InvoiceDetailDto?> GetByRegistrationAsync(int registrationId);
         Task<Invoice?> GetByIdAsync(int invoiceId);
         Task<bool> UpdateStatusAsync(int invoiceId, string status);
         Task<ApiResponse<InvoicePdfEmailResult>> GeneratePdfAndSendEmailAsync(int invoiceId, int accountantId);
@@ -93,9 +93,9 @@ namespace QLTTTA_API.Services
             }
         }
 
-        public async Task<Invoice?> GetByRegistrationAsync(int registrationId)
+        public async Task<InvoiceDetailDto?> GetByRegistrationAsync(int registrationId)
         {
-            var list = await ExecuteStoredProcedureQueryAsync<Invoice>("SP_GET_INVOICE_BY_REG", new { p_reg_id = registrationId });
+            var list = await ExecuteStoredProcedureQueryAsync<InvoiceDetailDto>("SP_GET_INVOICE_BY_REG", new { p_reg_id = registrationId });
             return list.FirstOrDefault();
         }
 

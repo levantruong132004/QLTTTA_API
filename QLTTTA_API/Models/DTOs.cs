@@ -283,4 +283,11 @@ namespace QLTTTA_API.Models.DTOs
         public string? Email { get; set; }
         public string? PhoneNumber { get; set; }
     }
+
+    public class InvoiceDetailDto : Invoice
+    {
+        public string? StudentName { get; set; }
+        public string? CourseName { get; set; }
+        public string? ClassName { get; set; }
+    }
 }
